@@ -50,10 +50,10 @@ Changes v7 -> v8:
  .../bindings/pwm/allwinner,sun4i-a10-pwm.yaml      | 33 +++++++++++++++++++++-
  1 file changed, 32 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/allwinner,sun4i-a10-pwm.yaml b/Documentation/devicetree/bindings/pwm/allwinner,sun4i-a10-pwm.yaml
+diff --git c/Documentation/devicetree/bindings/pwm/allwinner,sun4i-a10-pwm.yaml i/Documentation/devicetree/bindings/pwm/allwinner,sun4i-a10-pwm.yaml
 index 1197858e431f..3b1819c8630c 100644
---- a/Documentation/devicetree/bindings/pwm/allwinner,sun4i-a10-pwm.yaml
-+++ b/Documentation/devicetree/bindings/pwm/allwinner,sun4i-a10-pwm.yaml
+--- c/Documentation/devicetree/bindings/pwm/allwinner,sun4i-a10-pwm.yaml
++++ i/Documentation/devicetree/bindings/pwm/allwinner,sun4i-a10-pwm.yaml
 @@ -14,6 +14,13 @@ properties:
    "#pwm-cells":
      const: 3
@@ -115,117 +115,91 @@ index 1197858e431f..3b1819c8630c 100644
  required:
    - compatible
    - reg
-
-
-Subject: [PATCH v8 2/4] pwm: sun8i: Add H616 PWM support
-From: Richard Genoud <richard.genoud@bootlin.com>
-Date: Tue, 04 Aug 2026 15:27:25 -0600
-Message-Id: <20260804-h616-pwm-v8-v8-2-db37ab8624ae@gmail.com>
-
-
-Add a driver for the Allwinner H616 PWM controller, supporting six
-channels. Each channel output can carry either a PWM waveform or a clock
-from its bypass path.
-
-The channels are paired as 0/1, 2/3 and 4/5. Each pair shares a mux, gate
-and prescaler, while each channel has its own prescaler and bypass.
-
-Register each shared pair mux, divider and gate with the Common Clock
-Framework, and expose each channel bypass as a clock output. Program the
-channel-specific divider directly in the PWM path. Arbitrate each output
-when the PWM is requested or the bypass clock is prepared, and hold the
-shared pair rate exclusively while either sibling output is active.
-
-CCF reference counts do not describe outputs left active by firmware.
-Before disabling a pair gate or changing its rate, also inspect the
-hardware channel-enable bits. Preserve inherited outputs through generic
-unused-clock cleanup so declared consumers can claim them. At driver
-sync_state(), stop channels which remain unowned and reconcile an empty
-shared pair gate through CCF. This prevents both premature shutdown of a
-late-probing consumer and indefinite unclaimed outputs.
-
-The clock-provider interface is needed because pwm-clock cannot accurately
-represent the bypass path. For example, pwm-clock represents 24 MHz as an
-integer 42 ns PWM period. The PWM waveform-rounding rules happen to select
-the H616 bypass and produce 24 MHz for that request, but the pwm-clock API
-does not require its advertised clock rate to equal the rounded hardware
-waveform. Exposing the bypass through CCF provides an exact rate request,
-conveys that duty-cycle and polarity control are not needed, and makes the
-shared pair clock visible to CCF rate arbitration.
-
-Wait for the hardware period-update handshake before replacing PPR. Track
-the active and newly programmed periods so normal updates use a tight
-timeout, while an unknown firmware update conservatively allows the maximum
-hardware period. Scale the sleep interval to keep the number of MMIO polls
-bounded even for very long periods.
-
-Dead-zone mode is not representable by the PWM API. Reject it while either
-output in the pair is active, but clear dormant dead-zone enable state when
-both outputs are disabled so stale firmware configuration does not
-permanently prevent ordinary PWM use.
-
-Signed-off-by: Richard Genoud <richard.genoud@bootlin.com>
-Co-developed-by: James Hilliard <james.hilliard1@gmail.com>
-Signed-off-by: James Hilliard <james.hilliard1@gmail.com>
----
-Changes v7 -> v8:
-  - clear the complete two-bit clock-source selector field
-  - leave rate and period registers untouched when disabling a channel
-  - distinguish PWM-owned bypass signals from clock-owned bypass outputs
-  - round waveforms over all parent, pair-divider, channel-divider and bypass
-    choices according to the PWM core ordering
-  - encode constant levels without overflowing the 16-bit active-cycle field
-  - allocate clock topology state per device and use the fixed parent map
-    (reported by Sashiko)
-  - use managed clock registrations for complete probe-error cleanup
-    (reported by Sashiko and suggested by Philipp)
-  - deassert reset before registering clocks and keep the reset handle local
-    (reported by Sashiko and suggested by Philipp)
-  - arbitrate channel ownership in clock prepare/unprepare and select bypass
-    only while the clock output is enabled  (reported by Sashiko)
-  - roll back failed PWM requests and serialize channel release
-    (reported by Sashiko)
-  - protect the shared pair source while either sibling channel is active
-    (reported by Sashiko)
-  - preserve the 65536-tick duty intermediate before polarity conversion
-    (reported by Sashiko)
-  - avoid replaying write-one control bits while changing channel settings
-    (reported by Sashiko)
-  - keep the hardware-waveform state within the PWM core storage limit
-  - clarify that either co-packaged AC200 or AC300 PHY uses the bypass clock
-  - drop Tested-by tags after the clock implementation was reworked
-  - quantize inverted waveforms in hardware ticks and report their
-    physical offset
-  - force released channels off so stale waveforms cannot restart with a
-    sibling
-  - track the active and pending cycle for the period-update handshake and
-    adapt the sleep interval to bound MMIO polling on long periods
-  - quiesce rate, polarity and bypass transitions before reprogramming the
-    output
-  - clear unsupported pulse mode when programming periodic waveforms
-  - preserve firmware-active outputs through generic unused-clock cleanup,
-    stop any still-unclaimed channels at sync_state(), reconcile empty pair
-    gates through CCF, and reject pair retuning while either output is
-    active
-  - hold pair-rate exclusivity only while an output is active
-  - make pair-rate changes transactional and restore a quiesced output on
-    failure
-  - clear dormant dead-zone state when both pair outputs are disabled,
-    while rejecting active dead-zone and pulse modes which the PWM API
-    cannot represent
-  - correct the hardware topology to show the pair gate before div_m
-  - remove unused register definitions and simplify the fixed parent
-    topology
----
- drivers/pwm/Kconfig     |   12 +
- drivers/pwm/Makefile    |    1 +
- drivers/pwm/pwm-sun8i.c | 1542 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 1555 insertions(+)
-
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+diff --git c/MAINTAINERS i/MAINTAINERS
+index 8014b9f8253e..c77781832658 100644
+--- c/MAINTAINERS
++++ i/MAINTAINERS
+@@ -919,6 +919,11 @@ S:	Maintained
+ F:	Documentation/devicetree/bindings/hwlock/allwinner,sun6i-a31-hwspinlock.yaml
+ F:	drivers/hwspinlock/sun6i_hwspinlock.c
+ 
++ALLWINNER SUN8I PWM DRIVER
++M:	Richard Genoud <richard.genoud@bootlin.com>
++S:	Maintained
++F:	drivers/pwm/pwm-sun8i.c
++
+ ALLWINNER THERMAL DRIVER
+ M:	Vasily Khoruzhick <anarsoul@gmail.com>
+ M:	Yangtao Li <tiny.windzz@gmail.com>
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi i/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
+index 2fd05825e551..16203c7e30fc 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
+@@ -364,6 +364,17 @@ watchdog: watchdog@30090a0 {
+ 			clocks = <&osc24M>;
+ 		};
+ 
++		pwm: pwm@300a000 {
++			compatible = "allwinner,sun50i-h616-pwm";
++			reg = <0x0300a000 0x400>;
++			clocks = <&osc24M>, <&ccu CLK_BUS_PWM>;
++			clock-names = "mod", "bus";
++			resets = <&ccu RST_BUS_PWM>;
++			#pwm-cells = <3>;
++			#clock-cells = <1>;
++			status = "disabled";
++		};
++
+ 		pio: pinctrl@300b000 {
+ 			compatible = "allwinner,sun50i-h616-pinctrl";
+ 			reg = <0x0300b000 0x400>;
+@@ -494,6 +505,42 @@ nand_rb1_pin: nand-rb1-pin {
+ 				bias-pull-up;
+ 			};
+ 
++			/omit-if-no-ref/
++			pwm0_pin: pwm0-pin {
++				pins = "PD28";
++				function = "pwm0";
++			};
++
++			/omit-if-no-ref/
++			pwm1_pin: pwm1-pin {
++				pins = "PG19";
++				function = "pwm1";
++			};
++
++			/omit-if-no-ref/
++			pwm2_pin: pwm2-pin {
++				pins = "PH2";
++				function = "pwm2";
++			};
++
++			/omit-if-no-ref/
++			pwm3_pin: pwm3-pin {
++				pins = "PH0";
++				function = "pwm3";
++			};
++
++			/omit-if-no-ref/
++			pwm4_pin: pwm4-pin {
++				pins = "PI14";
++				function = "pwm4";
++			};
++
++			/omit-if-no-ref/
++			pwm5_pin: pwm5-pin {
++				pins = "PA12";
++				function = "pwm5";
++			};
++
+ 			/omit-if-no-ref/
+ 			spi0_pins: spi0-pins {
+ 				pins = "PC0", "PC2", "PC4";
+diff --git c/drivers/pwm/Kconfig i/drivers/pwm/Kconfig
 index e8886a9b64d9..e7fd2e66b1aa 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
+--- c/drivers/pwm/Kconfig
++++ i/drivers/pwm/Kconfig
 @@ -748,6 +748,18 @@ config PWM_SUN4I
  	  To compile this driver as a module, choose M here: the module
  	  will be called pwm-sun4i.
@@ -245,10 +219,10 @@ index e8886a9b64d9..e7fd2e66b1aa 100644
  config PWM_SUNPLUS
  	tristate "Sunplus PWM support"
  	depends on ARCH_SUNPLUS || COMPILE_TEST
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+diff --git c/drivers/pwm/Makefile i/drivers/pwm/Makefile
 index 5630a521a7cf..9c922b1fd0b4 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
+--- c/drivers/pwm/Makefile
++++ i/drivers/pwm/Makefile
 @@ -68,6 +68,7 @@ obj-$(CONFIG_PWM_STM32)		+= pwm-stm32.o
  obj-$(CONFIG_PWM_STM32_LP)	+= pwm-stm32-lp.o
  obj-$(CONFIG_PWM_STMPE)		+= pwm-stmpe.o
@@ -257,11 +231,11 @@ index 5630a521a7cf..9c922b1fd0b4 100644
  obj-$(CONFIG_PWM_SUNPLUS)	+= pwm-sunplus.o
  obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
  obj-$(CONFIG_PWM_TH1520)	+= pwm_th1520.o
-diff --git a/drivers/pwm/pwm-sun8i.c b/drivers/pwm/pwm-sun8i.c
+diff --git c/drivers/pwm/pwm-sun8i.c i/drivers/pwm/pwm-sun8i.c
 new file mode 100644
 index 000000000000..5c3580a0924d
 --- /dev/null
-+++ b/drivers/pwm/pwm-sun8i.c
++++ i/drivers/pwm/pwm-sun8i.c
 @@ -0,0 +1,1542 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
@@ -1805,120 +1779,3 @@ index 000000000000..5c3580a0924d
 +MODULE_AUTHOR("Richard Genoud <richard.genoud@bootlin.com>");
 +MODULE_DESCRIPTION("Allwinner sun8i PWM driver");
 +MODULE_LICENSE("GPL");
-
-
-Subject: [PATCH v8 3/4] arm64: dts: allwinner: h616: add PWM controller
-From: Richard Genoud <richard.genoud@bootlin.com>
-Date: Tue, 04 Aug 2026 15:27:26 -0600
-Message-Id: <20260804-h616-pwm-v8-v8-3-db37ab8624ae@gmail.com>
-
-
-The H616 has a PWM controller that can provide PWM signals, but also
-plain clocks.
-
-Add the PWM controller node and pins in the device tree.
-
-Signed-off-by: Richard Genoud <richard.genoud@bootlin.com>
-Signed-off-by: James Hilliard <james.hilliard1@gmail.com>
----
- arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi | 47 ++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
-index 1598e86259ab..90fe56a1d3cd 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
-@@ -281,6 +281,17 @@ watchdog: watchdog@30090a0 {
- 			clocks = <&osc24M>;
- 		};
- 
-+		pwm: pwm@300a000 {
-+			compatible = "allwinner,sun50i-h616-pwm";
-+			reg = <0x0300a000 0x400>;
-+			clocks = <&osc24M>, <&ccu CLK_BUS_PWM>;
-+			clock-names = "mod", "bus";
-+			resets = <&ccu RST_BUS_PWM>;
-+			#pwm-cells = <3>;
-+			#clock-cells = <1>;
-+			status = "disabled";
-+		};
-+
- 		pio: pinctrl@300b000 {
- 			compatible = "allwinner,sun50i-h616-pinctrl";
- 			reg = <0x0300b000 0x400>;
-@@ -385,6 +396,42 @@ nand_rb1_pin: nand-rb1-pin {
- 				bias-pull-up;
- 			};
- 
-+			/omit-if-no-ref/
-+			pwm0_pin: pwm0-pin {
-+				pins = "PD28";
-+				function = "pwm0";
-+			};
-+
-+			/omit-if-no-ref/
-+			pwm1_pin: pwm1-pin {
-+				pins = "PG19";
-+				function = "pwm1";
-+			};
-+
-+			/omit-if-no-ref/
-+			pwm2_pin: pwm2-pin {
-+				pins = "PH2";
-+				function = "pwm2";
-+			};
-+
-+			/omit-if-no-ref/
-+			pwm3_pin: pwm3-pin {
-+				pins = "PH0";
-+				function = "pwm3";
-+			};
-+
-+			/omit-if-no-ref/
-+			pwm4_pin: pwm4-pin {
-+				pins = "PI14";
-+				function = "pwm4";
-+			};
-+
-+			/omit-if-no-ref/
-+			pwm5_pin: pwm5-pin {
-+				pins = "PA12";
-+				function = "pwm5";
-+			};
-+
- 			/omit-if-no-ref/
- 			spi0_pins: spi0-pins {
- 				pins = "PC0", "PC2", "PC4";
-
-
-Subject: [PATCH v8 4/4] MAINTAINERS: Add entry on Allwinner sun8i/H616 PWM driver
-From: Richard Genoud <richard.genoud@bootlin.com>
-Date: Tue, 04 Aug 2026 15:27:27 -0600
-Message-Id: <20260804-h616-pwm-v8-v8-4-db37ab8624ae@gmail.com>
-
-
-Add myself as maintainer of Allwinner SUN8I PWM driver.
-
-Signed-off-by: Richard Genoud <richard.genoud@bootlin.com>
-Signed-off-by: James Hilliard <james.hilliard1@gmail.com>
----
- MAINTAINERS | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 5114e6db7307..9a778d1242c5 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -919,6 +919,11 @@ S:	Maintained
- F:	Documentation/devicetree/bindings/hwlock/allwinner,sun6i-a31-hwspinlock.yaml
- F:	drivers/hwspinlock/sun6i_hwspinlock.c
- 
-+ALLWINNER SUN8I PWM DRIVER
-+M:	Richard Genoud <richard.genoud@bootlin.com>
-+S:	Maintained
-+F:	drivers/pwm/pwm-sun8i.c
-+
- ALLWINNER THERMAL DRIVER
- M:	Vasily Khoruzhick <anarsoul@gmail.com>
- M:	Yangtao Li <tiny.windzz@gmail.com>
-

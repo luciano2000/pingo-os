@@ -23,8 +23,10 @@ s2idle was followed by "Power key pressed short" / "Suspending..." from
 systemd-logind in the same second.
 
 ---
---- a/drivers/input/misc/axp20x-pek.c
-+++ b/drivers/input/misc/axp20x-pek.c
+diff --git c/drivers/input/misc/axp20x-pek.c i/drivers/input/misc/axp20x-pek.c
+index 24f9e9d893de..c361bd1833e2 100644
+--- c/drivers/input/misc/axp20x-pek.c
++++ i/drivers/input/misc/axp20x-pek.c
 @@ -26,6 +26,7 @@
  #include <linux/platform_device.h>
  #include <linux/regmap.h>
@@ -33,7 +35,7 @@ systemd-logind in the same second.
  
  #define AXP20X_PEK_STARTUP_MASK		(0xc0)
  #define AXP20X_PEK_SHUTDOWN_MASK	(0x03)
-@@ -204,10 +205,15 @@
+@@ -204,10 +205,15 @@ static irqreturn_t axp20x_pek_irq(int irq, void *pwr)
  	 * The power-button is connected to ground so a falling edge (dbf)
  	 * means it is pressed.
  	 */

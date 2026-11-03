@@ -5,12 +5,13 @@ The RG35XX Plus has a NXP PCF8563 RTC on the same bus as the AXP717 PMIC.
 It is battery backed, so alias it to rtc0 and the SoC RTC to rtc1, making
 the PCF8563 the hctosys device.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
-@@ -9,6 +9,11 @@
- 	model = "Anbernic RG35XX Plus";
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
+index 950dbd39c7bc..324de40dc04a 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
+@@ -10,6 +10,11 @@ / {
  	compatible = "anbernic,rg35xx-plus", "allwinner,sun50i-h700";
+ 	rocknix-dt-id = "sun50i-h700-anbernic-rg35xx-plus";
  
 +	aliases {
 +		rtc0 = &pcf8563;
@@ -20,7 +21,7 @@ diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts 
  	wifi_pwrseq: pwrseq {
  		compatible = "mmc-pwrseq-simple";
  		clocks = <&rtc CLK_OSC32K_FANOUT>;
-@@ -37,6 +42,14 @@
+@@ -33,6 +38,14 @@ sdio_wifi: wifi@1 {
  	};
  };
  

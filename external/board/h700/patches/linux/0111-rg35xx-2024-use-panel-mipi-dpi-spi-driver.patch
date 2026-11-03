@@ -7,11 +7,11 @@ Subject: [PATCH] rg35xx-2024 use panel-mipi-dpi-spi driver
  .../boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts    | 3 ++-
  1 file changed, 1 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-index 360785601..aaeb00575 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-@@ -202,7 +202,7 @@ spi_lcd: spi {
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+index 58ace7d135bb..545aecca894e 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+@@ -220,7 +220,7 @@ spi_lcd: spi {
  		num-chipselects = <1>;
  
  		panel: panel@0 {
@@ -20,6 +20,3 @@ index 360785601..aaeb00575 100644
  
  			reg = <0>;
  
--- 
-2.48.1
-

@@ -15,9 +15,11 @@ Measured on RG34XX-SP in deep sleep: DE_CLK 0x80000000 -> 0, TCON_LCD0_CLK
 Origin: kailashrs/H700_rocknix_enhancement 77df6bbdc
 Assisted-by: Claude:claude-opus-5
 ---
---- a/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
-@@ -286,14 +286,64 @@
+diff --git c/drivers/clk/sunxi-ng/ccu-sun8i-de2.c i/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+index 11c019295cc8..2b37c58ef100 100644
+--- c/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
++++ i/drivers/clk/sunxi-ng/ccu-sun8i-de2.c
+@@ -286,14 +286,64 @@ static const struct regmap_config sun8i_de2_ccu_regmap_config = {
  	.writeable_reg	= sun8i_de2_ccu_regmap_accessible_reg,
  };
  
@@ -82,7 +84,7 @@ Assisted-by: Claude:claude-opus-5
  	ccu_desc = of_device_get_match_data(&pdev->dev);
  	if (!ccu_desc)
  		return -EINVAL;
-@@ -358,6 +408,12 @@
+@@ -358,6 +408,12 @@ static int sunxi_de2_clk_probe(struct platform_device *pdev)
  			goto err_assert_reset;
  	}
  
@@ -95,7 +97,7 @@ Assisted-by: Claude:claude-opus-5
  	ret = devm_sunxi_ccu_probe(&pdev->dev, reg, ccu_desc);
  	if (ret)
  		goto err_assert_reset;
-@@ -414,6 +470,7 @@
+@@ -414,6 +470,7 @@ static struct platform_driver sunxi_de2_clk_driver = {
  	.probe	= sunxi_de2_clk_probe,
  	.driver	= {
  		.name	= "sunxi-de2-clks",
@@ -103,8 +105,10 @@ Assisted-by: Claude:claude-opus-5
  		.of_match_table	= sunxi_de2_clk_ids,
  	},
  };
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+diff --git c/drivers/gpu/drm/sun4i/sun4i_drv.c i/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 3a5a1632bbb1..dc81e1ba8a81 100644
+--- c/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ i/drivers/gpu/drm/sun4i/sun4i_drv.c
 @@ -31,6 +31,7 @@
  #include "sun4i_framebuffer.h"
  #include "sun4i_tcon.h"
@@ -113,7 +117,7 @@ Assisted-by: Claude:claude-opus-5
  
  static int drm_sun4i_gem_dumb_create(struct drm_file *file_priv,
  				     struct drm_device *drm,
-@@ -78,6 +79,7 @@
+@@ -78,6 +79,7 @@ static int sun4i_drv_bind(struct device *dev)
  	drm->dev_private = drv;
  	INIT_LIST_HEAD(&drv->frontend_list);
  	INIT_LIST_HEAD(&drv->engine_list);
@@ -121,7 +125,7 @@ Assisted-by: Claude:claude-opus-5
  	INIT_LIST_HEAD(&drv->tcon_list);
  
  	ret = of_reserved_mem_device_init(dev);
-@@ -344,16 +346,64 @@
+@@ -344,16 +346,64 @@ static int sun4i_drv_add_endpoints(struct device *dev,
  }
  
  #ifdef CONFIG_PM_SLEEP
@@ -187,8 +191,10 @@ Assisted-by: Claude:claude-opus-5
  
  	return drm_mode_config_helper_resume(drm);
  }
---- a/drivers/gpu/drm/sun4i/sun4i_drv.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+diff --git c/drivers/gpu/drm/sun4i/sun4i_drv.h i/drivers/gpu/drm/sun4i/sun4i_drv.h
+index b7ba080614a2..9abbd697a455 100644
+--- c/drivers/gpu/drm/sun4i/sun4i_drv.h
++++ i/drivers/gpu/drm/sun4i/sun4i_drv.h
 @@ -15,6 +15,7 @@
  
  struct sun4i_drv {
@@ -197,8 +203,10 @@ Assisted-by: Claude:claude-opus-5
  	struct list_head	frontend_list;
  	struct list_head	tcon_list;
  };
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+diff --git c/drivers/gpu/drm/sun4i/sun4i_tcon.c i/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 566a44b33619..6a5f8cbf67b4 100644
+--- c/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ i/drivers/gpu/drm/sun4i/sun4i_tcon.c
 @@ -40,6 +40,20 @@
  #include "sun8i_tcon_top.h"
  #include "sunxi_engine.h"
@@ -220,7 +228,7 @@ Assisted-by: Claude:claude-opus-5
  static struct drm_connector *sun4i_tcon_get_connector(const struct drm_encoder *encoder)
  {
  	struct drm_connector *connector;
-@@ -781,17 +795,74 @@
+@@ -781,17 +795,74 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
  	return IRQ_HANDLED;
  }
  
@@ -297,7 +305,7 @@ Assisted-by: Claude:claude-opus-5
  		if (IS_ERR(tcon->sclk0)) {
  			dev_err(dev, "Couldn't get the TCON channel 0 clock\n");
  			return PTR_ERR(tcon->sclk0);
-@@ -806,7 +877,11 @@
+@@ -806,7 +877,11 @@ static int sun4i_tcon_init_clocks(struct device *dev,
  		}
  	}
  
@@ -310,7 +318,7 @@ Assisted-by: Claude:claude-opus-5
  }
  
  static int sun4i_tcon_init_irq(struct device *dev,
-@@ -826,6 +901,7 @@
+@@ -826,6 +901,7 @@ static int sun4i_tcon_init_irq(struct device *dev,
  		return ret;
  	}
  
@@ -318,7 +326,7 @@ Assisted-by: Claude:claude-opus-5
  	return 0;
  }
  
-@@ -1114,6 +1190,7 @@
+@@ -1114,6 +1190,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
  	struct sunxi_engine *engine;
  	struct device_node *remote;
  	struct sun4i_tcon *tcon;
@@ -326,7 +334,7 @@ Assisted-by: Claude:claude-opus-5
  	struct reset_control *edp_rstc;
  	bool has_lvds_rst, has_lvds_alt, can_lvds;
  	int ret;
-@@ -1124,9 +1201,12 @@
+@@ -1124,9 +1201,12 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
  		return -EPROBE_DEFER;
  	}
  
@@ -341,9 +349,11 @@ Assisted-by: Claude:claude-opus-5
  	dev_set_drvdata(dev, tcon);
  	tcon->drm = drm;
  	tcon->dev = dev;
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -293,6 +293,9 @@
+diff --git c/drivers/gpu/drm/sun4i/sun4i_tcon.h i/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index 98bee2bd96d2..c9460f3665f3 100644
+--- c/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ i/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -293,6 +293,9 @@ struct sun4i_tcon {
  struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
  struct drm_panel *sun4i_tcon_find_panel(struct device_node *node);
  
@@ -353,8 +363,10 @@ Assisted-by: Claude:claude-opus-5
  void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable);
  void sun4i_tcon_mode_set(struct sun4i_tcon *tcon,
  			 const struct drm_encoder *encoder,
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+diff --git c/drivers/gpu/drm/sun4i/sun8i_mixer.c i/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 006852c2c45b..dfd6fa2de3a8 100644
+--- c/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ i/drivers/gpu/drm/sun4i/sun8i_mixer.c
 @@ -8,6 +8,7 @@
   */
  
@@ -363,7 +375,7 @@ Assisted-by: Claude:claude-opus-5
  #include <linux/dma-mapping.h>
  #include <linux/module.h>
  #include <linux/of.h>
-@@ -413,6 +414,77 @@
+@@ -413,6 +414,77 @@ static void sun8i_mixer_mode_set(struct sunxi_engine *engine,
  			 interlaced ? "on" : "off");
  }
  
@@ -441,7 +453,7 @@ Assisted-by: Claude:claude-opus-5
  static const struct sunxi_engine_ops sun8i_engine_ops = {
  	.commit		= sun8i_mixer_commit,
  	.layers_init	= sun8i_layers_init,
-@@ -608,7 +680,9 @@
+@@ -608,7 +680,9 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
  		ret = PTR_ERR(mixer->bus_clk);
  		goto err_assert_reset;
  	}
@@ -452,7 +464,7 @@ Assisted-by: Claude:claude-opus-5
  
  	mixer->mod_clk = devm_clk_get(dev, "mod");
  	if (IS_ERR(mixer->mod_clk)) {
-@@ -625,7 +699,9 @@
+@@ -625,7 +699,9 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
  	if (mixer->cfg->mod_rate)
  		clk_set_rate(mixer->mod_clk, mixer->cfg->mod_rate);
  
@@ -463,7 +475,7 @@ Assisted-by: Claude:claude-opus-5
  
  	if (mixer->cfg->de_type == SUN8I_MIXER_DE33) {
  		struct platform_device *pdev;
-@@ -648,13 +724,20 @@
+@@ -648,13 +724,20 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
  		data = platform_get_drvdata(pdev);
  		if (!data) {
  			put_device(&pdev->dev);
@@ -485,7 +497,7 @@ Assisted-by: Claude:claude-opus-5
  
  	/* Reset registers and disable unused sub-engines */
  	if (mixer->cfg->de_type == SUN8I_MIXER_DE3) {
-@@ -703,9 +786,13 @@
+@@ -703,9 +786,13 @@ static void sun8i_mixer_unbind(struct device *dev, struct device *master,
  	struct sun8i_mixer *mixer = dev_get_drvdata(dev);
  
  	list_del(&mixer->engine.list);
@@ -501,9 +513,11 @@ Assisted-by: Claude:claude-opus-5
  	reset_control_assert(mixer->reset);
  }
  
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -206,6 +206,7 @@
+diff --git c/drivers/gpu/drm/sun4i/sun8i_mixer.h i/drivers/gpu/drm/sun4i/sun8i_mixer.h
+index 7abc88c898d9..d72b9db12a0d 100644
+--- c/drivers/gpu/drm/sun4i/sun8i_mixer.h
++++ i/drivers/gpu/drm/sun4i/sun8i_mixer.h
+@@ -206,6 +206,7 @@ struct sun8i_mixer_cfg {
  
  struct sun8i_mixer {
  	struct sunxi_engine		engine;
@@ -511,7 +525,7 @@ Assisted-by: Claude:claude-opus-5
  
  	const struct sun8i_mixer_cfg	*cfg;
  
-@@ -216,6 +217,9 @@
+@@ -216,6 +217,9 @@ struct sun8i_mixer {
  
  	struct regmap			*top_regs;
  	struct device			*planes_dev;
@@ -521,9 +535,11 @@ Assisted-by: Claude:claude-opus-5
  };
  
  enum {
---- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
-@@ -219,6 +219,8 @@
+diff --git c/drivers/gpu/drm/sun4i/sun8i_tcon_top.c i/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+index badb6609d8ed..07f4fc9a4146 100644
+--- c/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
++++ i/drivers/gpu/drm/sun4i/sun8i_tcon_top.c
+@@ -219,6 +219,8 @@ static int sun8i_tcon_top_bind(struct device *dev, struct device *master,
  	if (ret)
  		goto err_unregister_gates;
  
@@ -532,7 +548,7 @@ Assisted-by: Claude:claude-opus-5
  	dev_set_drvdata(dev, tcon_top);
  
  	return 0;
-@@ -246,8 +248,10 @@
+@@ -246,8 +248,10 @@ static void sun8i_tcon_top_unbind(struct device *dev, struct device *master,
  		if (clk_data->hws[i])
  			clk_hw_unregister_gate(clk_data->hws[i]);
  
@@ -544,7 +560,7 @@ Assisted-by: Claude:claude-opus-5
  }
  
  static const struct component_ops sun8i_tcon_top_ops = {
-@@ -297,11 +301,43 @@
+@@ -297,11 +301,43 @@ const struct of_device_id sun8i_tcon_top_of_table[] = {
  MODULE_DEVICE_TABLE(of, sun8i_tcon_top_of_table);
  EXPORT_SYMBOL(sun8i_tcon_top_of_table);
  
@@ -588,9 +604,11 @@ Assisted-by: Claude:claude-opus-5
  		.of_match_table	= sun8i_tcon_top_of_table,
  	},
  };
---- a/drivers/gpu/drm/sun4i/sun8i_tcon_top.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_tcon_top.h
-@@ -28,6 +28,8 @@
+diff --git c/drivers/gpu/drm/sun4i/sun8i_tcon_top.h i/drivers/gpu/drm/sun4i/sun8i_tcon_top.h
+index 0390584a330e..02d67f68d8f0 100644
+--- c/drivers/gpu/drm/sun4i/sun8i_tcon_top.h
++++ i/drivers/gpu/drm/sun4i/sun8i_tcon_top.h
+@@ -28,6 +28,8 @@ struct sun8i_tcon_top {
  	struct clk_hw_onecell_data	*clk_data;
  	void __iomem			*regs;
  	struct reset_control		*rst;
@@ -599,9 +617,11 @@ Assisted-by: Claude:claude-opus-5
  
  	/*
  	 * spinlock is used to synchronize access to same
---- a/drivers/gpu/drm/sun4i/sunxi_engine.h
-+++ b/drivers/gpu/drm/sun4i/sunxi_engine.h
-@@ -144,6 +144,18 @@
+diff --git c/drivers/gpu/drm/sun4i/sunxi_engine.h i/drivers/gpu/drm/sun4i/sunxi_engine.h
+index 1711c274a41b..125fb9d2ccb8 100644
+--- c/drivers/gpu/drm/sun4i/sunxi_engine.h
++++ i/drivers/gpu/drm/sun4i/sunxi_engine.h
+@@ -144,6 +144,18 @@ struct sunxi_engine {
  	struct list_head		list;
  };
  

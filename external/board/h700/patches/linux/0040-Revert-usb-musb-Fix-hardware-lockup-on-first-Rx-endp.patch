@@ -9,10 +9,10 @@ This reverts commit 3fc137386c4620305bbc2a216868c53f9245670a.
  drivers/usb/musb/musb_gadget.c | 13 +++----------
  1 file changed, 3 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
-index 6869c58367f2..661c6a16f4f7 100644
---- a/drivers/usb/musb/musb_gadget.c
-+++ b/drivers/usb/musb/musb_gadget.c
+diff --git c/drivers/usb/musb/musb_gadget.c i/drivers/usb/musb/musb_gadget.c
+index 016d3f3fc1e0..dd67ab97df9d 100644
+--- c/drivers/usb/musb/musb_gadget.c
++++ i/drivers/usb/musb/musb_gadget.c
 @@ -1162,19 +1162,12 @@ void musb_free_request(struct usb_ep *ep, struct usb_request *req)
   */
  void musb_ep_restart(struct musb *musb, struct musb_request *req)
@@ -36,6 +36,3 @@ index 6869c58367f2..661c6a16f4f7 100644
  }
  
  static int musb_ep_restart_resume_work(struct musb *musb, void *data)
--- 
-2.49.0
-

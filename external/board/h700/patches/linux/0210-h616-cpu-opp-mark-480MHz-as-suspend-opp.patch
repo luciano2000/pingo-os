@@ -10,9 +10,11 @@ The dtsi is shared by every H616/H618 board; the tag is harmless there,
 it only matters once a board suspends.
 
 ---
---- a/arch/arm64/boot/dts/allwinner/sun50i-h616-cpu-opp.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h616-cpu-opp.dtsi
-@@ -12,6 +12,7 @@
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h616-cpu-opp.dtsi i/arch/arm64/boot/dts/allwinner/sun50i-h616-cpu-opp.dtsi
+index 384cbffae746..8f72d2c1a730 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h616-cpu-opp.dtsi
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h616-cpu-opp.dtsi
+@@ -12,6 +12,7 @@ opp-480000000 {
  			opp-microvolt = <900000>;
  			clock-latency-ns = <244144>; /* 8 32k periods */
  			opp-supported-hw = <0x3f>;

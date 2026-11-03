@@ -34,7 +34,11 @@ mkdir -p "$P/linux" "$P/uboot" "$P/arm-trusted-firmware" "$B/dts" "$B/firmware/p
 # e depois os do aparelho. O Buildroot aplica em ordem alfabética, então os do pacote
 # recebem o prefixo 0000- para manter a mesma ordem. Os patches de 7.2 são quase todos
 # de Qualcomm (msm); só o 9998 é genérico.
-for f in "$R"/packages/linux/patches/mainline/*.patch; do cp "$f" "$P/linux/0000-mainline-$(basename "$f")"; done
+# O 0005 (Bluetooth USB RTL8733BU) não se aplica ao 7.2 e não é hardware do H700.
+for f in "$R"/packages/linux/patches/mainline/*.patch; do
+  case "$(basename "$f")" in *RTL8733BU*) continue ;; esac
+  cp "$f" "$P/linux/0000-mainline-$(basename "$f")"
+done
 cp "$R/packages/linux/patches/7.2/9998-silence-initramfs-unpack-warn.patch" "$P/linux/0000-7.2-9998-silence-initramfs-unpack-warn.patch"
 cp "$D"/patches/linux/*.patch "$P/linux/"
 cp "$D/linux/linux.aarch64.conf" "$B/linux-rocknix.config"
@@ -52,3 +56,13 @@ cp "$R"/packages/linux-firmware/kernel-firmware/extra-firmware/panels/*.panel "$
 
 echo "$SHA" > "$B/ROCKNIX_COMMIT"
 echo "ROCKNIX $SHA importado em $B"
+
+# O Buildroot aplica patches com -F0; o ROCKNIX, com o fuzz padrão. Regenera os
+# patches de kernel contra a fonte exata (baixe antes com: scripts/build.sh rg35xxh linux-source).
+KVER="$(sed -n 's/^BR2_LINUX_KERNEL_CUSTOM_VERSION_VALUE="\(.*\)"/\1/p' "$ROOT/external/configs/pingo_rg35xxh_defconfig")"
+KTAR="$ROOT/.cache/dl/linux/linux-$KVER.tar.xz"
+if [ -f "$KTAR" ]; then
+  "$ROOT/scripts/refresh-patches.sh" "$KTAR" "$P/linux"
+else
+  echo "AVISO: $KTAR não existe; patches de kernel não foram regenerados"
+fi

@@ -15,9 +15,11 @@ PD_CFG3 0x00022222 -> 0x00027777, PD28 (pwm0) untouched.
 Origin: kailashrs/H700_rocknix_enhancement af90bc4cd
 Assisted-by: Claude:claude-opus-5
 ---
---- a/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
-@@ -429,6 +429,20 @@
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi i/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
+index 16203c7e30fc..c26eacd591c6 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h616.dtsi
+@@ -429,6 +429,20 @@ lcd0_rgb888_pins: lcd0-rgb888-pins {
  				function = "lcd0";
  			};
  
@@ -38,9 +40,11 @@ Assisted-by: Claude:claude-opus-5
  			/omit-if-no-ref/
  			lvds0_pins: lvds0-pins {
  				pins = "PD0", "PD1", "PD2", "PD3", "PD4",
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-@@ -288,7 +288,8 @@
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+index 52409f5408ce..bb4b14fedb7a 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+@@ -288,7 +288,8 @@ panel: panel@0 {
  			power-supply = <&reg_lcd>;
  
  			pinctrl-0 = <&lcd0_rgb888_pins>;
@@ -50,8 +54,10 @@ Assisted-by: Claude:claude-opus-5
  
  			port {
  				panel_in_rgb: endpoint {
---- a/drivers/gpu/drm/panel/panel-mipi.c
-+++ b/drivers/gpu/drm/panel/panel-mipi.c
+diff --git c/drivers/gpu/drm/panel/panel-mipi.c i/drivers/gpu/drm/panel/panel-mipi.c
+index ebabda4096ca..98603c700ef4 100644
+--- c/drivers/gpu/drm/panel/panel-mipi.c
++++ i/drivers/gpu/drm/panel/panel-mipi.c
 @@ -23,6 +23,7 @@
  #include <linux/media-bus-format.h>
  #include <linux/module.h>
@@ -60,7 +66,7 @@ Assisted-by: Claude:claude-opus-5
  #include <linux/platform_device.h>
  #include <linux/regulator/consumer.h>
  #include <linux/spi/spi.h>
-@@ -557,6 +558,8 @@
+@@ -557,6 +558,8 @@ static int panel_mipi_prepare(struct drm_panel *panel)
  	struct panel_mipi *mipi = to_panel_mipi(panel);
  	int err, display_id;
  
@@ -69,7 +75,7 @@ Assisted-by: Claude:claude-opus-5
  	err = regulator_bulk_enable(ARRAY_SIZE(mipi->supplies), mipi->supplies);
  	if (err)
  		return err;
-@@ -628,6 +631,9 @@
+@@ -628,6 +631,9 @@ static int panel_mipi_unprepare(struct drm_panel *panel)
  		msleep(mipi->reset_delay);
  	}
  
@@ -79,9 +85,11 @@ Assisted-by: Claude:claude-opus-5
  	regulator_bulk_disable(ARRAY_SIZE(mipi->supplies), mipi->supplies);
  
  	return 0;
---- a/drivers/pinctrl/sunxi/pinctrl-sun50i-h616.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-h616.c
-@@ -202,179 +202,207 @@
+diff --git c/drivers/pinctrl/sunxi/pinctrl-sun50i-h616.c i/drivers/pinctrl/sunxi/pinctrl-sun50i-h616.c
+index ecf6d2438e21..1fb51a08b52f 100644
+--- c/drivers/pinctrl/sunxi/pinctrl-sun50i-h616.c
++++ i/drivers/pinctrl/sunxi/pinctrl-sun50i-h616.c
+@@ -202,179 +202,207 @@ static const struct sunxi_desc_pin h616_pins[] = {
  		  SUNXI_FUNCTION(0x2, "lcd0"),		/* D0 */
  		  SUNXI_FUNCTION(0x3, "lvds0"),		/* VP0 */
  		  SUNXI_FUNCTION(0x4, "ts0"),		/* CLK */

@@ -8,12 +8,12 @@ Subject: [PATCH] rg35xx-2024 use rocknix joypad driver
  .../sun50i-h700-anbernic-rg35xx-h.dts         |  95 --------
  2 files changed, 144 insertions(+), 179 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-index a8f36c4f1..1c2637d21 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-@@ -47,111 +47,156 @@ chosen {
- 		stdout-path = "serial0:115200n8";
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+index 3b86db31964c..3de7b46c4f9c 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+@@ -52,112 +52,157 @@ hdmi_con_in: endpoint {
+ 		};
  	};
  
 -	gpio_keys_gamepad: gpio-keys-gamepad {
@@ -112,7 +112,13 @@ index a8f36c4f1..1c2637d21 100644
 +		*/
 +		button-adc-fuzz = <32>;
 +		button-adc-flat = <32>;
-+
+ 
+-		button-right {
+-			label = "D-Pad Right";
+-			gpios = <&pio 0 9 GPIO_ACTIVE_LOW>; /* PA9 */
+-			linux,input-type = <EV_KEY>;
+-			linux,code = <BTN_DPAD_RIGHT>;
+-		};
 +		/*
 +			Analog Stick data tuning value(precent)
 +			p = positive direction, n = negative direction
@@ -121,11 +127,25 @@ index a8f36c4f1..1c2637d21 100644
 +		abs_x-p-tuning = <70>;
 +		abs_x-n-tuning = <70>;
 +		invert-absx;
-+
+ 
+-		button-select {
+-			label = "Key Select";
+-			gpios = <&pio 0 5 GPIO_ACTIVE_LOW>; /* PA5 */
+-			linux,input-type = <EV_KEY>;
+-			linux,code = <BTN_SELECT>;
+-		};
+-		button-start {
+-			label = "Key Start";
+-			gpios = <&pio 0 4 GPIO_ACTIVE_LOW>; /* PA4 */
+-			linux,input-type = <EV_KEY>;
+-			linux,code = <BTN_START>;
+-		};
 +		abs_y-p-tuning = <70>;
 +		abs_y-n-tuning = <70>;
 +		invert-absy;
-+
+ 
+-		button-up {
+-			label = "D-Pad Up";
 +		abs_rx-p-tuning = <70>;
 +		abs_rx-n-tuning = <70>;
 +
@@ -134,17 +154,21 @@ index a8f36c4f1..1c2637d21 100644
 +
 +		/* poll device interval (ms), adc read interval */
 +		poll-interval = <10>;
- 
--		button-right {
--			label = "D-Pad Right";
++
 +		/* gpio button auto repeat set value : default disable */
 +		/* autorepeat; */
 +
 +		sw1 {
-+			gpios = <&pio 0 6 GPIO_ACTIVE_LOW>; /* PA6 */
+ 			gpios = <&pio 0 6 GPIO_ACTIVE_LOW>; /* PA6 */
+-			linux,input-type = <EV_KEY>;
 +			label = "GPIO DPAD-UP";
-+			linux,code = <BTN_DPAD_UP>;
-+		};
+ 			linux,code = <BTN_DPAD_UP>;
+ 		};
+-
+-		button-x {
+-			label = "Action-Pad X";
+-			gpios = <&pio 0 3 GPIO_ACTIVE_LOW>; /* PA3 */
+-			linux,input-type = <EV_KEY>;
 +		sw2 {
 +			gpios = <&pio 4 0 GPIO_ACTIVE_LOW>; /* PE0 */
 +			label = "GPIO DPAD-DOWN";
@@ -156,14 +180,10 @@ index a8f36c4f1..1c2637d21 100644
 +			linux,code = <BTN_DPAD_LEFT>;
 +		};
 +		sw4 {
- 			gpios = <&pio 0 9 GPIO_ACTIVE_LOW>; /* PA9 */
--			linux,input-type = <EV_KEY>;
++			gpios = <&pio 0 9 GPIO_ACTIVE_LOW>; /* PA9 */
 +			label = "GPIO DPAD-RIGHT";
- 			linux,code = <BTN_DPAD_RIGHT>;
- 		};
--
--		button-select {
--			label = "Key Select";
++			linux,code = <BTN_DPAD_RIGHT>;
++		};
 +		sw5 {
 +			gpios = <&pio 0 0 GPIO_ACTIVE_LOW>; /* PA0 */
 +			label = "GPIO BTN-A";
@@ -177,55 +197,38 @@ index a8f36c4f1..1c2637d21 100644
 +		sw7 {
 +			gpios = <&pio 0 3 GPIO_ACTIVE_LOW>; /* PA2 */
 +			label = "GPIO BTN-X";
-+			linux,code = <BTN_NORTH>;
-+		};
-+		sw8 {
-+			gpios = <&pio 0 2 GPIO_ACTIVE_LOW>; /* PA3 */
-+			label = "GPIO BTN-Y";
-+			linux,code = <BTN_WEST>;
-+		};
-+		sw9 {
- 			gpios = <&pio 0 5 GPIO_ACTIVE_LOW>; /* PA5 */
--			linux,input-type = <EV_KEY>;
-+			label = "BTN_SELECT";
- 			linux,code = <BTN_SELECT>;
- 		};
--		button-start {
--			label = "Key Start";
-+		sw10 {
- 			gpios = <&pio 0 4 GPIO_ACTIVE_LOW>; /* PA4 */
--			linux,input-type = <EV_KEY>;
-+			label = "BTN_START";
- 			linux,code = <BTN_START>;
- 		};
--
--		button-up {
--			label = "D-Pad Up";
--			gpios = <&pio 0 6 GPIO_ACTIVE_LOW>; /* PA6 */
--			linux,input-type = <EV_KEY>;
--			linux,code = <BTN_DPAD_UP>;
-+		sw11 {
-+			gpios = <&pio 4 3 GPIO_ACTIVE_LOW>; /* PE3 */
-+			label = "GPIO BTN_F";
-+			linux,code = <BTN_MODE>;
- 		};
--
--		button-x {
--			label = "Action-Pad X";
--			gpios = <&pio 0 3 GPIO_ACTIVE_LOW>; /* PA3 */
--			linux,input-type = <EV_KEY>;
--			linux,code = <BTN_NORTH>;
-+		sw12 {
-+			gpios = <&pio 4 8 GPIO_ACTIVE_LOW>; /* PE8 */
-+			label = "BTN_THUMBL";
-+			linux,code = <BTN_THUMBL>;
+ 			linux,code = <BTN_NORTH>;
  		};
 -
 -		button-y {
 -			label = "Action Pad Y";
 -			gpios = <&pio 0 2 GPIO_ACTIVE_LOW>; /* PA2 */
 -			linux,input-type = <EV_KEY>;
--			linux,code = <BTN_WEST>;
++		sw8 {
++			gpios = <&pio 0 2 GPIO_ACTIVE_LOW>; /* PA3 */
++			label = "GPIO BTN-Y";
+ 			linux,code = <BTN_WEST>;
+ 		};
++		sw9 {
++			gpios = <&pio 0 5 GPIO_ACTIVE_LOW>; /* PA5 */
++			label = "BTN_SELECT";
++			linux,code = <BTN_SELECT>;
++		};
++		sw10 {
++			gpios = <&pio 0 4 GPIO_ACTIVE_LOW>; /* PA4 */
++			label = "BTN_START";
++			linux,code = <BTN_START>;
++		};
++		sw11 {
++			gpios = <&pio 4 3 GPIO_ACTIVE_LOW>; /* PE3 */
++			label = "GPIO BTN_F";
++			linux,code = <BTN_MODE>;
++		};
++		sw12 {
++			gpios = <&pio 4 8 GPIO_ACTIVE_LOW>; /* PE8 */
++			label = "BTN_THUMBL";
++			linux,code = <BTN_THUMBL>;
++		};
 +		sw13 {
 +			gpios = <&pio 4 9 GPIO_ACTIVE_LOW>; /* PE9 */
 +			label = "BTN_THUMBR";
@@ -250,10 +253,11 @@ index a8f36c4f1..1c2637d21 100644
 +			gpios = <&pio 0 11 GPIO_ACTIVE_LOW>; /* PA11 */
 +			label = "GPIO BTN_TL2";
 +			linux,code = <BTN_TL2>;
- 		};
++		};
  	};
  
-@@ -351,6 +396,21 @@ lcd_backlight_pin: pwm0-pin {
+ 	gpio-keys-volume {
+@@ -369,6 +414,21 @@ lcd_backlight_pin: pwm0-pin {
  		pins = "PD28";
  		function = "pwm0";
  	};
@@ -275,10 +279,10 @@ index a8f36c4f1..1c2637d21 100644
  };
  
  &r_i2c {
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
-index bef4d1074..83bdbeef6 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
+index 9e5bd72496f6..6df77e92c95a 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
 @@ -10,68 +10,6 @@ / {
  	model = "Anbernic RG35XX H";
  	compatible = "anbernic,rg35xx-h", "allwinner,sun50i-h700";
@@ -348,7 +352,7 @@ index bef4d1074..83bdbeef6 100644
  	reg_vcc3v8_usb: regulator-vcc3v8-usb {
  		compatible = "regulator-fixed";
  		enable-active-high;
-@@ -92,32 +30,6 @@ reg_vcc5v0_usb: regulator-vcc5v0-usb {
+@@ -111,32 +49,6 @@ reg_usb1_vbus: regulator-usb1-vbus {
  	};
  };
  
@@ -381,7 +385,7 @@ index bef4d1074..83bdbeef6 100644
  &ehci1 {
  	status = "okay";
  };
-@@ -126,13 +38,6 @@ &ohci1 {
+@@ -145,13 +57,6 @@ &ohci1 {
  	status = "okay";
  };
  
@@ -395,6 +399,3 @@ index bef4d1074..83bdbeef6 100644
  &usbphy {
  	usb1_vbus-supply = <&reg_vcc5v0_usb>;
  };
--- 
-2.47.1
-

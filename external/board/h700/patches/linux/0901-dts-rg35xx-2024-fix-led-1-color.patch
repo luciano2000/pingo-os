@@ -7,11 +7,11 @@ Subject: [PATCH] dts: rg35xx-2024: fix led-1 color
  .../boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts     | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-index 7e17ca07892d..1cc1b3672ad3 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-@@ -170,7 +170,7 @@ led-0 {
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+index cf0fe2a3c048..f4584ef0bc83 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+@@ -243,7 +243,7 @@ led-0 {
  
  		led-1 {
  			function = LED_FUNCTION_STATUS;
@@ -20,6 +20,3 @@ index 7e17ca07892d..1cc1b3672ad3 100644
  			gpios = <&pio 8 11 GPIO_ACTIVE_HIGH>; /* PI11 */
  		};
  	};
--- 
-2.49.0
-

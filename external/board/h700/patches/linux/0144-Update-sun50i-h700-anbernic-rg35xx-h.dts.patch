@@ -7,11 +7,11 @@ Subject: [PATCH] Update sun50i-h700-anbernic-rg35xx-h.dts
  .../boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts      | 4 ++++
  1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
-index 83bdbeef6..f4bfd11be 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
-@@ -30,6 +30,10 @@ reg_vcc5v0_usb: regulator-vcc5v0-usb {
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
+index 6df77e92c95a..2b1469717f3b 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
+@@ -49,6 +49,10 @@ reg_usb1_vbus: regulator-usb1-vbus {
  	};
  };
  
@@ -22,6 +22,3 @@ index 83bdbeef6..f4bfd11be 100644
  &ehci1 {
  	status = "okay";
  };
--- 
-2.47.1
-

@@ -13,9 +13,11 @@ directly and does not show the problem.
 
 Assisted-by: Claude:claude-opus-5
 ---
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-@@ -334,6 +334,8 @@
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+index 776f293d1147..52409f5408ce 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+@@ -334,6 +334,8 @@ reg_vcc3v3_mmc2: regulator-vcc3v3-mmc2 {
  		regulator-min-microvolt = <3300000>;
  		regulator-max-microvolt = <3300000>;
  		regulator-name = "vcc3v3-mmc2";

@@ -8,11 +8,11 @@ Subject: [PATCH] enable mmc1 for RG35XX-2024
  .../dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts   | 8 --------
  2 files changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-index e25160ef6..1d2d018a6 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-@@ -391,6 +391,15 @@ &mmc0 {
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+index 834d79d7a8ba..3b86db31964c 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+@@ -332,6 +332,15 @@ &mmc0 {
  	status = "okay";
  };
  
@@ -28,24 +28,20 @@ index e25160ef6..1d2d018a6 100644
  &mmc2 {
  	bus-width = <4>;
  	cd-gpios = <&pio 4 22 GPIO_ACTIVE_LOW>; /* PE22 */
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
-index 95ca8e2ab..14e1e8867 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
-@@ -23,11 +23,6 @@ wifi_pwrseq: pwrseq {
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
+index 60a8e4922103..065c5a99e652 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-plus.dts
+@@ -22,12 +22,7 @@ wifi_pwrseq: pwrseq {
  
  /* SDIO WiFi RTL8821CS */
  &mmc1 {
 -	vmmc-supply = <&reg_cldo4>;
 -	vqmmc-supply = <&reg_aldo4>;
-	mmc-pwrseq = <&wifi_pwrseq>;
+ 	mmc-pwrseq = <&wifi_pwrseq>;
 -	bus-width = <4>;
 -	non-removable;
 -	status = "okay";
-
+ 
  	sdio_wifi: wifi@1 {
  		reg = <1>;
- 		interrupt-parent = <&pio>;
--- 
-2.47.1
-

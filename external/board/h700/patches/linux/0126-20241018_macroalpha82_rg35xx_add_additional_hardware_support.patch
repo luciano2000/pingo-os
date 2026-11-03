@@ -19,10 +19,10 @@ Signed-off-by: Chris Morgan <macromorgan@hotmail.com>
  .../sun50i-h700-anbernic-rg35xx-2024.dts      | 27 +++++++++++++++++--
  1 file changed, 25 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-index 80ccab7b5ba7..e2039fd76b3d 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
+index 545aecca894e..834d79d7a8ba 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-2024.dts
 @@ -18,6 +18,9 @@ / {
  	compatible = "anbernic,rg35xx-2024", "allwinner,sun50i-h700";
  
@@ -33,9 +33,9 @@ index 80ccab7b5ba7..e2039fd76b3d 100644
  		serial0 = &uart0;
  	};
  
-@@ -175,6 +178,15 @@ reg_vcc5v: regulator-vcc5v { /* USB-C power input */
- 		regulator-min-microvolt = <5000000>;
- 		regulator-max-microvolt = <5000000>;
+@@ -271,6 +274,15 @@ opp-648000000 {
+ 			opp-microvolt = <960000>;
+ 		};
  	};
 +
 +	reg_vcc3v3_mmc2: regulator-vcc3v3-mmc2 {
@@ -48,15 +48,16 @@ index 80ccab7b5ba7..e2039fd76b3d 100644
 +	};
  };
  
- &cpu0 {
-@@ -186,10 +198,21 @@ &ehci0 {
+ &codec {
+@@ -312,10 +324,21 @@ hdmi_out_con: endpoint {
  };
  
  &mmc0 {
 -	vmmc-supply = <&reg_cldo3>;
 -	disable-wp;
-+	bus-width = <4>;
- 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;  /* PF6 */
+-	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;  /* PF6 */
+ 	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;  /* PF6 */
 +	disable-wp;
 +	no-1-8-v;
 +	vmmc-supply = <&reg_cldo3>;
@@ -64,7 +65,7 @@ index 80ccab7b5ba7..e2039fd76b3d 100644
 +};
 +
 +&mmc2 {
- 	bus-width = <4>;
++	bus-width = <4>;
 +	cd-gpios = <&pio 4 22 GPIO_ACTIVE_LOW>; /* PE22 */
 +	disable-wp;
 +	no-1-8-v;
@@ -73,34 +74,13 @@ index 80ccab7b5ba7..e2039fd76b3d 100644
  	status = "okay";
  };
  
--- 
-2.43.0
-
-From git@z Thu Jan  1 00:00:00 1970
-Subject: [PATCH 4/4] arm64: dts: allwinner: h700: Add USB Host for RG35XX-H
-From: Chris Morgan <macromorgan@hotmail.com>
-Date: Fri, 18 Oct 2024 11:06:17 -0500
-Message-Id: <20241018160617.157083-5-macroalpha82@gmail.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: 7bit
-
-The RG35XX-H has a USB host port in addition to the USB OTG port used
-for charging. The host port receives its power from two distinct GPIO
-controlled regulators.
-
-Signed-off-by: Chris Morgan <macromorgan@hotmail.com>
----
- .../sun50i-h700-anbernic-rg35xx-h.dts         | 23 +++++++++++++++++++
- 1 file changed, 23 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
-index ff453336eab1..e6dc29a38dd6 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
-@@ -71,6 +71,25 @@ gpio_mux: mux-controller {
- 			    <&pio 8 2 GPIO_ACTIVE_LOW>;
- 		#mux-control-cells = <0>;
+diff --git c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
+index bef4d107482f..9e5bd72496f6 100644
+--- c/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
++++ i/arch/arm64/boot/dts/allwinner/sun50i-h700-anbernic-rg35xx-h.dts
+@@ -90,6 +90,25 @@ reg_vcc5v0_usb: regulator-vcc5v0-usb {
+ 		regulator-name = "vcc5v0-usb";
+ 		vin-supply = <&reg_vcc3v8_usb>;
  	};
 +
 +	reg_vcc3v8_usb: regulator-vcc3v8-usb {
@@ -124,14 +104,11 @@ index ff453336eab1..e6dc29a38dd6 100644
  };
  
  &gpadc {
-@@ -113,3 +132,7 @@ joy_mux_pin: joy-mux-pin {
- 		function = "gpio_out";
- 	};
+@@ -136,3 +155,7 @@ joy_mux_pin: joy-mux-pin {
+ &usbphy {
+ 	usb1_vbus-supply = <&reg_vcc5v0_usb>;
  };
 +
 +&usbphy {
 +	usb1_vbus-supply = <&reg_usb1_vbus>;
 +};
--- 
-2.43.0
-
