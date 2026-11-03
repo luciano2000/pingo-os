@@ -17,12 +17,18 @@ LINUX_POST_PATCH_HOOKS += PINGO_LINUX_ADD_DTS
 
 # Firmwares embutidos no kernel (CONFIG_EXTRA_FIRMWARE): o painel e o Wi-Fi são
 # drivers built-in e pedem o firmware antes de a raiz estar montada.
+# Alguns nomes são só "Link:" no WHENCE do linux-firmware; resolvemos aqui.
 PINGO_LINUX_FW_WIFI = rtw88/rtw8821c_fw.bin rtl_bt/rtl8821cs_config.bin rtl_bt/rtl8821cs_fw.bin
 define PINGO_LINUX_ADD_FIRMWARE
 	mkdir -p $(LINUX_DIR)/external-firmware/panels
 	cp $(PINGO_H700_BOARD)/firmware/panels/*.panel $(LINUX_DIR)/external-firmware/panels/
 	for f in $(PINGO_LINUX_FW_WIFI); do \
-		install -D -m 0644 "$$(readlink -f $(LINUX_FIRMWARE_DIR)/$$f)" $(LINUX_DIR)/external-firmware/$$f || exit 1; \
+		src=$(LINUX_FIRMWARE_DIR)/$$f; \
+		if [ ! -e "$$src" ]; then \
+			l=$$(sed -n "s|^Link: $$f -> ||p" $(LINUX_FIRMWARE_DIR)/WHENCE); \
+			src=$(LINUX_FIRMWARE_DIR)/$$(dirname $$f)/$$l; \
+		fi; \
+		install -D -m 0644 "$$(readlink -f $$src)" $(LINUX_DIR)/external-firmware/$$f || exit 1; \
 	done
 endef
 ifeq ($(BR2_PACKAGE_LINUX_FIRMWARE),y)
