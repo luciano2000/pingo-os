@@ -82,8 +82,11 @@ Conferido no cartão ROCKNIX que já roda no aparelho (2026-11-03):
 - O driver de controle precisa de `DEVICE=H700` no make para compilar o `rocknix-singleadc-joypad`.
 - Bluetooth (RTL8821CS) carrega o firmware.
 - Suspend: com o stub de SRAM no TF-A, `mem_sleep` oferece `deep` (padrão).
-- Resume travava (tanto em `s2idle` quanto em `deep`): o RTL8821CS (SDIO) perde a energia no suspend e o rtw88 fica preso em timeouts (`sdio read32 failed: -110`) ao religar. Solução no `pingo-suspend`: parar o Wi-Fi e soltar o controlador SDIO (`4021000.mmc`) antes de dormir, religar e reconectar depois. O ROCKNIX também desliga o Wi-Fi antes do suspend.
+- Resume travava (tanto em `s2idle` quanto em `deep`): o RTL8821CS (SDIO) perde a energia no suspend e o rtw88 fica preso em timeouts (`sdio read32 failed: -110`) ao religar. Era um problema conhecido: o ROCKNIX ([PR #3316](https://github.com/ROCKNIX/distribution/pull/3316)) bloqueia o rádio por `rfkill` antes de dormir e desbloqueia depois. O `pingo-suspend` faz o mesmo. (Soltar o controlador SDIO inteiro também funcionou, mas é mais bruto.)
+- O mesmo PR documenta que o primeiro probe do RTL8821CS às vezes falha no boot (`-110`); o `S41pingo-wifi` religa o driver, como o quirk `040-wifi_probe_retry` do ROCKNIX.
+- Consumo esperado em deep, segundo o ROCKNIX: ~3 %/h no RG35XX-H.
 - O `rtc0` (PCF8563) não acorda o aparelho; quem acorda é o RTC interno (`rtc1`).
 - O musb derruba a sessão USB no suspend; o `pingo-suspend` religa o gadget.
-- Uma vez o sistema perdeu USB e Wi-Fi ~1 min depois do boot, sem suspend. Não se repetiu; suspeita: o mesmo problema do SDIO.
+- Uma vez o sistema perdeu USB e Wi-Fi ~1 min depois do boot, sem suspend. Não se repetiu; provavelmente a falha de probe do Wi-Fi acima.
+- O relógio estava 2 h adiantado (sem NTP): o `S41pingo-wifi` agora acerta a hora (`ntpd`) e grava no RTC.
 - Aviso `drm_mode_object_add` no boot (sun4i-drm); a tela funciona. Investigar.

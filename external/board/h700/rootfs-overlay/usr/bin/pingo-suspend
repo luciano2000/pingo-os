@@ -8,20 +8,15 @@ SECS="$1"
 # Antes: muta o DAC (evita estalo no alto-falante)
 amixer -q cset name='DAC Playback Switch' off 2>/dev/null
 
-# Wi-Fi (RTL8821CS no SDIO): o chip perde a energia no suspend profundo e o
-# rtw88 não sabe reinicializá-lo; com ele ligado, o resume trava em timeouts
-# do SDIO. O ROCKNIX também desliga o Wi-Fi antes de dormir. Aqui soltamos o
-# controlador SDIO inteiro, para o chip ser detectado do zero no resume.
-SDIO_HOST=""
-for d in /sys/bus/sdio/devices/*; do
-  [ -e "$d" ] || continue
-  h=$(readlink -f "$d" | sed -n 's|.*/\([^/]*\.mmc\)/mmc_host/.*|\1|p')
-  [ -n "$h" ] && { SDIO_HOST="$h"; break; }
+# Wi-Fi (RTL8821CS no SDIO): o chip perde a energia no suspend profundo e, com
+# o rádio ligado, o rtw88 trava o resume em timeouts do SDIO (-110). Como o
+# ROCKNIX (wifictl disable), bloqueamos o rádio por rfkill: o driver desliga o
+# chip direito e o reinicializa do zero quando o rádio volta.
+WLAN_RFKILL=""
+for r in /sys/class/rfkill/rfkill*; do
+  [ "$(cat "$r/type" 2>/dev/null)" = wlan ] && [ "$(cat "$r/soft")" = 0 ] && {
+    WLAN_RFKILL="$r"; echo 1 > "$r/soft"; }
 done
-if [ -n "$SDIO_HOST" ]; then
-  /etc/init.d/S41pingo-wifi stop
-  echo "$SDIO_HOST" > /sys/bus/platform/drivers/sunxi-mmc/unbind
-fi
 sync
 
 if [ -n "$SECS" ]; then
@@ -48,9 +43,6 @@ if [ -n "$UDC" ] && [ "$(cat $G/UDC 2>/dev/null)" = "$UDC" ]; then
   fi
 fi
 
-# Wi-Fi de volta: religa o controlador SDIO e reconecta (wpa + DHCP)
-if [ -n "$SDIO_HOST" ]; then
-  echo "$SDIO_HOST" > /sys/bus/platform/drivers/sunxi-mmc/bind
-  /etc/init.d/S41pingo-wifi start &
-fi
+# Wi-Fi de volta: o wpa_supplicant reconecta sozinho quando o rádio volta
+[ -n "$WLAN_RFKILL" ] && echo 0 > "$WLAN_RFKILL/soft"
 exit 0
