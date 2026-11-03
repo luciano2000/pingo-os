@@ -1,0 +1,35 @@
+#!/bin/sh
+# Suspende o aparelho com os ajustes de antes/depois que o H700 precisa.
+# Uso: pingo-suspend            (acorda pelo botão power)
+#      pingo-suspend <segundos> (acorda também pelo RTC)
+# Baseado nos hooks sleep.d do ROCKNIX para o H700.
+SECS="$1"
+
+# Antes: muta o DAC (evita estalo no alto-falante)
+amixer -q cset name='DAC Playback Switch' off 2>/dev/null
+sync
+
+if [ -n "$SECS" ]; then
+  # rtc0 (PCF8563) não acorda o H700; usa o RTC com wakeup habilitado
+  RTC=""
+  for r in /sys/class/rtc/rtc*; do
+    [ "$(cat "$r/device/power/wakeup" 2>/dev/null)" = enabled ] && { RTC="$(basename "$r")"; break; }
+  done
+  rtcwake -d "${RTC:-rtc0}" -m mem -s "$SECS"
+else
+  echo mem > /sys/power/state
+fi
+
+# Depois: som de volta
+amixer -q cset name='DAC Playback Switch' on 2>/dev/null
+
+# O musb derruba a sessão USB no suspend e não a retoma: religa o gadget
+G=/sys/kernel/config/usb_gadget/pingo
+UDC=$(ls /sys/class/udc 2>/dev/null | head -n1)
+if [ -n "$UDC" ] && [ "$(cat $G/UDC 2>/dev/null)" = "$UDC" ]; then
+  sleep 3
+  if [ "$(cat /sys/class/udc/$UDC/state)" = "not attached" ]; then
+    echo "" > $G/UDC; sleep 1; echo "$UDC" > $G/UDC
+  fi
+fi
+exit 0

@@ -31,8 +31,11 @@ define PINGO_LINUX_ADD_FIRMWARE
 		install -D -m 0644 "$$(readlink -f $$src)" $(LINUX_DIR)/external-firmware/$$f || exit 1; \
 	done
 endef
+# Os .mk do Buildroot já foram avaliados quando este arquivo é lido, então
+# acrescentar a LINUX_DEPENDENCIES não muda a ordem do build: a dependência
+# entra direto na regra do passo de configuração.
 ifeq ($(BR2_PACKAGE_LINUX_FIRMWARE),y)
-LINUX_DEPENDENCIES += linux-firmware
+$(LINUX_TARGET_CONFIGURE): | linux-firmware
 LINUX_PRE_BUILD_HOOKS += PINGO_LINUX_ADD_FIRMWARE
 endif
 
@@ -42,3 +45,12 @@ define PINGO_UBOOT_ADD_DEFCONFIG
 	cp $(PINGO_H700_BOARD)/uboot/*_defconfig $(UBOOT_DIR)/configs/
 endef
 UBOOT_POST_PATCH_HOOKS += PINGO_UBOOT_ADD_DEFCONFIG
+
+# --- TF-A -----------------------------------------------------------------
+# Suspend profundo: o BL31 embute o stub de SRAM (PSCI SYSTEM_SUSPEND).
+ifeq ($(BR2_PACKAGE_H700_SUSPEND_STUB),y)
+ARM_TRUSTED_FIRMWARE_MAKE_OPTS += \
+	SUNXI_SYSTEM_SUSPEND=1 \
+	SUNXI_SUSPEND_STUB=$(BINARIES_DIR)/suspend_stub_lpddr4.bin
+$(ARM_TRUSTED_FIRMWARE_TARGET_CONFIGURE): | h700-suspend-stub
+endif

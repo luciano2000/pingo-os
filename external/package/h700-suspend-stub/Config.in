@@ -1,0 +1,13 @@
+config BR2_PACKAGE_H700_SUSPEND_STUB
+	bool "h700-suspend-stub"
+	depends on BR2_TARGET_ARM_TRUSTED_FIRMWARE
+	depends on BR2_TARGET_UBOOT
+	help
+	  Programa em SRAM que o TF-A executa no PSCI SYSTEM_SUSPEND do
+	  H616/H700: coloca a DRAM em self-refresh e a reinicializa no
+	  resume. Ativa o suspend profundo ("mem" = deep).
+
+	  Compilado a partir do driver de DRAM do U-Boot; o TF-A embute
+	  o binário (SUNXI_SYSTEM_SUSPEND=1).
+
+	  https://github.com/MagnominusGit/h700-suspend-stub
