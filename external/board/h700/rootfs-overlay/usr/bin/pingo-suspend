@@ -7,6 +7,21 @@ SECS="$1"
 
 # Antes: muta o DAC (evita estalo no alto-falante)
 amixer -q cset name='DAC Playback Switch' off 2>/dev/null
+
+# Wi-Fi (RTL8821CS no SDIO): o chip perde a energia no suspend profundo e o
+# rtw88 não sabe reinicializá-lo; com ele ligado, o resume trava em timeouts
+# do SDIO. O ROCKNIX também desliga o Wi-Fi antes de dormir. Aqui soltamos o
+# controlador SDIO inteiro, para o chip ser detectado do zero no resume.
+SDIO_HOST=""
+for d in /sys/bus/sdio/devices/*; do
+  [ -e "$d" ] || continue
+  h=$(readlink -f "$d" | sed -n 's|.*/\([^/]*\.mmc\)/mmc_host/.*|\1|p')
+  [ -n "$h" ] && { SDIO_HOST="$h"; break; }
+done
+if [ -n "$SDIO_HOST" ]; then
+  /etc/init.d/S41pingo-wifi stop
+  echo "$SDIO_HOST" > /sys/bus/platform/drivers/sunxi-mmc/unbind
+fi
 sync
 
 if [ -n "$SECS" ]; then
@@ -31,5 +46,11 @@ if [ -n "$UDC" ] && [ "$(cat $G/UDC 2>/dev/null)" = "$UDC" ]; then
   if [ "$(cat /sys/class/udc/$UDC/state)" = "not attached" ]; then
     echo "" > $G/UDC; sleep 1; echo "$UDC" > $G/UDC
   fi
+fi
+
+# Wi-Fi de volta: religa o controlador SDIO e reconecta (wpa + DHCP)
+if [ -n "$SDIO_HOST" ]; then
+  echo "$SDIO_HOST" > /sys/bus/platform/drivers/sunxi-mmc/bind
+  /etc/init.d/S41pingo-wifi start &
 fi
 exit 0

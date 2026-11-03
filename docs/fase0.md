@@ -62,8 +62,8 @@ Console serial: UART a 115200 baud nos pads da placa (`ttyS0`). Ajuda muito se o
 - [x] Bateria e carregador (`pingo-hwtest bateria`)
 - [x] Wi-Fi: conecta (802.11ac 80 MHz, -54 dBm), DHCP e internet OK
 - [ ] Segundo cartão SD
-- [ ] Suspend s2idle: consumo medido
-- [ ] Suspend deep (stub SRAM): consumo medido
+- [x] Suspend deep (stub SRAM): entra, acorda pelo RTC, USB e Wi-Fi voltam (`pingo-suspend`)
+- [ ] Suspend deep: consumo medido
 - [ ] Etapa 2: Mesa/Panfrost + SDL2 KMSDRM + `kmscube`
 - [ ] Etapa 2: frontend mínimo rodando o gambatte
 
@@ -81,5 +81,9 @@ Conferido no cartão ROCKNIX que já roda no aparelho (2026-11-03):
 - Serial pelo USB (ACM): com a ACM antes da NCM no gadget, nenhum byte passa no musb. Com a NCM primeiro funciona nos dois sentidos (corrigido no S02pingo-usb).
 - O driver de controle precisa de `DEVICE=H700` no make para compilar o `rocknix-singleadc-joypad`.
 - Bluetooth (RTL8821CS) carrega o firmware.
-- Suspend: só `s2idle` até ativar o stub de SRAM no TF-A.
+- Suspend: com o stub de SRAM no TF-A, `mem_sleep` oferece `deep` (padrão).
+- Resume travava (tanto em `s2idle` quanto em `deep`): o RTL8821CS (SDIO) perde a energia no suspend e o rtw88 fica preso em timeouts (`sdio read32 failed: -110`) ao religar. Solução no `pingo-suspend`: parar o Wi-Fi e soltar o controlador SDIO (`4021000.mmc`) antes de dormir, religar e reconectar depois. O ROCKNIX também desliga o Wi-Fi antes do suspend.
+- O `rtc0` (PCF8563) não acorda o aparelho; quem acorda é o RTC interno (`rtc1`).
+- O musb derruba a sessão USB no suspend; o `pingo-suspend` religa o gadget.
+- Uma vez o sistema perdeu USB e Wi-Fi ~1 min depois do boot, sem suspend. Não se repetiu; suspeita: o mesmo problema do SDIO.
 - Aviso `drm_mode_object_add` no boot (sun4i-drm); a tela funciona. Investigar.
