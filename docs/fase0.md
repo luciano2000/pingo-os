@@ -78,7 +78,7 @@ Conferido no cartão ROCKNIX que já roda no aparelho (2026-11-03):
 ## Resultados do primeiro boot (2026-11-03)
 
 - Rede pelo USB (NCM) e SSH funcionam: `ssh root@192.168.7.2`.
-- Serial pelo USB (ACM): o `/dev/ttyACM0` aparece no PC e o `getty` roda em `ttyGS0`, mas não recebe o que é digitado. Em investigação.
+- Serial pelo USB (ACM): com a ACM antes da NCM no gadget, nenhum byte passa no musb. Com a NCM primeiro funciona nos dois sentidos (corrigido no S02pingo-usb).
 - O driver de controle precisa de `DEVICE=H700` no make para compilar o `rocknix-singleadc-joypad`.
 - Bluetooth (RTL8821CS) carrega o firmware.
 - Suspend: só `s2idle` até ativar o stub de SRAM no TF-A.

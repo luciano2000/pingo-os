@@ -20,8 +20,10 @@ case "$1" in
     echo "pingo0001" > strings/0x409/serialnumber
     mkdir -p configs/c.1/strings/0x409 functions/acm.usb0 functions/ncm.usb0
     echo "serial + rede" > configs/c.1/strings/0x409/configuration
-    ln -s functions/acm.usb0 configs/c.1/
+    # A ordem importa: com a ACM primeiro, a serial enumera mas nenhum byte
+    # passa no musb do H700. Com a NCM primeiro, as duas funcionam.
     ln -s functions/ncm.usb0 configs/c.1/
+    ln -s functions/acm.usb0 configs/c.1/
     udc="$(ls /sys/class/udc | head -1)"
     [ -n "$udc" ] || { echo "pingo-usb: nenhum UDC"; exit 0; }
     echo "$udc" > UDC
