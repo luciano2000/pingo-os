@@ -1,0 +1,13 @@
+#!/bin/sh
+# Mixer inicial do codec H616 (mesmos valores do UCM do ROCKNIX).
+# Sem o DAC ligado, o DAPM deixa o codec desligado, o DMA não anda e a
+# reprodução falha com "Input/output error".
+case "$1" in
+  start)
+    amixer -q cset name='DAC Playback Switch' on
+    amixer -q cset name='DAC Playback Volume' 63
+    amixer -q sset 'Line Out' 20 on
+    amixer -q sset 'Speaker' on
+    ;;
+esac
+exit 0
