@@ -57,8 +57,8 @@ Console serial: UART a 115200 baud nos pads da placa (`ttyS0`). Ajuda muito se o
 - [x] Build completo da imagem
 - [x] U-Boot sobe
 - [x] Kernel sobe, log na tela, login (painel DSI 640x480)
-- [x] Botões (`evtest`, "H700 Gamepad"); analógicos e L3/R3 ainda sem teste
-- [x] Áudio: funciona depois de ligar o DAC no mixer (S03pingo-audio); fone ainda sem teste
+- [x] Botões e analógicos (`evtest`, "H700 Gamepad")
+- [x] Áudio: alto-falante e fone (precisa ligar o DAC no mixer: S03pingo-audio)
 - [x] Bateria e carregador (`pingo-hwtest bateria`)
 - [x] Wi-Fi: conecta (802.11ac 80 MHz, -54 dBm), DHCP e internet OK
 - [ ] Segundo cartão SD
