@@ -1,0 +1,45 @@
+#!/bin/sh
+# Transforma a porta USB-C em "serial + rede" para depuração (Fase 0).
+# No PC Linux: aparece /dev/ttyACM0 (terminal) e uma interface de rede.
+#   Terminal: picocom -b 115200 /dev/ttyACM0  (ou screen /dev/ttyACM0 115200)
+#   SSH:      ssh root@192.168.7.2   (o PC recebe 192.168.7.1 por DHCP)
+G=/sys/kernel/config/usb_gadget/pingo
+case "$1" in
+  start)
+    mountpoint -q /sys/kernel/config || mount -t configfs none /sys/kernel/config
+    # A porta pode subir como host: força o papel de periférico no musb
+    for m in /sys/devices/platform/soc*/*.usb/musb-hdrc.*/mode /sys/bus/platform/devices/musb-hdrc.*/mode; do
+      [ -w "$m" ] && echo peripheral > "$m"
+    done
+    [ -d "$G" ] && exit 0
+    mkdir -p "$G" && cd "$G" || exit 0
+    echo 0x1d6b > idVendor; echo 0x0104 > idProduct
+    mkdir -p strings/0x409
+    echo "Retrogamer Brasil" > strings/0x409/manufacturer
+    echo "Pingo OS" > strings/0x409/product
+    echo "pingo0001" > strings/0x409/serialnumber
+    mkdir -p configs/c.1/strings/0x409 functions/acm.usb0 functions/ncm.usb0
+    echo "serial + rede" > configs/c.1/strings/0x409/configuration
+    ln -s functions/acm.usb0 configs/c.1/
+    ln -s functions/ncm.usb0 configs/c.1/
+    udc="$(ls /sys/class/udc | head -1)"
+    [ -n "$udc" ] || { echo "pingo-usb: nenhum UDC"; exit 0; }
+    echo "$udc" > UDC
+    sleep 1
+    ip addr add 192.168.7.2/24 dev usb0 2>/dev/null; ip link set usb0 up
+    if command -v udhcpd >/dev/null; then
+      mkdir -p /run/pingo-usb /var/lib/misc
+      printf 'start 192.168.7.1\nend 192.168.7.1\ninterface usb0\nmax_leases 1\nlease_file /run/pingo-usb/leases\noption subnet 255.255.255.0\n' > /run/pingo-usb/udhcpd.conf
+      udhcpd /run/pingo-usb/udhcpd.conf
+    fi
+    # Terminal na serial USB
+    ( while true; do
+        [ -e /dev/ttyGS0 ] && /sbin/getty -L 115200 ttyGS0 vt100
+        sleep 2
+      done ) >/dev/null 2>&1 &
+    ;;
+  stop)
+    [ -d "$G" ] && echo "" > "$G/UDC" 2>/dev/null
+    ;;
+esac
+exit 0

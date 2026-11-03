@@ -1,0 +1,19 @@
+#!/bin/sh
+# Grava o log do boot em PINGOBOOT/pingo-log.txt para ler no PC
+# (útil se a tela ficar preta). Fase 0.
+case "$1" in
+  start)
+    mountpoint -q /boot || exit 0
+    sleep 5
+    mount -o remount,rw /boot || exit 0
+    {
+      echo "== Pingo OS $(. /etc/os-release; echo "$VERSION_ID") - $(date)"
+      echo "== compatible: $(tr '\0' ' ' < /proc/device-tree/compatible)"
+      echo "== pingo-hwtest"; pingo-hwtest 2>&1
+      echo "== dmesg"; dmesg
+    } > /boot/pingo-log.txt 2>&1
+    sync
+    mount -o remount,ro /boot
+    ;;
+esac
+exit 0

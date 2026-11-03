@@ -66,3 +66,11 @@ Console serial: UART a 115200 baud nos pads da placa (`ttyS0`). Ajuda muito se o
 - [ ] Suspend deep (stub SRAM): consumo medido
 - [ ] Etapa 2: Mesa/Panfrost + SDL2 KMSDRM + `kmscube`
 - [ ] Etapa 2: frontend mínimo rodando o gambatte
+
+## Aparelho de teste (RG35XX-H do autor)
+
+Conferido no cartão ROCKNIX que já roda no aparelho (2026-11-03):
+
+- DTB em uso: `sun50i-h700-anbernic-rg35xx-h` (painel original, **não** é rev6).
+- `extlinux.conf` sem o overlay `rg35xx-2024-ddr3.dtbo`, ou seja, imagem LPDDR4.
+- Conclusão: o defconfig atual (U-Boot LPDDR4 + DTB padrão) corresponde a este aparelho.

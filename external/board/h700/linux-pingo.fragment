@@ -12,3 +12,6 @@ CONFIG_DEVTMPFS=y
 CONFIG_DEVTMPFS_MOUNT=y
 # Sem Rust no toolchain do Buildroot
 # CONFIG_RUST is not set
+# Depuração pelo cabo USB: serial (ACM) + rede (NCM) via gadget configfs
+CONFIG_USB_CONFIGFS_ACM=y
+CONFIG_USB_CONFIGFS_NCM=y
