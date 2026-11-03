@@ -2,22 +2,42 @@
 # Mede o consumo da bateria durante o suspend.
 # Uso: pingo-suspend-test [segundos] [s2idle|deep]
 # Acorda sozinho pelo RTC; desconecte o carregador antes.
+# O resultado e o log do kernel vão para /boot/pingo-suspend.txt, porque
+# a rede (Wi-Fi e USB) pode não voltar depois do resume.
 SECS="${1:-60}"
 MODE="${2:-}"
+OUT=/boot/pingo-suspend.txt
 BAT="$(ls -d /sys/class/power_supply/*battery* 2>/dev/null | head -1)"
 [ -n "$BAT" ] || { echo "bateria não encontrada"; exit 1; }
 [ -n "$MODE" ] && echo "$MODE" > /sys/power/mem_sleep
-echo "modo: $(cat /sys/power/mem_sleep)"
+
+# Usa um RTC capaz de acordar o sistema (no H700, o rtc0 é um PCF8563
+# sem IRQ de wakeup; quem acorda é o RTC interno do SoC).
+RTC=""
+for r in /sys/class/rtc/rtc*; do
+  [ "$(cat "$r/device/power/wakeup" 2>/dev/null)" = enabled ] && { RTC="$(basename "$r")"; break; }
+done
+[ -n "$RTC" ] || { echo "nenhum RTC com wakeup"; exit 1; }
 
 v0=$(cat "$BAT/voltage_now"); c0=$(cat "$BAT/capacity"); t0=$(date +%s)
+dmesg -c >/dev/null 2>&1
 sync
-if command -v rtcwake >/dev/null; then
-  rtcwake -m mem -s "$SECS"
-else
-  echo "+$SECS" > /sys/class/rtc/rtc0/wakealarm; echo mem > /sys/power/state
-fi
+rtcwake -d "$RTC" -m mem -s "$SECS"
 t1=$(date +%s); v1=$(cat "$BAT/voltage_now"); c1=$(cat "$BAT/capacity")
-echo "tempo: $((t1 - t0)) s"
-echo "tensão: $v0 -> $v1 uV ($(( (v0 - v1) / 1000 )) mV)"
-echo "carga:  $c0% -> $c1%"
+
+{
+  echo "modo: $(cat /sys/power/mem_sleep)  rtc: $RTC"
+  echo "tempo: $((t1 - t0)) s"
+  echo "tensão: $v0 -> $v1 uV ($(( (v0 - v1) / 1000 )) mV)"
+  echo "carga:  $c0% -> $c1%"
+  echo "--- dmesg do suspend/resume ---"
+  dmesg
+} > /run/pingo-suspend.txt
+
+cat /run/pingo-suspend.txt | head -5
+if mount -o remount,rw /boot 2>/dev/null; then
+  cp /run/pingo-suspend.txt "$OUT"; sync
+  mount -o remount,ro /boot
+  echo "salvo em $OUT"
+fi
 echo "Rode com 600 s ou mais para um número confiável."
