@@ -1,0 +1,3 @@
+# Wi-Fi RTL8821CS (SDIO): sem economia de energia, que faz a latência variar
+# de 5 a 650 ms. Mesma regra do ROCKNIX.
+ACTION=="add", SUBSYSTEM=="net", SUBSYSTEMS=="sdio", KERNELS=="mmc2:0001:1", RUN+="/usr/sbin/iw dev %k set power_save off"

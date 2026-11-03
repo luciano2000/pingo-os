@@ -60,7 +60,7 @@ Console serial: UART a 115200 baud nos pads da placa (`ttyS0`). Ajuda muito se o
 - [x] Botões (`evtest`, "H700 Gamepad"); analógicos e L3/R3 ainda sem teste
 - [ ] Áudio (`speaker-test`)
 - [x] Bateria e carregador (`pingo-hwtest bateria`)
-- [ ] Wi-Fi (`pingo-hwtest wifi`): chip e firmware OK, `wlan0` existe; falta conectar
+- [x] Wi-Fi: conecta (802.11ac 80 MHz, -54 dBm), DHCP e internet OK
 - [ ] Segundo cartão SD
 - [ ] Suspend s2idle: consumo medido
 - [ ] Suspend deep (stub SRAM): consumo medido
