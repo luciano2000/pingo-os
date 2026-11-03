@@ -1,0 +1,14 @@
+# Ajustes do Pingo OS sobre a config do ROCKNIX (linux-rocknix.config)
+CONFIG_LOCALVERSION="-pingo"
+CONFIG_INITRAMFS_SOURCE=""
+CONFIG_EXTRA_FIRMWARE="panels/anbernic,rg28xx-panel.panel panels/anbernic,rg34xx-panel.panel panels/anbernic,rg34xx-sp-panel.panel panels/anbernic,rg34xx-sp-v2-panel.panel panels/anbernic,rg35xx-plus-panel.panel panels/anbernic,rg35xx-plus-rev6-panel.panel panels/anbernic,rg35xx-sp-v2-panel.panel panels/anbernic,rg40xx-panel.panel panels/anbernic,rg40xx-v2-panel.panel panels/anbernic,rgcubexx-panel.panel rtw88/rtw8821c_fw.bin rtl_bt/rtl8821cs_config.bin rtl_bt/rtl8821cs_fw.bin"
+CONFIG_EXTRA_FIRMWARE_DIR="external-firmware"
+# Raiz squashfs somente leitura + partição ROMS em exFAT
+CONFIG_SQUASHFS=y
+CONFIG_SQUASHFS_ZSTD=y
+CONFIG_EXFAT_FS=y
+CONFIG_VFAT_FS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+# Sem Rust no toolchain do Buildroot
+# CONFIG_RUST is not set

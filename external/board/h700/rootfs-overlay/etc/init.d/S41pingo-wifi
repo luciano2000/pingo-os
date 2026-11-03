@@ -1,0 +1,23 @@
+#!/bin/sh
+# Fase 0: conecta ao Wi-Fi descrito em /boot/pingo-wifi.txt (editável no PC).
+CONF=/boot/pingo-wifi.txt
+RUN=/run/pingo-wifi
+case "$1" in
+  start)
+    [ -r "$CONF" ] || exit 0
+    SSID="$(sed -n 's/^SSID=//p' "$CONF" | tr -d '\r')"
+    PSK="$(sed -n 's/^SENHA=//p' "$CONF" | tr -d '\r')"
+    [ -n "$SSID" ] || exit 0
+    mkdir -p "$RUN"
+    { echo "ctrl_interface=/run/wpa_supplicant"; wpa_passphrase "$SSID" "$PSK"; } > "$RUN/wpa.conf"
+    for i in 1 2 3 4 5 6 7 8 9 10; do [ -e /sys/class/net/wlan0 ] && break; sleep 1; done
+    ip link set wlan0 up
+    wpa_supplicant -B -i wlan0 -c "$RUN/wpa.conf" -P "$RUN/wpa.pid"
+    udhcpc -b -i wlan0 -p "$RUN/udhcpc.pid" -s /usr/share/udhcpc/default.script >/dev/null 2>&1
+    ;;
+  stop)
+    [ -f "$RUN/udhcpc.pid" ] && kill "$(cat "$RUN/udhcpc.pid")"
+    [ -f "$RUN/wpa.pid" ] && kill "$(cat "$RUN/wpa.pid")"
+    ;;
+esac
+exit 0

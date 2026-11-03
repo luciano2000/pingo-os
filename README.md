@@ -1,0 +1,57 @@
+# Pingo OS by Retrogamer Brasil
+
+Uma distro Linux mínima para consoles portáteis retrô. Grave a `.img` no cartão SD, ligue o aparelho e jogue.
+
+A interface segue a filosofia do MinUI: direta ao ponto, sem boxart, temas ou menus de emulador. O sistema roda em uma partição somente leitura, então um cartão corrompido se resolve gravando a imagem de novo.
+
+> O nome vem do Pingo, o cachorro de infância do autor: curto, com cara de mascote, e representa algo pequeno.
+
+Um projeto do Retrogamer Brasil.
+
+## Aparelhos
+
+| Aparelho | SoC | Estado |
+|---|---|---|
+| Anbernic RG35XX-H | Allwinner H700 | **Fase 0** (prova de conceito) |
+| Anbernic RG40XX-H / V | Allwinner H700 | Fase 2 (mesmo SoC) |
+| TrimUI Brick | Allwinner A133P | Fase 3 |
+
+## Como compilar
+
+Requisitos: Linux, Docker e uns 30 GB livres. O build roda dentro de um contêiner Debian, então o toolchain do seu sistema não interfere.
+
+```sh
+scripts/build.sh            # RG35XX-H, imagem completa
+```
+
+A imagem sai em `output/rg35xxh/images/pingo-os-rg35xxh.img` (e `.img.xz`). Grave com o balenaEtcher, o Raspberry Pi Imager ou:
+
+```sh
+sudo dd if=output/rg35xxh/images/pingo-os-rg35xxh.img of=/dev/sdX bs=4M conv=fsync status=progress
+```
+
+Outros alvos do Buildroot: `scripts/build.sh rg35xxh menuconfig`, `scripts/build.sh rg35xxh linux-rebuild all`.
+
+## Estrutura
+
+```
+docs/                  especificação, mockup da interface, notas de cada fase
+docker/                ambiente de build
+scripts/build.sh       build dentro do Docker
+scripts/sync-rocknix.sh  importa patches, device trees e firmwares do ROCKNIX
+external/              árvore BR2_EXTERNAL do Buildroot
+  configs/             um defconfig por aparelho
+  board/h700/          kernel, U-Boot, TF-A, imagem e overlay da raiz (família H700)
+  package/             pacotes próprios
+```
+
+## Créditos
+
+- [ROCKNIX](https://github.com/ROCKNIX/distribution): kernel, patches e device trees do H700 (GPL-2.0). O commit importado fica em `external/board/h700/ROCKNIX_COMMIT`.
+- [rocknix-joypad](https://github.com/hackbar/rocknix-joypad): driver dos controles.
+- [Buildroot](https://buildroot.org), [U-Boot](https://u-boot.org), [Trusted Firmware-A](https://www.trustedfirmware.org).
+- [MinUI](https://github.com/shauninman/MinUI): referência de interface.
+
+## Licença
+
+GPL-2.0. Componentes de terceiros mantêm as próprias licenças.

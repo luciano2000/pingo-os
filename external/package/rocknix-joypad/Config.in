@@ -1,0 +1,8 @@
+config BR2_PACKAGE_ROCKNIX_JOYPAD
+	bool "rocknix-joypad"
+	depends on BR2_LINUX_KERNEL
+	help
+	  Driver de controle (botões, analógicos via ADC, vibração)
+	  usado pelo ROCKNIX nos aparelhos H700.
+
+	  https://github.com/hackbar/rocknix-joypad

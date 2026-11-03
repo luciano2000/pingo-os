@@ -1,0 +1,23 @@
+#!/bin/sh
+# Mede o consumo da bateria durante o suspend.
+# Uso: pingo-suspend-test [segundos] [s2idle|deep]
+# Acorda sozinho pelo RTC; desconecte o carregador antes.
+SECS="${1:-60}"
+MODE="${2:-}"
+BAT="$(ls -d /sys/class/power_supply/*battery* 2>/dev/null | head -1)"
+[ -n "$BAT" ] || { echo "bateria não encontrada"; exit 1; }
+[ -n "$MODE" ] && echo "$MODE" > /sys/power/mem_sleep
+echo "modo: $(cat /sys/power/mem_sleep)"
+
+v0=$(cat "$BAT/voltage_now"); c0=$(cat "$BAT/capacity"); t0=$(date +%s)
+sync
+if command -v rtcwake >/dev/null; then
+  rtcwake -m mem -s "$SECS"
+else
+  echo "+$SECS" > /sys/class/rtc/rtc0/wakealarm; echo mem > /sys/power/state
+fi
+t1=$(date +%s); v1=$(cat "$BAT/voltage_now"); c1=$(cat "$BAT/capacity")
+echo "tempo: $((t1 - t0)) s"
+echo "tensão: $v0 -> $v1 uV ($(( (v0 - v1) / 1000 )) mV)"
+echo "carga:  $c0% -> $c1%"
+echo "Rode com 600 s ou mais para um número confiável."
