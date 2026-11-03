@@ -54,13 +54,13 @@ Console serial: UART a 115200 baud nos pads da placa (`ttyS0`). Ajuda muito se o
 
 ## Checklist
 
-- [ ] Build completo da imagem
-- [ ] U-Boot sobe (LED / serial)
-- [ ] Kernel sobe, log na tela
-- [ ] Botões e analógicos (`evtest`)
+- [x] Build completo da imagem
+- [x] U-Boot sobe
+- [x] Kernel sobe, log na tela, login (painel DSI 640x480)
+- [x] Botões (`evtest`, "H700 Gamepad"); analógicos e L3/R3 ainda sem teste
 - [ ] Áudio (`speaker-test`)
-- [ ] Bateria (`pingo-hwtest bateria`)
-- [ ] Wi-Fi (`pingo-hwtest wifi`)
+- [x] Bateria e carregador (`pingo-hwtest bateria`)
+- [ ] Wi-Fi (`pingo-hwtest wifi`): chip e firmware OK, `wlan0` existe; falta conectar
 - [ ] Segundo cartão SD
 - [ ] Suspend s2idle: consumo medido
 - [ ] Suspend deep (stub SRAM): consumo medido
@@ -74,3 +74,12 @@ Conferido no cartão ROCKNIX que já roda no aparelho (2026-11-03):
 - DTB em uso: `sun50i-h700-anbernic-rg35xx-h` (painel original, **não** é rev6).
 - `extlinux.conf` sem o overlay `rg35xx-2024-ddr3.dtbo`, ou seja, imagem LPDDR4.
 - Conclusão: o defconfig atual (U-Boot LPDDR4 + DTB padrão) corresponde a este aparelho.
+
+## Resultados do primeiro boot (2026-11-03)
+
+- Rede pelo USB (NCM) e SSH funcionam: `ssh root@192.168.7.2`.
+- Serial pelo USB (ACM): o `/dev/ttyACM0` aparece no PC e o `getty` roda em `ttyGS0`, mas não recebe o que é digitado. Em investigação.
+- O driver de controle precisa de `DEVICE=H700` no make para compilar o `rocknix-singleadc-joypad`.
+- Bluetooth (RTL8821CS) carrega o firmware.
+- Suspend: só `s2idle` até ativar o stub de SRAM no TF-A.
+- Aviso `drm_mode_object_add` no boot (sun4i-drm); a tela funciona. Investigar.

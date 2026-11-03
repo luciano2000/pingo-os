@@ -39,7 +39,7 @@ bateria() {
 
 wifi() {
   titulo "Wi-Fi"
-  ip -br addr show wlan0 2>/dev/null || echo "sem wlan0"
+  ip addr show wlan0 2>/dev/null | grep -E "state|inet " || echo "sem wlan0"
   iw dev wlan0 link 2>/dev/null
 }
 
