@@ -63,8 +63,8 @@ Console serial: UART a 115200 baud nos pads da placa (`ttyS0`). Ajuda muito se o
 - [x] Wi-Fi: conecta (802.11ac 80 MHz, -54 dBm), DHCP e internet OK
 - [ ] Segundo cartão SD
 - [x] Suspend deep (stub SRAM): entra, acorda pelo RTC, USB e Wi-Fi voltam (`pingo-suspend`)
-- [ ] Suspend deep: consumo medido
-- [ ] Etapa 2: Mesa/Panfrost + SDL2 KMSDRM + `kmscube`
+- [x] Suspend deep: consumo medido, ~2 %/h (8 h: 100 % -> 84 %, 4,104 V -> 3,966 V; o ROCKNIX mede ~3 %/h)
+- [ ] Etapa 2: Mesa/Panfrost + SDL2 KMSDRM + `kmscube` (compilado; falta testar no aparelho)
 - [ ] Etapa 2: frontend mínimo rodando o gambatte
 
 ## Aparelho de teste (RG35XX-H do autor)
@@ -90,3 +90,8 @@ Conferido no cartão ROCKNIX que já roda no aparelho (2026-11-03):
 - Uma vez o sistema perdeu USB e Wi-Fi ~1 min depois do boot, sem suspend. Não se repetiu; provavelmente a falha de probe do Wi-Fi acima.
 - O relógio estava 2 h adiantado (sem NTP): o `S41pingo-wifi` agora acerta a hora (`ntpd`) e grava no RTC.
 - Aviso `drm_mode_object_add` no boot (sun4i-drm); a tela funciona. Investigar.
+
+## Notas da etapa 2 (GPU)
+
+- O Panfrost no Mesa 26 exige LLVM: o build leva horas e o LLVM/Clang de host passam de 1,5 GB de RAM por compilação. Num PC com 16 GB, use `scripts/build.sh rg35xxh BR2_JLEVEL=4 all`.
+- O `libgallium` liga no `libLLVM` em tempo de execução, mas o Clang (~95 MB) só serve ao OpenCL e entrou na imagem (175 MB). Tirar na Fase 1.
