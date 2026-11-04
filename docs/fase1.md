@@ -47,11 +47,11 @@ Outros ajustes:
 
 ### Checklist
 
-- [ ] Imagem sem o Clang; `kmscube` e `pingo-retro` continuam funcionando
-- [ ] Primeiro boot cria e formata a `ROMS`
+- [x] Imagem sem o Clang (131 MB, 57 MB em `.xz`); `kmscube` e `pingo-retro` a 60 fps; cache de shaders na `ROMS`
+- [x] Primeiro boot cria e formata a `ROMS` (118,5 GB no cartão de 119 GB). Primeira versão criava a partição no buraco antes do boot; corrigido com início explícito
 - [ ] A `ROMS` aparece no PC (Linux, e se possível Windows) com as pastas
 - [ ] Regravar a imagem preserva a `ROMS` e o conteúdo
-- [ ] Chaves SSH iguais entre boots
+- [x] Chaves SSH iguais entre boots
 - [ ] Desligamento sujo: `fsck` corrige no boot seguinte
 
 ## Formatos de jogos
