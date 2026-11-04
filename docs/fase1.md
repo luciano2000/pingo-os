@@ -137,7 +137,7 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 
 ### Checklist
 
-- [ ] Toque no power no jogo: suspende e volta
-- [ ] Segurar no jogo: desliga e, no boot, volta para o jogo no mesmo ponto
-- [ ] Suspensão prolongada (teste curto): desliga sozinho e retoma no boot
-- [ ] Sair pelo menu: o boot seguinte abre o launcher normal
+- [x] Toque no power no jogo: suspende e volta
+- [x] Segurar no jogo: desliga e, no boot, volta para o jogo no mesmo ponto
+- [x] Suspensão prolongada (teste curto): desliga sozinho e retoma no boot
+- [x] Sair pelo menu: o boot seguinte abre o launcher normal
