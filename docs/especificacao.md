@@ -173,7 +173,7 @@ Caso de uso típico: um cartão de 128 GB com todos os consoles e arcade (SD1) e
 O jogo volta instantaneamente da RAM, exatamente de onde parou.
 
 ### Suspensão prolongada
-Depois de **10 a 15 minutos** suspenso, o aparelho desliga de vez. Como o save state já está gravado, ao ligar de novo ele volta automaticamente para o jogo (auto-resume).
+Quando a bateria chega a ~10 %, ou depois de no máximo 24 horas suspenso, o aparelho grava tudo e desliga de vez. (Decidido na Fase 1: o deep suspend medido na Fase 0 gasta ~2 %/h, então 10 a 15 minutos jogaria fora essa vantagem.) Como o save state já está gravado, ao ligar de novo ele volta automaticamente para o jogo (auto-resume).
 
 ### Bateria acabou durante a suspensão
 No boot seguinte, o launcher encontra o marcador e carrega o save state sozinho.
@@ -181,8 +181,8 @@ No boot seguinte, o launcher encontra o marcador e carrega o save state sozinho.
 ### Segurar o Power por 2 segundos
 Grava o save state e desliga. Nunca existe desligamento "sujo".
 
-### Risco técnico
-A qualidade do **deep suspend no H700 com kernel mainline** é incerta. O modo s2idle funciona, mas gasta bastante bateria. **Testar isso logo no início da Fase 1.** Se o deep suspend não funcionar, a combinação s2idle + desligamento automático após X minutos resolve.
+### Risco técnico (resolvido na Fase 0)
+O deep suspend funciona com o stub de SRAM do ROCKNIX no TF-A: ~2 %/h no RG35XX-H. O Wi-Fi precisa ser desligado por `rfkill` antes de dormir (ver `docs/fase0.md`).
 
 ---
 
@@ -317,8 +317,7 @@ Exemplos em tela 640x480 (4:3):
 ---
 
 ## 11. Decisões em aberto
-- Fork do MinUI ou frontend escrito do zero (depende da licença e da qualidade do código).
-- Nomes finais das pastas de cada console.
 - Atalho global de saída para os ports.
-- Tempo exato até desligar quando suspenso.
 - Se uma única `.img` atende o RG35XX-H e o RG40XX, ou se é preciso uma imagem por aparelho.
+
+Decididas na Fase 1 (ver `docs/fase1.md`): frontend escrito do zero (o MinUI não tem licença); pastas com os códigos curtos da seção 3; saves com os nomes do RetroArch (`.srm`); desligamento de emergência com 10 % de bateria ou depois de 24 h de suspensão; interface em português com textos em arquivo separado.

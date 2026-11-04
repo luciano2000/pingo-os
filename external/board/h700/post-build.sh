@@ -14,3 +14,9 @@ OS
 
 # Pontos de montagem: boot (FAT) e cartões
 mkdir -p "$TARGET_DIR/boot" "$TARGET_DIR/mnt/sd1" "$TARGET_DIR/mnt/sd2"
+
+# O Mesa precisa do Clang/libclc só no build (shaders internos pré-compilados)
+# e para OpenCL, que não usamos. O libgallium liga só no libLLVM.
+rm -f "$TARGET_DIR"/usr/lib/libclang*.so* "$TARGET_DIR"/usr/lib/libLLVMSPIRVLib.so*
+rm -rf "$TARGET_DIR"/usr/share/clc
+rm -f "$TARGET_DIR"/usr/bin/llvm-spirv "$TARGET_DIR"/usr/bin/spirv-*

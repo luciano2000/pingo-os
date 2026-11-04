@@ -1,0 +1,113 @@
+#!/bin/sh
+# Partição ROMS (exFAT) no cartão do sistema, montada em /mnt/sd1.
+#
+# Primeiro boot: cria a partição 3 no espaço livre depois do sistema, formata
+# em exFAT (rótulo ROMS) e cria as pastas. Em todo boot: fsck e montagem.
+# Nunca mexe numa partição 3 que já exista.
+MNT=/mnt/sd1
+LABEL=ROMS
+TTY=/dev/tty1
+
+# Códigos curtos no cartão; o launcher mostra o nome completo
+CONSOLES="GB GBC GBA NES SNES VB POKEMINI MS GG MD SEGACD 32X PCE PCECD NGP WS MSX A2600 A7800 LYNX PS ARCADE"
+
+say() { echo "pingo-storage: $*" > /dev/kmsg; }
+
+screen() {
+	printf '\033[2J\033[H\n\n\n\n   Pingo OS by Retrogamer Brasil\n\n   %s\n' "$1" > $TTY 2>/dev/null
+}
+
+# Disco e número da partição raiz, a partir do PARTUUID do cmdline
+root_disk() {
+	local uuid dev
+	uuid=$(sed -n 's/.*root=PARTUUID=\([^ ]*\).*/\1/p' /proc/cmdline)
+	dev=$(blkid -t PARTUUID="$uuid" -o device 2>/dev/null | head -1)
+	[ -n "$dev" ] || return 1
+	ROOT_PART="$dev"
+	DISK="/dev/$(basename "$(readlink -f /sys/class/block/$(basename "$dev")/..)")"
+	case "$DISK" in *[0-9]) PSEP=p ;; *) PSEP= ;; esac
+	DATA_PART="${DISK}${PSEP}3"
+}
+
+# Espaço livre (setores) depois da última partição
+free_sectors() {
+	local size last
+	size=$(cat /sys/class/block/$(basename "$DISK")/size)
+	last=$(sfdisk -l -o End "$DISK" 2>/dev/null | awk '/^ *[0-9]+ *$/ {e=$1} END {print e+0}')
+	echo $((size - last - 1))
+}
+
+create_data_partition() {
+	local free
+	free=$(free_sectors)
+	# Pelo menos 1 GiB livre; senão é um cartão que já foi mexido
+	if [ "$free" -lt 2097152 ]; then
+		say "sem espaço livre para a partição $LABEL ($free setores)"
+		return 1
+	fi
+
+	screen "Preparando cartão... não desligue o aparelho."
+	say "criando $DATA_PART ($free setores livres)"
+	# Tipo 07 (exFAT/NTFS): é o que o Windows e o macOS esperam
+	echo ',,07' | sfdisk --append --no-reread --no-tell-kernel -q "$DISK" || return 1
+	# O disco está em uso (raiz): registra só a partição nova no kernel
+	partx -a -n 3 "$DISK" 2>/dev/null || partx -u "$DISK"
+	for i in 1 2 3 4 5 6 7 8 9 10; do [ -b "$DATA_PART" ] && break; sleep 1; done
+	[ -b "$DATA_PART" ] || { say "$DATA_PART não apareceu"; return 1; }
+
+	# Regravar a .img apaga a tabela de partições, mas não os dados: a nova
+	# partição 3 cai exatamente no mesmo lugar. Se já houver uma ROMS ali,
+	# reaproveita (jogos e saves sobrevivem a uma regravação do sistema).
+	if [ "$(blkid -p -o value -s TYPE "$DATA_PART" 2>/dev/null)" = exfat ] &&
+	   [ "$(blkid -p -o value -s LABEL "$DATA_PART" 2>/dev/null)" = "$LABEL" ]; then
+		say "partição $LABEL existente reaproveitada"
+		return 0
+	fi
+
+	screen "Formatando a partição $LABEL... não desligue o aparelho."
+	mkfs.exfat -L "$LABEL" "$DATA_PART" > /dev/null || return 1
+	sync
+	say "partição $LABEL criada"
+}
+
+make_folders() {
+	local c
+	for c in $CONSOLES; do mkdir -p "$MNT/Roms/$c"; done
+	mkdir -p "$MNT/Bios" "$MNT/Saves" "$MNT/States" "$MNT/Ports" "$MNT/Config"
+	# Dados internos do sistema (chaves SSH, cache de shaders, logs)
+	mkdir -p "$MNT/.system/dropbear" "$MNT/.system/cache" "$MNT/.system/logs"
+}
+
+start() {
+	root_disk || { say "não achei o disco do sistema"; return 0; }
+
+	if [ ! -b "$DATA_PART" ]; then
+		create_data_partition || { screen ""; return 0; }
+		FRESH=1
+	fi
+
+	fstype=$(blkid -p -o value -s TYPE "$DATA_PART" 2>/dev/null)
+	if [ "$fstype" != exfat ]; then
+		say "$DATA_PART é '$fstype', não exFAT: não monto"
+		return 0
+	fi
+
+	# Desligamento sujo deixa a FAT do exFAT inconsistente; -p corrige sozinho
+	fsck.exfat -p "$DATA_PART" > /dev/null 2>&1
+	rc=$?
+	[ $rc -ge 4 ] && say "fsck.exfat terminou com código $rc"
+
+	mount -t exfat -o noatime,errors=remount-ro "$DATA_PART" "$MNT" || {
+		say "falha ao montar $DATA_PART"; return 0; }
+	make_folders
+	[ -n "$FRESH" ] && screen ""
+
+	# Chaves SSH persistentes: o S50dropbear usa /etc/dropbear -> /var/run/dropbear
+	ln -sfn "$MNT/.system/dropbear" /var/run/dropbear
+}
+
+case "$1" in
+	start) start ;;
+	stop) sync; umount "$MNT" 2>/dev/null ;;
+esac
+exit 0
