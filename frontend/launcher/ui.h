@@ -38,6 +38,7 @@ enum font_id {
 	F_COUNT,     /* 16 px, 500 */
 	F_SMALL,     /* 14 px, 500 */
 	F_TITLE,     /* 23 px, 600 (mensagens) */
+	F_BODY,      /* 18 px, 400 (textos do assistente) */
 	F_COUNT_N
 };
 
@@ -51,6 +52,11 @@ void ui_present(void);
 /* Texto: devolve a largura desenhada. align: 0 esquerda, 1 direita, 2 centro */
 int ui_text(enum font_id f, const char *s, int x, int y_center, Uint32 rgb, int align, int max_w);
 int ui_text_width(enum font_id f, const char *s);
+
+/* Texto em várias linhas, quebrado por palavras e centralizado em x.
+ * Devolve a altura ocupada. */
+int ui_text_wrap(enum font_id f, const char *s, int x_center, int y_top, int max_w, int line_h,
+		 Uint32 rgb);
 
 void ui_round_rect(int x, int y, int w, int h, int r, Uint32 rgb);
 void ui_rect(int x, int y, int w, int h, Uint32 rgb);

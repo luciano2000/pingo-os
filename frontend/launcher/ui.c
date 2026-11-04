@@ -126,6 +126,48 @@ int ui_text(enum font_id f, const char *s, int x, int y_center, Uint32 rgb, int 
 	return e->w;
 }
 
+int ui_text_wrap(enum font_id f, const char *s, int x_center, int y_top, int max_w, int line_h,
+		 Uint32 rgb)
+{
+	char line[512];
+	int y = y_top + line_h / 2;
+	const char *p = s;
+
+	while (*p) {
+		/* junta palavras enquanto couber */
+		size_t len = 0, best = 0;
+		for (;;) {
+			const char *w = p + len;
+			while (*w == ' ')
+				w++;
+			const char *e = w;
+			while (*e && *e != ' ')
+				e++;
+			size_t cand = (size_t)(e - p);
+			if (cand >= sizeof(line))
+				break;
+			memcpy(line, p, cand);
+			line[cand] = 0;
+			if (best && ui_text_width(f, line) > max_w)
+				break;
+			best = cand;
+			if (!*e)
+				break;
+			len = cand;
+		}
+		if (!best) /* palavra maior que a linha: corta */
+			best = strlen(p) < sizeof(line) - 1 ? strlen(p) : sizeof(line) - 1;
+		memcpy(line, p, best);
+		line[best] = 0;
+		ui_text(f, line, x_center, y, rgb, 2, max_w);
+		y += line_h;
+		p += best;
+		while (*p == ' ')
+			p++;
+	}
+	return y - line_h / 2 - y_top;
+}
+
 /* ---- rasterização com antisserrilhado -------------------------------- */
 
 typedef bool (*shape_fn)(float x, float y, const void *arg);
@@ -274,8 +316,12 @@ bool ui_init(void)
 		[F_COUNT]    = { "Inter-Medium.ttf",   16 },
 		[F_SMALL]    = { "Inter-Medium.ttf",   14 },
 		[F_TITLE]    = { "Inter-SemiBold.ttf", 23 },
+		[F_BODY]     = { "Inter-Regular.ttf",  18 },
 	};
 
+	/* Sem isto o SDL transforma o SIGTERM num evento que o launcher não lê,
+	 * e o processo não fecha (desligamento, fim da mensagem de boot) */
+	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
 	if (SDL_Init(SDL_INIT_VIDEO) < 0 || TTF_Init() < 0) {
 		fprintf(stderr, "pingo-launcher: SDL: %s\n", SDL_GetError());
 		return false;

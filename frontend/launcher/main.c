@@ -642,6 +642,33 @@ static bool press(int code)
 	return false;
 }
 
+#define POWER_HOLD_MS 2000
+
+static Uint32 power_down_at; /* 0: power solto */
+
+static void message_screen(const char *title, const char *hint)
+{
+	for (int i = 0; i < 2; i++) { /* dois quadros: ver draw() */
+		ui_clear();
+		ui_text(F_TITLE, title, UI_W / 2, UI_H / 2 - (hint ? 14 : 0), COL_TEXT, 2,
+			UI_W - 2 * PAD_X);
+		if (hint)
+			ui_text(F_BAR, hint, UI_W / 2, UI_H / 2 + 20, COL_DIM, 2, UI_W - 2 * PAD_X);
+		ui_present();
+	}
+}
+
+static void shutdown_now(void)
+{
+	state_save();
+	message_screen(S_SHUTDOWN, NULL);
+	sync();
+	if (system("/sbin/poweroff") < 0)
+		perror("poweroff");
+	for (;;)
+		pause(); /* o init encerra o launcher */
+}
+
 static void suspend(void)
 {
 	/* pingo-suspend devolve quando o aparelho acorda */
@@ -656,12 +683,141 @@ static void suspend(void)
 	dirty = true;
 }
 
+/* ---- assistente do primeiro boot ------------------------------------- *
+ * O boot (pingo-storage) deixa em /run/pingo/storage "setup <GB>" quando o
+ * cartão é novo. Nada é formatado sem o usuário apertar A.
+ */
+
+#define STORAGE_STATE RUN_DIR "/storage"
+
+static void read_storage_state(char *kind, size_t kn, char *arg, size_t an)
+{
+	FILE *f = fopen(STORAGE_STATE, "r");
+	char line[128] = "";
+	kind[0] = arg[0] = 0;
+	if (!f)
+		return;
+	if (fgets(line, sizeof(line), f)) {
+		char *nl = strchr(line, '\n');
+		if (nl)
+			*nl = 0;
+		char *sp = strchr(line, ' ');
+		if (sp) {
+			*sp = 0;
+			snprintf(arg, an, "%s", sp + 1);
+		}
+		snprintf(kind, kn, "%s", line);
+	}
+	fclose(f);
+}
+
+static void setup_screen(const char *title, const char *text, const char *hint_a, const char *hint_b)
+{
+	for (int i = 0; i < 2; i++) { /* dois quadros: ver draw() */
+		ui_clear();
+		int y = 150;
+		ui_text(F_TITLE, title, UI_W / 2, y, COL_TEXT, 2, UI_W - 2 * PAD_X);
+		if (text)
+			ui_text_wrap(F_BODY, text, UI_W / 2, y + 30, 480, 26, COL_DIM);
+		int right = UI_W - PAD_X;
+		if (hint_b)
+			right -= draw_hint(right, "B", hint_b) + 22;
+		if (hint_a)
+			draw_hint(right, "A", hint_a);
+		ui_present();
+	}
+}
+
+/* Espera A ou B (power: toque suspende, segurar desliga) */
+static int wait_ab(void)
+{
+	struct input_event ev;
+	for (;;) {
+		poll(fds, DEV_N, power_down_at ? 50 : 1000);
+		while (fds[DEV_PAD].fd >= 0 && read(fds[DEV_PAD].fd, &ev, sizeof(ev)) == sizeof(ev))
+			if (ev.type == EV_KEY && ev.value == 1 &&
+			    (ev.code == BTN_EAST || ev.code == BTN_SOUTH))
+				return ev.code;
+		while (fds[DEV_POWER].fd >= 0 &&
+		       read(fds[DEV_POWER].fd, &ev, sizeof(ev)) == sizeof(ev)) {
+			if (ev.type != EV_KEY || ev.code != KEY_POWER)
+				continue;
+			if (ev.value == 1)
+				power_down_at = SDL_GetTicks() | 1;
+			else if (ev.value == 0 && power_down_at) {
+				power_down_at = 0;
+				suspend();
+				return -1; /* redesenha a tela */
+			}
+		}
+		if (power_down_at && SDL_GetTicks() - power_down_at >= POWER_HOLD_MS)
+			shutdown_now();
+	}
+}
+
+/* true: a ROMS ficou pronta */
+static bool setup_wizard(const char *gb)
+{
+	char text[256];
+	snprintf(text, sizeof(text), S_SETUP_TEXT, gb[0] ? gb : "?");
+
+	for (;;) {
+		setup_screen(S_WELCOME, text, S_INSTALL, S_POWER_OFF);
+		int b = wait_ab();
+		if (b == BTN_SOUTH)
+			shutdown_now();
+		if (b == BTN_EAST)
+			break;
+	}
+
+	message_screen(S_PREPARING, S_DONT_TURN_OFF);
+	int rc = system("/usr/sbin/pingo-storage format");
+	if (rc != 0) {
+		fprintf(stderr, "pingo-launcher: pingo-storage format falhou (%d)\n", rc);
+		for (;;) {
+			setup_screen(S_SETUP_FAIL, S_SETUP_FAIL_TXT, NULL, S_POWER_OFF);
+			if (wait_ab() == BTN_SOUTH)
+				shutdown_now();
+		}
+	}
+
+	do
+		setup_screen(S_SETUP_DONE, S_SETUP_DONE_TXT, S_CONTINUE, NULL);
+	while (wait_ab() != BTN_EAST);
+	return true;
+}
+
 /* ---- principal -------------------------------------------------------- */
 
-int main(void)
+int main(int argc, char **argv)
 {
 	struct stat st;
 
+	/* Mensagem de tela cheia até receber SIGTERM (usado no boot) */
+	if (argc >= 3 && !strcmp(argv[1], "--message")) {
+		if (!ui_init())
+			return 1;
+		message_screen(argv[2], argc >= 4 ? argv[3] : NULL);
+		for (;;)
+			pause();
+	}
+
+	if (!ui_init())
+		return 1;
+	fds[DEV_PAD].fd = open_by_name("H700 Gamepad");
+	fds[DEV_POWER].fd = open_by_name("axp20x-pek");
+	fds[DEV_VOLUME].fd = open_by_name("gpio-keys-volume");
+	for (int i = 0; i < DEV_N; i++)
+		fds[i].events = POLLIN;
+
+	char skind[32], sarg[64];
+	read_storage_state(skind, sizeof(skind), sarg, sizeof(sarg));
+	if (!strcmp(skind, "setup"))
+		setup_wizard(sarg);
+	else if (!strcmp(skind, "unknown"))
+		show_toast(S_UNKNOWN_PART);
+
+	osd_init(); /* depois da ROMS: os valores ficam em Config/ */
 	have_roms = stat(ROMS_DIR, &st) == 0;
 	recents_load();
 
@@ -675,15 +831,6 @@ int main(void)
 	stack[0] = (struct level){ &home, 0, 0 };
 	state_load();
 
-	if (!ui_init())
-		return 1;
-
-	fds[DEV_PAD].fd = open_by_name("H700 Gamepad");
-	fds[DEV_POWER].fd = open_by_name("axp20x-pek");
-	fds[DEV_VOLUME].fd = open_by_name("gpio-keys-volume");
-	osd_init();
-	for (int i = 0; i < DEV_N; i++)
-		fds[i].events = POLLIN;
 
 	/* a lista veio do cache: confere o cartão em segundo plano */
 	if (from_cache)
@@ -711,6 +858,8 @@ int main(void)
 			timeout = timeout > 200 ? 200 : timeout;
 		if (osd_visible())
 			timeout = timeout > 100 ? 100 : timeout;
+		if (power_down_at)
+			timeout = timeout > 50 ? 50 : timeout;
 		if (!SDL_AtomicGet(&scan_done) && from_cache)
 			timeout = timeout > 100 ? 100 : timeout;
 
@@ -741,8 +890,21 @@ int main(void)
 		}
 		while (!quit && fds[DEV_POWER].fd >= 0 &&
 		       read(fds[DEV_POWER].fd, &ev, sizeof(ev)) == sizeof(ev)) {
-			if (ev.type == EV_KEY && ev.code == KEY_POWER && ev.value == 1)
-				suspend();
+			if (ev.type != EV_KEY || ev.code != KEY_POWER)
+				continue;
+			if (ev.value == 1) {
+				power_down_at = SDL_GetTicks() | 1;
+				fprintf(stderr, "pingo-launcher: power apertado\n");
+			} else if (ev.value == 0 && power_down_at) {
+				fprintf(stderr, "pingo-launcher: power solto após %u ms: suspender\n",
+					SDL_GetTicks() - power_down_at);
+				power_down_at = 0;
+				suspend(); /* toque curto: suspende ao soltar */
+			}
+		}
+		if (power_down_at && SDL_GetTicks() - power_down_at >= POWER_HOLD_MS) {
+			fprintf(stderr, "pingo-launcher: power segurado %d ms: desligar\n", POWER_HOLD_MS);
+			shutdown_now();
 		}
 
 		while (!quit && fds[DEV_VOLUME].fd >= 0 &&

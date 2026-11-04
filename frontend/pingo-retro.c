@@ -142,7 +142,9 @@ static void audio_sample(int16_t left, int16_t right)
 
 /* ---- controles (evdev) ----------------------------------------------- */
 
-static int pad_fd = -1, vol_fd = -1;
+static int pad_fd = -1, vol_fd = -1, power_fd = -1;
+static Uint32 power_down_at;
+static bool power_off_requested, suspend_requested;
 static bool pad_state[16];
 static bool quit_requested;
 
@@ -200,6 +202,24 @@ static void input_poll(void)
 {
 	struct input_event ev;
 
+	while (power_fd >= 0 && read(power_fd, &ev, sizeof(ev)) == sizeof(ev)) {
+		if (ev.type != EV_KEY || ev.code != KEY_POWER)
+			continue;
+		if (ev.value == 1) {
+			power_down_at = SDL_GetTicks() | 1;
+		} else if (ev.value == 0 && power_down_at) {
+			fprintf(stderr, "pingo-retro: power solto após %u ms: suspender\n",
+				SDL_GetTicks() - power_down_at);
+			power_down_at = 0;
+			suspend_requested = true; /* toque curto, ao soltar */
+		}
+	}
+	/* Segurar 2 s: sai e desliga (na fatia 4, grava o save state antes) */
+	if (power_down_at && SDL_GetTicks() - power_down_at >= 2000) {
+		fprintf(stderr, "pingo-retro: power segurado 2000 ms: desligar\n");
+		power_off_requested = quit_requested = true;
+		power_down_at = 0;
+	}
 	while (vol_fd >= 0 && read(vol_fd, &ev, sizeof(ev)) == sizeof(ev))
 		if (ev.type == EV_KEY)
 			osd_key(ev.code, ev.value);
@@ -383,6 +403,7 @@ int main(int argc, char **argv)
 
 	pad_fd = open_input(GAMEPAD_NAME);
 	vol_fd = open_input("gpio-keys-volume");
+	power_fd = open_input("axp20x-pek");
 	osd_init();
 	if (pad_fd < 0)
 		fprintf(stderr, "pingo-retro: \"%s\" não encontrado, sem controle\n", GAMEPAD_NAME);
@@ -405,6 +426,21 @@ int main(int argc, char **argv)
 		core.run();
 		render_frame();
 
+		if (suspend_requested) {
+			suspend_requested = false;
+			if (audio_dev)
+				SDL_PauseAudioDevice(audio_dev, 1);
+			if (system("/usr/bin/pingo-suspend") < 0)
+				perror("pingo-suspend");
+			struct input_event ev;
+			while (power_fd >= 0 && read(power_fd, &ev, sizeof(ev)) == sizeof(ev))
+				;
+			if (audio_dev) {
+				SDL_ClearQueuedAudio(audio_dev);
+				SDL_PauseAudioDevice(audio_dev, 0);
+			}
+		}
+
 		frames++;
 		Uint32 now = SDL_GetTicks();
 		if (now - t0 >= 5000) {
@@ -423,5 +459,6 @@ int main(int argc, char **argv)
 	osd_quit();
 	SDL_Quit();
 	free((void *)game.data);
-	return 0;
+	/* 3: o pingo-shell mostra "Desligando…" e desliga */
+	return power_off_requested ? 3 : 0;
 }

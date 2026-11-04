@@ -1,0 +1,138 @@
+#!/bin/sh
+# Partição ROMS (exFAT) no cartão do sistema, montada em /mnt/sd1.
+#
+#   pingo-storage boot    (todo boot, pelo S06pingo-storage)
+#     Monta a ROMS (com fsck). Depois de regravar a .img, a tabela de
+#     partições perde a partição 3, mas os dados continuam lá: ela é
+#     recriada no mesmo lugar e reaproveitada, sem perguntar.
+#     Cartão novo: só cria a partição; quem formata é o assistente do
+#     launcher, depois que o usuário confirma.
+#
+#   pingo-storage format  (assistente do primeiro boot)
+#     Formata a partição 3, só se ela estiver vazia (sem nenhum sistema de
+#     arquivos), cria as pastas e monta.
+#
+# Estado para o launcher em /run/pingo/storage:
+#   ok | setup <tamanho em GB> | unknown <tipo> | nodisk
+MNT=/mnt/sd1
+LABEL=ROMS
+STATE=/run/pingo/storage
+
+# Códigos curtos no cartão; o launcher mostra o nome completo
+CONSOLES="GB GBC GBA NES SNES VB POKEMINI MS GG MD SEGACD 32X PCE PCECD NGP WS MSX A2600 A7800 LYNX PS ARCADE"
+
+say() { echo "pingo-storage: $*" > /dev/kmsg; }
+state() { mkdir -p /run/pingo; echo "$*" > "$STATE"; }
+
+# Disco da partição raiz, a partir do PARTUUID do cmdline
+root_disk() {
+	local uuid dev
+	uuid=$(sed -n 's/.*root=PARTUUID=\([^ ]*\).*/\1/p' /proc/cmdline)
+	dev=$(blkid -t PARTUUID="$uuid" -o device 2>/dev/null | head -1)
+	[ -n "$dev" ] || return 1
+	DISK="/dev/$(basename "$(readlink -f /sys/class/block/$(basename "$dev")/..)")"
+	case "$DISK" in *[0-9]) PSEP=p ;; *) PSEP= ;; esac
+	DATA_PART="${DISK}${PSEP}3"
+}
+
+# Início da partição nova: logo depois do fim da última partição, alinhado a
+# 1 MiB. Precisa ser explícito: sozinho, o sfdisk usa o primeiro buraco livre,
+# que é o espaço entre o bootloader e a partição de boot.
+data_start() {
+	local last
+	last=$(sfdisk -l -o End "$DISK" 2>/dev/null | awk '/^ *[0-9]+ *$/ {if ($1 > e) e = $1} END {print e+0}')
+	echo $(( (last / 2048 + 1) * 2048 ))
+}
+
+create_entry() {
+	local size start free
+	size=$(cat /sys/class/block/$(basename "$DISK")/size)
+	start=$(data_start)
+	free=$((size - start))
+	# Pelo menos 1 GiB livre; senão é um cartão que já foi mexido
+	if [ "$free" -lt 2097152 ]; then
+		say "sem espaço livre para a partição $LABEL ($free setores)"
+		return 1
+	fi
+	say "criando $DATA_PART a partir do setor $start ($free setores)"
+	# Tipo 07 (exFAT/NTFS): é o que o Windows e o macOS esperam
+	echo "$start,,07" | sfdisk --append --no-reread --no-tell-kernel -q "$DISK" || return 1
+	# O disco está em uso (raiz): registra só a partição nova no kernel
+	partx -a -n 3 "$DISK" 2>/dev/null || partx -u "$DISK"
+	for i in 1 2 3 4 5 6 7 8 9 10; do [ -b "$DATA_PART" ] && break; sleep 1; done
+	[ -b "$DATA_PART" ]
+}
+
+fs_type() { blkid -p -o value -s TYPE "$DATA_PART" 2>/dev/null; }
+fs_label() { blkid -p -o value -s LABEL "$DATA_PART" 2>/dev/null; }
+
+size_gb() {
+	awk '{printf "%.0f", $1 * 512 / 1e9}' /sys/class/block/$(basename "$DATA_PART")/size
+}
+
+make_folders() {
+	local c
+	for c in $CONSOLES; do mkdir -p "$MNT/Roms/$c"; done
+	mkdir -p "$MNT/Bios" "$MNT/Saves" "$MNT/States" "$MNT/Ports" "$MNT/Config"
+	# Dados internos do sistema (chaves SSH, cache de shaders, logs)
+	mkdir -p "$MNT/.system/dropbear" "$MNT/.system/cache" "$MNT/.system/logs"
+}
+
+mount_data() {
+	# Desligamento sujo deixa a FAT do exFAT inconsistente; -p corrige sozinho
+	fsck.exfat -p "$DATA_PART" > /dev/null 2>&1
+	rc=$?
+	[ $rc -ge 4 ] && say "fsck.exfat terminou com código $rc"
+	mount -t exfat -o noatime,errors=remount-ro "$DATA_PART" "$MNT" || {
+		say "falha ao montar $DATA_PART"; return 1; }
+	make_folders
+	# Chaves SSH persistentes: o S50dropbear usa /etc/dropbear -> /var/run/dropbear
+	[ -e /var/run/dropbear ] && [ ! -L /var/run/dropbear ] && rm -rf /var/run/dropbear
+	ln -sfn "$MNT/.system/dropbear" /var/run/dropbear
+	state ok
+}
+
+do_boot() {
+	root_disk || { say "não achei o disco do sistema"; state nodisk; return 0; }
+
+	if [ ! -b "$DATA_PART" ]; then
+		create_entry || { state nodisk; return 0; }
+	fi
+
+	case "$(fs_type)" in
+		exfat)
+			[ "$(fs_label)" = "$LABEL" ] && say "partição $LABEL encontrada"
+			mount_data || state unknown exfat
+			;;
+		"")
+			# vazia: cartão novo, o assistente do launcher pergunta
+			say "partição $LABEL vazia: aguardando o assistente"
+			state setup "$(size_gb)"
+			;;
+		*)
+			say "$DATA_PART é '$(fs_type)', não exFAT: não mexo"
+			state unknown "$(fs_type)"
+			;;
+	esac
+}
+
+do_format() {
+	root_disk || return 1
+	[ -b "$DATA_PART" ] || create_entry || return 1
+	# Nunca formata por cima de alguma coisa
+	if [ -n "$(fs_type)" ]; then
+		say "$DATA_PART já tem '$(fs_type)': não formato"
+		return 1
+	fi
+	mkfs.exfat -L "$LABEL" "$DATA_PART" > /dev/null || return 1
+	sync
+	say "partição $LABEL criada"
+	mount_data
+}
+
+case "$1" in
+	boot) do_boot ;;
+	format) do_format ;;
+	stop) sync; umount "$MNT" 2>/dev/null ;;
+	*) echo "uso: $0 boot|format|stop" >&2; exit 2 ;;
+esac
