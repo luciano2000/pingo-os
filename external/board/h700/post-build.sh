@@ -20,3 +20,9 @@ mkdir -p "$TARGET_DIR/boot" "$TARGET_DIR/mnt/sd1" "$TARGET_DIR/mnt/sd2"
 rm -f "$TARGET_DIR"/usr/lib/libclang*.so* "$TARGET_DIR"/usr/lib/libLLVMSPIRVLib.so*
 rm -rf "$TARGET_DIR"/usr/share/clc
 rm -f "$TARGET_DIR"/usr/bin/llvm-spirv "$TARGET_DIR"/usr/bin/spirv-*
+
+# Tela de boot: PNG -> formato bruto do framebuffer (XRGB8888 640x480)
+mkdir -p "$TARGET_DIR/usr/share/pingo"
+python3 -I "$BR2_EXTERNAL_PINGO_PATH/../scripts/png2fb.py" \
+	"$BR2_EXTERNAL_PINGO_PATH/board/h700/splash/pingo.png" \
+	"$TARGET_DIR/usr/share/pingo/splash.raw"

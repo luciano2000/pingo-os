@@ -53,3 +53,18 @@ Outros ajustes:
 - [ ] Regravar a imagem preserva a `ROMS` e o conteúdo
 - [ ] Chaves SSH iguais entre boots
 - [ ] Desligamento sujo: `fsck` corrige no boot seguinte
+
+## Formatos de jogos
+
+| Sistema | Formatos | Observação |
+|---|---|---|
+| Cartuchos (GB, GBA, NES, SNES, MD...) | ROM solta ou `.zip` | O `pingo-retro` descompacta o `.zip` na memória (fatia 3) |
+| Arcade (FBNeo) | `.zip` (romset) | Nunca extrair: o romset é o próprio `.zip` |
+| PlayStation (PCSX ReARMed) | `.chd` (recomendado), `.cue`+`.bin`, `.m3u`, `.pbp` | Vários discos: um item na lista via `.m3u` |
+| PC Engine CD (Beetle PCE Fast) | `.chd` (recomendado), `.cue`+`.bin`/`.wav`/`.ogg`, `.ccd` | |
+| `.zip` de CD, `.7z` | Não suportados por enquanto | Para CD, o compactado é o `.chd` (`chdman` no PC) |
+
+## Tela de boot
+
+- `board/h700/splash/pingo.png` (640x480) vira `/usr/share/pingo/splash.raw` no build (`scripts/png2fb.py`, XRGB8888) e o `S00pingo-splash` copia para o `/dev/fb0` no começo do boot.
+- Kernel silencioso (`loglevel=3 logo.nologo vt.global_cursor_default=0`); `/dev/console` passa a ser a serial (`ttyS0`), então as mensagens do init e o login não escrevem por cima do logo. Diagnóstico: `pingo-log.txt`, `dmesg`, SSH e serial USB.

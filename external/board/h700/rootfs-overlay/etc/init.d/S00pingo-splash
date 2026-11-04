@@ -1,0 +1,4 @@
+#!/bin/sh
+# Primeira coisa do boot: o logo do Pingo na tela
+[ "$1" = start ] && /usr/bin/pingo-splash
+exit 0

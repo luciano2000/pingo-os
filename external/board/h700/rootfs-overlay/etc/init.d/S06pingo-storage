@@ -82,7 +82,7 @@ start() {
 	root_disk || { say "não achei o disco do sistema"; return 0; }
 
 	if [ ! -b "$DATA_PART" ]; then
-		create_data_partition || { screen ""; return 0; }
+		create_data_partition || { /usr/bin/pingo-splash; return 0; }
 		FRESH=1
 	fi
 
@@ -100,7 +100,7 @@ start() {
 	mount -t exfat -o noatime,errors=remount-ro "$DATA_PART" "$MNT" || {
 		say "falha ao montar $DATA_PART"; return 0; }
 	make_folders
-	[ -n "$FRESH" ] && screen ""
+	[ -n "$FRESH" ] && /usr/bin/pingo-splash
 
 	# Chaves SSH persistentes: o S50dropbear usa /etc/dropbear -> /var/run/dropbear
 	ln -sfn "$MNT/.system/dropbear" /var/run/dropbear

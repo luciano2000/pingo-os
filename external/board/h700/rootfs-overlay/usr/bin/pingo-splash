@@ -1,0 +1,12 @@
+#!/bin/sh
+# Desenha a tela de boot (logo do Pingo) direto no framebuffer.
+# A imagem é gerada no build a partir de board/h700/splash/pingo.png.
+IMG=/usr/share/pingo/splash.raw
+FB=/sys/class/graphics/fb0
+[ -r "$IMG" ] && [ -e /dev/fb0 ] || exit 0
+# Só se a tela for 640x480 em 32 bits (o formato do arquivo)
+[ "$(cat $FB/virtual_size 2>/dev/null | cut -d, -f1)" = 640 ] || exit 0
+[ "$(cat $FB/bits_per_pixel 2>/dev/null)" = 32 ] || exit 0
+echo 0 > /sys/class/graphics/fbcon/cursor_blink 2>/dev/null
+cat "$IMG" > /dev/fb0 2>/dev/null
+exit 0
