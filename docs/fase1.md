@@ -141,3 +141,39 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] Segurar no jogo: desliga e, no boot, volta para o jogo no mesmo ponto
 - [x] Suspensão prolongada (teste curto): desliga sozinho e retoma no boot
 - [x] Sair pelo menu: o boot seguinte abre o launcher normal
+
+## Fatia 5: cores
+
+16 cores libretro na imagem (`/usr/lib/libretro/`), ~45 MB no total; imagem de 139 MB (64 MB em `.xz`).
+
+- Modelo comum em `external/external.mk` (`pingo-libretro-core`): cada pacote `libretro-*` só define commit, hash, Makefile, subpasta e nome do `.so`. Compila com `platform=unix` e só `CC/CXX/AR` na linha de comando.
+- mGBA usa CMake (`-DBUILD_LIBRETRO=ON`, sem interface nem dependências).
+- PicoDrive vem por git com submódulos (o `.tar.gz` do GitHub não traz `libpicofe`, `cyclone`...).
+- PCSX ReARMed com recompilador dinâmico ARM64 (`DYNAREC=ari64`).
+- Atari 2600: `stella2014` (mais leve que o Stella atual).
+- BIOS: `docs/bios.md`.
+
+| Console | Core |
+|---|---|
+| GB/GBC | gambatte |
+| GBA | mgba |
+| NES/FDS | fceumm |
+| SNES | snes9x |
+| Virtual Boy | mednafen_vb |
+| Pokémon mini | pokemini |
+| MS/GG/MD/Sega CD | genesis_plus_gx |
+| 32X | picodrive |
+| PC Engine / CD | mednafen_pce_fast |
+| Neo Geo Pocket | mednafen_ngp |
+| WonderSwan | mednafen_wswan |
+| MSX | bluemsx |
+| Atari 2600/7800/Lynx | stella2014 / prosystem / handy |
+| PlayStation | pcsx_rearmed |
+
+### Pendente nesta fatia
+
+- [ ] Testar um jogo de cada console no aparelho
+- [ ] PS1 com vários discos: `.m3u` como um item ("N discos") e troca de disco no menu
+- [ ] Listas curadas de opções dos cores novos (por enquanto só a Escala)
+- [ ] Filtros de tela (seção 8.1)
+- [ ] Remapeamento de botões

@@ -1,0 +1,7 @@
+config BR2_PACKAGE_LIBRETRO_BEETLE_PCE_FAST
+	bool "libretro-beetle-pce-fast"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Core libretro mednafen_pce_fast (GPL-2.0).
+
+	  https://github.com/libretro/beetle-pce-fast-libretro

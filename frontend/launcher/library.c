@@ -33,7 +33,7 @@ const struct console consoles[] = {
 	{ "NGP",      "Neo Geo Pocket",    "ngp ngc zip",             "mednafen_ngp" },
 	{ "WS",       "WonderSwan",        "ws wsc zip",              "mednafen_wswan" },
 	{ "MSX",      "MSX",               "rom mx1 mx2 dsk zip",     "bluemsx" },
-	{ "A2600",    "Atari 2600",        "a26 bin zip",             "stella" },
+	{ "A2600",    "Atari 2600",        "a26 bin zip",             "stella2014" },
 	{ "A7800",    "Atari 7800",        "a78 zip",                 "prosystem" },
 	{ "LYNX",     "Atari Lynx",        "lnx zip",                 "handy" },
 	{ "PS",       "PlayStation",       "chd cue pbp m3u",         "pcsx_rearmed" },

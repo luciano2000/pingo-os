@@ -1,0 +1,7 @@
+config BR2_PACKAGE_LIBRETRO_POKEMINI
+	bool "libretro-pokemini"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Core libretro pokemini (GPL-3.0).
+
+	  https://github.com/libretro/PokeMini

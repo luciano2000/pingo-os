@@ -1,3 +1,17 @@
+# --- Cores libretro ---------------------------------------------------------
+# Modelo comum: cada pacote libretro-* define _CORE (nome do .so), _MAKEFILE,
+# _SUBDIR (opcional) e _MAKE_OPTS (opcional) e chama este macro.
+# Só CC/CXX/AR na linha de comando: os Makefiles dos cores acrescentam as
+# próprias flags com +=, que um CFLAGS na linha de comando anularia.
+define pingo-libretro-core
+$(1)_BUILD_CMDS = $$(TARGET_MAKE_ENV) $$(MAKE) -C $$(@D)/$$($(1)_SUBDIR) \
+	-f $$($(1)_MAKEFILE) platform=unix \
+	CC="$$(TARGET_CC)" CXX="$$(TARGET_CXX)" AR="$$(TARGET_AR)" $$($(1)_MAKE_OPTS)
+$(1)_INSTALL_TARGET_CMDS = $$(INSTALL) -D -m 0644 \
+	$$(@D)/$$($(1)_SUBDIR)/$$($(1)_CORE)_libretro.so \
+	$$(TARGET_DIR)/usr/lib/libretro/$$($(1)_CORE)_libretro.so
+endef
+
 include $(sort $(wildcard $(BR2_EXTERNAL_PINGO_PATH)/package/*/*.mk))
 
 PINGO_H700_BOARD = $(BR2_EXTERNAL_PINGO_PATH)/board/h700

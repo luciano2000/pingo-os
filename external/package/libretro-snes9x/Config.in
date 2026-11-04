@@ -1,0 +1,7 @@
+config BR2_PACKAGE_LIBRETRO_SNES9X
+	bool "libretro-snes9x"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Core libretro snes9x (Snes9x (não comercial)).
+
+	  https://github.com/libretro/snes9x

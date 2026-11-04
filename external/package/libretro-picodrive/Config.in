@@ -1,0 +1,7 @@
+config BR2_PACKAGE_LIBRETRO_PICODRIVE
+	bool "libretro-picodrive"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Core libretro picodrive (PicoDrive (não comercial)).
+
+	  https://github.com/libretro/picodrive

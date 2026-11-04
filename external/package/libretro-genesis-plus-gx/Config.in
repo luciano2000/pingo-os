@@ -1,0 +1,7 @@
+config BR2_PACKAGE_LIBRETRO_GENESIS_PLUS_GX
+	bool "libretro-genesis-plus-gx"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Core libretro genesis_plus_gx (Genesis Plus GX (não comercial)).
+
+	  https://github.com/libretro/Genesis-Plus-GX

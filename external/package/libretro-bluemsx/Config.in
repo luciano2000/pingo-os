@@ -1,0 +1,7 @@
+config BR2_PACKAGE_LIBRETRO_BLUEMSX
+	bool "libretro-bluemsx"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Core libretro bluemsx (blueMSX (não comercial)).
+
+	  https://github.com/libretro/blueMSX-libretro
