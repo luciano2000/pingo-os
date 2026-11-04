@@ -71,3 +71,24 @@ Nota para a fatia 3: o frontend deve gravar SRAM e save states com `fsync` logo 
 
 - `board/h700/splash/pingo.png` (640x480) vira `/usr/share/pingo/splash.raw` no build (`scripts/png2fb.py`, XRGB8888) e o `S00pingo-splash` copia para o `/dev/fb0` no começo do boot.
 - Kernel silencioso (`loglevel=3 logo.nologo vt.global_cursor_default=0`); `/dev/console` passa a ser a serial (`ttyS0`), então as mensagens do init e o login não escrevem por cima do logo. Diagnóstico: `pingo-log.txt`, `dmesg`, SSH e serial USB.
+
+## Fatia 2: launcher
+
+Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (volume e brilho, usado também pelo `pingo-retro`). Pacote `pingo-frontend`; fonte Inter 4.1 (`font-inter`, OFL).
+
+- Telas do mockup: Início (relógio, Wi-Fi, bateria; Recentes e consoles com contagem) e listas como navegador de pastas.
+- Biblioteca: varre `Roms/<console>` com subpastas; oculta pastas sem jogos e arquivos ocultos; nome limpo (sem extensão, `(...)` e `[...]`); ordem natural. Cache em `.system/cache/launcher.cache`, conferido em segundo plano a cada abertura.
+- Navegação: ↑↓ (segurar repete), ←→ página, L1/R1 letra inicial anterior/próxima, A abre/joga, B volta. Power suspende.
+- Volume (Vol±, 20 passos) e brilho (MENU segurado + Vol±, 10 passos) com a barra vertical à direita; salvos em `Config/sistema.cfg`.
+- Abrir um jogo: o launcher grava `/run/pingo/next` e sai; o `pingo-shell` roda o `pingo-retro` e reabre o launcher no mesmo lugar (`/run/pingo/launcher.state`). Recentes em `Config/recentes.txt` (console + caminho relativo).
+- O launcher desenha só quando algo muda (bateria). Desenha dois quadros ao abrir: o KMS/DRM do SDL nem sempre mostra o primeiro, e a tela ficava preta ao voltar do jogo.
+- Boot: `S90pingo-ui` inicia o `pingo-shell`; o Wi-Fi (`S41`) e o log de boot (`S99`) passaram para segundo plano.
+
+### Checklist
+
+- [x] Início, listas e subpastas como no MinUI (pastas vazias ocultas)
+- [x] B volta para a pasta de onde se saiu; rolagem ao segurar; L1/R1 por letra
+- [x] Abrir jogo, voltar para a lista, Recentes
+- [x] Power suspende e volta para a mesma tela
+- [x] Volume e brilho com sobreposição, no launcher e no jogo; valores persistem
+- [ ] Boot direto no launcher pela imagem (testado até aqui com cópia na RAM)

@@ -24,6 +24,7 @@
 #include <SDL2/SDL.h>
 
 #include "libretro.h"
+#include "osd.h"
 
 #define GAMEPAD_NAME "H700 Gamepad"
 
@@ -103,15 +104,22 @@ static void video_refresh(const void *data, unsigned width, unsigned height, siz
 		tex_h = height;
 	}
 	SDL_UpdateTexture(texture, NULL, data, (int)pitch);
+}
 
-	/* escala inteira, centralizada */
-	int scale = SDL_min(screen_w / tex_w, screen_h / tex_h);
-	if (scale < 1)
-		scale = 1;
-	SDL_Rect dst = { (screen_w - tex_w * scale) / 2, (screen_h - tex_h * scale) / 2,
-			 tex_w * scale, tex_h * scale };
+/* Quadro atual (escala inteira, centralizada) + sobreposição de volume/brilho */
+static void render_frame(void)
+{
 	SDL_RenderClear(renderer);
-	SDL_RenderCopy(renderer, texture, NULL, &dst);
+	if (texture) {
+		int scale = SDL_min(screen_w / tex_w, screen_h / tex_h);
+		if (scale < 1)
+			scale = 1;
+		SDL_Rect dst = { (screen_w - tex_w * scale) / 2, (screen_h - tex_h * scale) / 2,
+				 tex_w * scale, tex_h * scale };
+		SDL_RenderCopy(renderer, texture, NULL, &dst);
+	}
+	osd_draw(renderer, screen_w, screen_h);
+	SDL_RenderPresent(renderer);
 }
 
 /* ---- som ------------------------------------------------------------- */
@@ -134,11 +142,11 @@ static void audio_sample(int16_t left, int16_t right)
 
 /* ---- controles (evdev) ----------------------------------------------- */
 
-static int pad_fd = -1;
+static int pad_fd = -1, vol_fd = -1;
 static bool pad_state[16];
 static bool quit_requested;
 
-static int open_gamepad(void)
+static int open_input(const char *want)
 {
 	DIR *dir = opendir("/dev/input");
 	struct dirent *ent;
@@ -153,7 +161,7 @@ static int open_gamepad(void)
 		int fd = open(path, O_RDONLY | O_NONBLOCK);
 		if (fd < 0)
 			continue;
-		if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) >= 0 && !strcmp(name, GAMEPAD_NAME)) {
+		if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) >= 0 && !strcmp(name, want)) {
 			closedir(dir);
 			fprintf(stderr, "pingo-retro: controle em %s\n", path);
 			return fd;
@@ -192,13 +200,21 @@ static void input_poll(void)
 {
 	struct input_event ev;
 
+	while (vol_fd >= 0 && read(vol_fd, &ev, sizeof(ev)) == sizeof(ev))
+		if (ev.type == EV_KEY)
+			osd_key(ev.code, ev.value);
 	if (pad_fd < 0)
 		return;
 	while (read(pad_fd, &ev, sizeof(ev)) == sizeof(ev)) {
 		if (ev.type != EV_KEY)
 			continue;
-		if (ev.code == BTN_MODE && ev.value == 1) {
-			quit_requested = true;
+		if (osd_key(ev.code, ev.value))
+			continue;
+		if (ev.code == BTN_MODE) {
+			/* MENU ao soltar, sem Vol± junto. Até o menu do jogo existir
+			 * (fatia 3), ele sai do jogo. */
+			if (osd_menu_tapped())
+				quit_requested = true;
 			continue;
 		}
 		int id = map_key(ev.code);
@@ -365,7 +381,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "pingo-retro: sem som: %s\n", SDL_GetError());
 	}
 
-	pad_fd = open_gamepad();
+	pad_fd = open_input(GAMEPAD_NAME);
+	vol_fd = open_input("gpio-keys-volume");
+	osd_init();
 	if (pad_fd < 0)
 		fprintf(stderr, "pingo-retro: \"%s\" não encontrado, sem controle\n", GAMEPAD_NAME);
 
@@ -385,7 +403,7 @@ int main(int argc, char **argv)
 				quit_requested = true;
 
 		core.run();
-		SDL_RenderPresent(renderer);
+		render_frame();
 
 		frames++;
 		Uint32 now = SDL_GetTicks();
@@ -402,6 +420,7 @@ int main(int argc, char **argv)
 	core.deinit();
 	if (audio_dev)
 		SDL_CloseAudioDevice(audio_dev);
+	osd_quit();
 	SDL_Quit();
 	free((void *)game.data);
 	return 0;

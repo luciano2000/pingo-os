@@ -1,7 +1,10 @@
-config BR2_PACKAGE_PINGO_RETRO
-	bool "pingo-retro"
+config BR2_PACKAGE_PINGO_FRONTEND
+	bool "pingo-frontend"
 	depends on BR2_PACKAGE_SDL2
+	select BR2_PACKAGE_SDL2_TTF
+	select BR2_PACKAGE_FONT_INTER
+	select BR2_PACKAGE_ALSA_LIB
 	help
-	  Frontend libretro mínimo do Pingo OS (Fase 0): carrega um
-	  core, desenha pelo SDL2 (KMS/DRM + GLES), toca o som pelo
-	  ALSA e lê o controle direto do evdev.
+	  Interface do Pingo OS: pingo-launcher (tela inicial e listas
+	  de jogos), pingo-retro (frontend libretro) e pingo-shell (o
+	  laço que liga os dois).

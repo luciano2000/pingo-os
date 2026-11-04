@@ -1,17 +1,32 @@
-# pingo-retro: frontend libretro mínimo (Fase 0)
+# Frontend do Pingo OS: pingo-retro (jogos) e pingo-launcher (listas)
 CC ?= gcc
 PKG_CONFIG ?= pkg-config
 CFLAGS ?= -O2
-override CFLAGS += -Wall -Wextra -Wno-unused-parameter -Iinclude $(shell $(PKG_CONFIG) --cflags sdl2)
-override LDLIBS += $(shell $(PKG_CONFIG) --libs sdl2) -ldl
+override CFLAGS += -Wall -Wextra -Wno-unused-parameter -Iinclude -Icommon
+SDL_CFLAGS = $(shell $(PKG_CONFIG) --cflags sdl2)
+SDL_LIBS = $(shell $(PKG_CONFIG) --libs sdl2)
+TTF_LIBS = $(shell $(PKG_CONFIG) --libs SDL2_ttf)
+ALSA_LIBS = $(shell $(PKG_CONFIG) --libs alsa)
+COMMON_SRC = common/osd.c
+COMMON_HDR = common/osd.h
 
-pingo-retro: pingo-retro.c include/libretro.h
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
+LAUNCHER_SRC = launcher/main.c launcher/library.c launcher/ui.c
+LAUNCHER_HDR = launcher/library.h launcher/ui.h launcher/strings_pt.h
 
-install: pingo-retro
+all: pingo-retro pingo-launcher
+
+pingo-retro: pingo-retro.c include/libretro.h $(COMMON_SRC) $(COMMON_HDR)
+	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(LDFLAGS) -o $@ pingo-retro.c $(COMMON_SRC) $(SDL_LIBS) $(ALSA_LIBS) -ldl -lm
+
+pingo-launcher: $(LAUNCHER_SRC) $(LAUNCHER_HDR) $(COMMON_SRC) $(COMMON_HDR)
+	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(LDFLAGS) -o $@ $(LAUNCHER_SRC) $(COMMON_SRC) $(TTF_LIBS) $(SDL_LIBS) $(ALSA_LIBS) -lm
+
+install: all
 	install -D -m 0755 pingo-retro $(DESTDIR)/usr/bin/pingo-retro
+	install -D -m 0755 pingo-launcher $(DESTDIR)/usr/bin/pingo-launcher
+	install -D -m 0755 pingo-shell $(DESTDIR)/usr/bin/pingo-shell
 
 clean:
-	rm -f pingo-retro
+	rm -f pingo-retro pingo-launcher
 
-.PHONY: install clean
+.PHONY: all install clean

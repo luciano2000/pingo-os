@@ -1,0 +1,7 @@
+config BR2_PACKAGE_FONT_INTER
+	bool "font-inter"
+	help
+	  Fonte Inter (pesos 400, 500 e 600), usada pela interface do
+	  Pingo OS. Licença SIL Open Font License 1.1.
+
+	  https://rsms.me/inter/

@@ -4,38 +4,41 @@ CONF=/boot/pingo-wifi.txt
 RUN=/run/pingo-wifi
 case "$1" in
   start)
-    [ -r "$CONF" ] || exit 0
-    SSID="$(sed -n 's/^SSID=//p' "$CONF" | tr -d '\r')"
-    PSK="$(sed -n 's/^SENHA=//p' "$CONF" | tr -d '\r')"
-    [ -n "$SSID" ] || exit 0
-    mkdir -p "$RUN"
-    { echo "ctrl_interface=/run/wpa_supplicant"; wpa_passphrase "$SSID" "$PSK"; } > "$RUN/wpa.conf"
-    for i in 1 2 3 4 5 6 7 8 9 10; do [ -e /sys/class/net/wlan0 ] && break; sleep 1; done
-    # O RTL8821CS às vezes falha o primeiro probe no boot (erros de SDIO,
-    # -110); religar o driver resolve. Mesmo quirk do ROCKNIX (040-wifi_probe_retry).
-    for try in 1 2 3; do
-      [ -e /sys/class/net/wlan0 ] && break
-      for dev in /sys/bus/sdio/devices/*; do
-        [ -e "$dev/driver" ] && continue
-        case "$(cat "$dev/modalias" 2>/dev/null)" in sdio:*v024CdC821*) ;; *) continue ;; esac
-        echo "pingo-wifi: RTL8821CS sem driver, religando $(basename "$dev") (tentativa $try)" > /dev/kmsg
-        basename "$dev" > /sys/bus/sdio/drivers/rtw88_8821cs/bind 2>/dev/null
+    # Em segundo plano: esperar o Wi-Fi associar não pode atrasar o boot
+    (
+      [ -r "$CONF" ] || exit 0
+      SSID="$(sed -n 's/^SSID=//p' "$CONF" | tr -d '\r')"
+      PSK="$(sed -n 's/^SENHA=//p' "$CONF" | tr -d '\r')"
+      [ -n "$SSID" ] || exit 0
+      mkdir -p "$RUN"
+      { echo "ctrl_interface=/run/wpa_supplicant"; wpa_passphrase "$SSID" "$PSK"; } > "$RUN/wpa.conf"
+      for i in 1 2 3 4 5 6 7 8 9 10; do [ -e /sys/class/net/wlan0 ] && break; sleep 1; done
+      # O RTL8821CS às vezes falha o primeiro probe no boot (erros de SDIO,
+      # -110); religar o driver resolve. Mesmo quirk do ROCKNIX (040-wifi_probe_retry).
+      for try in 1 2 3; do
+        [ -e /sys/class/net/wlan0 ] && break
+        for dev in /sys/bus/sdio/devices/*; do
+          [ -e "$dev/driver" ] && continue
+          case "$(cat "$dev/modalias" 2>/dev/null)" in sdio:*v024CdC821*) ;; *) continue ;; esac
+          echo "pingo-wifi: RTL8821CS sem driver, religando $(basename "$dev") (tentativa $try)" > /dev/kmsg
+          basename "$dev" > /sys/bus/sdio/drivers/rtw88_8821cs/bind 2>/dev/null
+        done
+        sleep 5
       done
-      sleep 5
-    done
-    ip link set wlan0 up
-    iw dev wlan0 set power_save off 2>/dev/null
-    wpa_supplicant -B -i wlan0 -c "$RUN/wpa.conf" -P "$RUN/wpa.pid" || exit 0
-    # espera associar antes do DHCP (até 15 s)
-    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-      iw dev wlan0 link | grep -q Connected && break; sleep 1
-    done
-    udhcpc -b -i wlan0 -p "$RUN/udhcpc.pid" -s /usr/share/udhcpc/default.script >/dev/null 2>&1
-    # Acerta o relógio pela internet e grava no RTC (o kernel lê o rtc0 no boot)
-    ( for i in 1 2 3 4 5 6; do
-        ntpd -n -q -p pool.ntp.org >/dev/null 2>&1 && { hwclock -w -u; break; }
-        sleep 10
-      done ) &
+      ip link set wlan0 up
+      iw dev wlan0 set power_save off 2>/dev/null
+      wpa_supplicant -B -i wlan0 -c "$RUN/wpa.conf" -P "$RUN/wpa.pid" || exit 0
+      # espera associar antes do DHCP (até 15 s)
+      for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        iw dev wlan0 link | grep -q Connected && break; sleep 1
+      done
+      udhcpc -b -i wlan0 -p "$RUN/udhcpc.pid" -s /usr/share/udhcpc/default.script >/dev/null 2>&1
+      # Acerta o relógio pela internet e grava no RTC (o kernel lê o rtc0 no boot)
+      ( for i in 1 2 3 4 5 6; do
+          ntpd -n -q -p pool.ntp.org >/dev/null 2>&1 && { hwclock -w -u; break; }
+          sleep 10
+        done ) &
+    ) > /dev/null 2>&1 &
     ;;
   stop)
     [ -f "$RUN/udhcpc.pid" ] && kill "$(cat "$RUN/udhcpc.pid")"

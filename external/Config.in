@@ -1,6 +1,7 @@
 menu "Pingo OS"
 source "$BR2_EXTERNAL_PINGO_PATH/package/h700-suspend-stub/Config.in"
 source "$BR2_EXTERNAL_PINGO_PATH/package/libretro-gambatte/Config.in"
-source "$BR2_EXTERNAL_PINGO_PATH/package/pingo-retro/Config.in"
+source "$BR2_EXTERNAL_PINGO_PATH/package/font-inter/Config.in"
+source "$BR2_EXTERNAL_PINGO_PATH/package/pingo-frontend/Config.in"
 source "$BR2_EXTERNAL_PINGO_PATH/package/rocknix-joypad/Config.in"
 endmenu

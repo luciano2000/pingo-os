@@ -1,0 +1,21 @@
+#!/bin/sh
+# Laço da interface do Pingo OS: launcher -> jogo -> launcher.
+# O launcher grava o jogo escolhido em /run/pingo/next e sai; aqui o jogo
+# roda como outro processo e, ao sair, o launcher volta para o mesmo lugar.
+export HOME=/root
+mountpoint -q /mnt/sd1 && export XDG_CACHE_HOME=/mnt/sd1/.system/cache
+mkdir -p /run/pingo
+rm -f /run/pingo/next /run/pingo/launcher.state
+
+while true; do
+	/usr/bin/pingo-launcher
+	rc=$?
+	if [ -f /run/pingo/next ]; then
+		{ read -r core; read -r rom; } < /run/pingo/next
+		rm -f /run/pingo/next
+		echo "== $(date '+%F %T') $rom"
+		/usr/bin/pingo-retro "$core" "$rom"
+	elif [ $rc -ne 0 ]; then
+		sleep 1 # o launcher caiu: evita um laço rápido
+	fi
+done
