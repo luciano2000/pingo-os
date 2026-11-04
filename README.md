@@ -61,3 +61,5 @@ external/              árvore BR2_EXTERNAL do Buildroot
 ## Licença
 
 GPL-2.0. Componentes de terceiros mantêm as próprias licenças.
+
+**Cores com licença não comercial.** Snes9x, Genesis Plus GX, PicoDrive, FBNeo e blueMSX só podem ser distribuídos sem fins lucrativos. A imagem do Pingo OS é gratuita e pode incluí-los; **vender** a imagem, cartões ou aparelhos com esses cores não é permitido pelas licenças deles.

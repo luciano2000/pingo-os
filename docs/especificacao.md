@@ -107,6 +107,9 @@ Os nomes finais das pastas ainda podem mudar, mas a estrutura deve ser idêntica
 | PlayStation | PCSX ReARMed |
 | Arcade | **FBNeo** (principal); MAME 2003-Plus só como complemento |
 
+### Licenças dos cores
+Snes9x, Genesis Plus GX, PicoDrive, FBNeo e blueMSX têm licença **não comercial**: podem ir na imagem gratuita, mas impedem vender a imagem, cartões ou aparelhos com eles. Se um dia houver venda, esses cores ficam de fora ou são trocados por alternativas livres (ex.: bsnes/Mesen-S para SNES).
+
 ### Fora do escopo (decisão do projeto)
 Nintendo DS, N64, Dreamcast, PSP e Saturn. Rodam mal ou só parcialmente nesse hardware.
 
