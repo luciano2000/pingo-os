@@ -1,0 +1,8 @@
+config BR2_PACKAGE_LIBRETRO_GAMBATTE
+	bool "libretro-gambatte"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Core libretro de Game Boy / Game Boy Color (gambatte).
+	  Instala em /usr/lib/libretro/gambatte_libretro.so.
+
+	  https://github.com/libretro/gambatte-libretro

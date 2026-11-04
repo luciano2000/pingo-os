@@ -65,7 +65,7 @@ Console serial: UART a 115200 baud nos pads da placa (`ttyS0`). Ajuda muito se o
 - [x] Suspend deep (stub SRAM): entra, acorda pelo RTC, USB e Wi-Fi voltam (`pingo-suspend`)
 - [x] Suspend deep: consumo medido, ~2 %/h (8 h: 100 % -> 84 %, 4,104 V -> 3,966 V; o ROCKNIX mede ~3 %/h)
 - [x] Etapa 2: Mesa/Panfrost + `kmscube`: Mali-G31 MC1, OpenGL ES 3.1, 60 fps cravados no painel 640x480
-- [ ] Etapa 2: frontend mínimo rodando o gambatte
+- [x] Etapa 2: frontend mínimo (`pingo-retro`) rodando o gambatte: 60 fps, som limpo, controles OK
 
 ## Aparelho de teste (RG35XX-H do autor)
 
@@ -97,3 +97,11 @@ Conferido no cartão ROCKNIX que já roda no aparelho (2026-11-03):
 - O `libgallium` liga no `libLLVM` em tempo de execução, mas o Clang (~95 MB) só serve ao OpenCL e entrou na imagem (175 MB). Tirar na Fase 1.
 - `kmscube` sai no primeiro quadro se a entrada padrão fechar (lê o stdin para detectar tecla). Pelo SSH, rode `sleep 20 | kmscube -D /dev/dri/card1 -c 600`. O display é o `card1` (sun4i-drm); o `card0` é a GPU (panfrost).
 - O Mesa tenta gravar o cache de shaders em `~/.cache` (raiz somente leitura). Na Fase 1, apontar `MESA_SHADER_CACHE_DIR` para a partição de dados.
+
+## Teste do frontend (2026-11-04)
+
+- `pingo-retro <core.so> <rom>` (código em `frontend/`): SDL2 KMSDRM + GLES2, escala inteira centralizada (Game Boy em 3x = 480x432), som SDL2/ALSA na taxa do core, controle lido direto do evdev "H700 Gamepad". MENU sai.
+- Core: `libretro-gambatte` (pacote em `external/package/`), instalado em `/usr/lib/libretro/`.
+- ROM de teste: [Adjustris](https://github.com/tbsp/Adjustris) v1.1, licença CC0 (domínio público). Não vai na imagem.
+- Resultado: 60 fps estáveis, fila de som estável (~50 ms), imagem e som OK, botões responsivos.
+- Um `retro_run` por vsync (60 Hz) com o Game Boy a 59,73 Hz: a diferença é descartada no som. Na Fase 1, sincronizar pelo áudio ou usar o modo de 59,7 Hz do painel.

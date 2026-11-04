@@ -37,6 +37,7 @@ Outros alvos do Buildroot: `scripts/build.sh rg35xxh menuconfig`, `scripts/build
 ```
 docs/                  especificação, mockup da interface, notas de cada fase
 docker/                ambiente de build
+frontend/              pingo-retro, o frontend libretro (Fase 0: mínimo)
 scripts/build.sh       build dentro do Docker
 scripts/sync-rocknix.sh  importa patches, device trees e firmwares do ROCKNIX
 external/              árvore BR2_EXTERNAL do Buildroot
@@ -51,6 +52,7 @@ external/              árvore BR2_EXTERNAL do Buildroot
 - [rocknix-joypad](https://github.com/hackbar/rocknix-joypad): driver dos controles.
 - [Buildroot](https://buildroot.org), [U-Boot](https://u-boot.org), [Trusted Firmware-A](https://www.trustedfirmware.org).
 - [MinUI](https://github.com/shauninman/MinUI): referência de interface.
+- [libretro](https://www.libretro.com): API dos cores (`libretro.h`, MIT) e o core [gambatte](https://github.com/libretro/gambatte-libretro).
 
 ## Licença
 

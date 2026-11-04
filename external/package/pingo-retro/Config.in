@@ -1,0 +1,7 @@
+config BR2_PACKAGE_PINGO_RETRO
+	bool "pingo-retro"
+	depends on BR2_PACKAGE_SDL2
+	help
+	  Frontend libretro mínimo do Pingo OS (Fase 0): carrega um
+	  core, desenha pelo SDL2 (KMS/DRM + GLES), toca o som pelo
+	  ALSA e lê o controle direto do evdev.
