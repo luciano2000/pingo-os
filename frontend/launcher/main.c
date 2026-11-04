@@ -488,7 +488,7 @@ static bool launch(struct node *game)
 	FILE *f = fopen(NEXT_FILE ".tmp", "w");
 	if (!f)
 		return false;
-	fprintf(f, "%s\n%s\n", core, game->path);
+	fprintf(f, "%s\n%s\n%s\n", core, game->path, consoles[game->console].code);
 	fclose(f);
 	rename(NEXT_FILE ".tmp", NEXT_FILE);
 	return true;

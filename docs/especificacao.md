@@ -302,6 +302,18 @@ Exemplos em tela 640x480 (4:3):
 
 - Só no launcher: depois de 2 minutos sem tocar em nenhum botão, a luz da tela apaga. Qualquer botão acende de novo, e esse primeiro toque só acorda a tela (não abre nada). Dentro do jogo, nada muda.
 
+## 8.0.2 Idiomas
+
+- **Toda a interface é traduzível pela comunidade.** Os textos ficam em arquivos de idioma lidos em tempo de execução (`chave=texto`), um por idioma (ex.: `pt_BR`, `en`, `es`), sem precisar compilar nada.
+- O português é o idioma de referência e vem embutido como padrão; um idioma incompleto cai no português na chave que faltar.
+- Idiomas novos podem vir na imagem ou ser colocados no cartão (`/Config`) para testar. Escolha nas Configurações.
+
+## 8.0.3 Data, hora e fuso horário
+
+- Nas Configurações: **"Ajustar pela internet"** (ligado de fábrica, via NTP quando há Wi-Fi) ou ajuste manual de data e hora.
+- Escolha do **fuso horário** (padrão: América/São Paulo).
+- O relógio de hardware (RTC) guarda a hora com o aparelho desligado.
+
 ## 9. Wi-Fi (usos previstos)
 - Conectar a redes pelo menu de configurações: lista das redes com o sinal, senha num teclado na tela. **Obrigatório na versão final.** Continua com o `wpa_supplicant` (sem NetworkManager/D-Bus), conversando pelo socket de controle; redes salvas no cartão. O `pingo-wifi.txt` na partição de boot continua valendo para configurar pelo PC.
 - **RetroAchievements** (principal uso do Wi-Fi): biblioteca oficial `rcheevos` (MIT) dentro do `pingo-retro`. Login pelo teclado na tela ou por arquivo no cartão; guarda só o token, nunca a senha. Aviso "Conquista desbloqueada" no jogo, item **Conquistas** no menu do jogo, modo hardcore opcional (bloqueia save states e fast-forward, regra do RetroAchievements). Sem rede na hora, as conquistas ficam pendentes e são enviadas quando a conexão voltar.

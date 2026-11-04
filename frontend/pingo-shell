@@ -11,10 +11,10 @@ while true; do
 	/usr/bin/pingo-launcher
 	rc=$?
 	if [ -f /run/pingo/next ]; then
-		{ read -r core; read -r rom; } < /run/pingo/next
+		{ read -r core; read -r rom; read -r console; } < /run/pingo/next
 		rm -f /run/pingo/next
 		echo "== $(date '+%F %T') $rom"
-		/usr/bin/pingo-retro "$core" "$rom"
+		/usr/bin/pingo-retro "$core" "$rom" "$console"
 		if [ $? -eq 3 ]; then # power segurado no jogo
 			# desenha e deixa no fb0 (fica na tela até apagar)
 			/usr/bin/pingo-launcher --message "Desligando…"

@@ -9,7 +9,7 @@
 | Suspensão prolongada | Fica suspenso até a bateria chegar a 10 % (desligamento de emergência) ou por no máximo 24 h; aí salva e desliga | O deep suspend gasta ~2 %/h (Fase 0); 10-15 min jogaria fora essa vantagem |
 | Pastas | Códigos curtos no cartão (`GB`, `SNES`, `MD`...); o launcher mostra o nome completo | Fácil de digitar no PC, sem acentos nem espaços |
 | Saves | Nomes do RetroArch (`Jogo.srm`); save states em formato próprio | Saves do ROCKNIX/RetroArch funcionam sem renomear |
-| Idioma | Português, com os textos num arquivo separado | O inglês entra depois sem retrabalho |
+| Idioma | Português, com os textos num arquivo separado; depois, arquivos de idioma lidos em tempo de execução | A comunidade traduz sem compilar nada |
 
 ## Fatias
 
@@ -102,3 +102,24 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - Segurando por mais tempo (> 3,5 s), o próprio chip corta a energia, sem avisar o sistema: desligamento sujo. Por isso o "segurar 2 s" do Pingo desliga antes.
 - Bug corrigido: o instante do aperto era guardado com o bit mais baixo ligado para distinguir de "solto"; metade das vezes ficava 1 ms no futuro, a conta sem sinal dava um número enorme e o toque virava "segurou 2 s".
 - Log da interface no cartão: `.system/logs/ui.log` (eventos do power, jogos abertos, fps).
+
+## Fatia 3: jogo completo
+
+`frontend/pingo-retro.c` reescrito; a camada de desenho (`common/ui.c`) e os textos (`common/strings_pt.h`) agora são compartilhados com o launcher.
+
+- **Menu do jogo** (MENU ao soltar), como no mockup: Continuar, Salvar, Carregar, Opções, Sair, com o jogo escurecido atrás; prévia do slot à direita, 4 slots (◀ ▶), "Salvo hoje, HH:MM". Salvar volta ao jogo, como no MinUI.
+- **Save states**: `States/<console>/<jogo>.st0..st3` + prévia `.bmp`; o slot inicial é o salvo mais recentemente.
+- **SRAM**: `Saves/<console>/<jogo>.srm` (nome do RetroArch); grava sozinha quando muda (a cada 5 s), ao abrir o menu, antes de suspender e ao sair. Tudo com arquivo temporário + `fsync` + `rename`.
+- **Som** a 48 kHz com reamostragem e controle dinâmico de taxa (±0,5 %): o Game Boy (59,73 Hz) roda um quadro por vsync (60 Hz) sem picotar; consoles longe de 60 Hz (PAL) acumulam tempo.
+- **Escala** Ajustada (padrão) ou Inteira, sempre com a proporção do core.
+- **`.zip`** de cartucho aberto na memória (`libzip`, maior arquivo do `.zip`); cores com `need_fullpath` (FBNeo) recebem o `.zip` como está.
+- **Opções**: Escala + lista curada por core (`frontend/cores/<core>.opts`, "chave=Nome em português"); "Salvar para este jogo" (`Config/<console>/<jogo>.cfg`) ou "para o console" (`Config/<console>/console.cfg`), o do jogo tem prioridade. Só as opções mostradas são gravadas.
+- O launcher passa o código do console ao `pingo-retro` (3ª linha de `/run/pingo/next`).
+
+### Checklist
+
+- [x] Som limpo (sem picotes) no Game Boy
+- [x] Menu do jogo, salvar/carregar nos 4 slots com prévia
+- [x] Escala Ajustada/Inteira e opções do Gambatte (só as úteis)
+- [x] `.zip` de Game Boy
+- [ ] Remapeamento de botões nas Opções (fica para depois dos cores, fatia 5)

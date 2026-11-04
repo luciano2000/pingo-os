@@ -4,6 +4,7 @@ config BR2_PACKAGE_PINGO_FRONTEND
 	select BR2_PACKAGE_SDL2_TTF
 	select BR2_PACKAGE_FONT_INTER
 	select BR2_PACKAGE_ALSA_LIB
+	select BR2_PACKAGE_LIBZIP
 	help
 	  Interface do Pingo OS: pingo-launcher (tela inicial e listas
 	  de jogos), pingo-retro (frontend libretro) e pingo-shell (o

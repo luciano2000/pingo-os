@@ -8,7 +8,7 @@ PINGO_FRONTEND_VERSION = 0.2
 PINGO_FRONTEND_SITE = $(BR2_EXTERNAL_PINGO_PATH)/../frontend
 PINGO_FRONTEND_SITE_METHOD = local
 PINGO_FRONTEND_LICENSE = GPL-2.0, MIT (libretro.h)
-PINGO_FRONTEND_DEPENDENCIES = sdl2 sdl2_ttf font-inter alsa-lib host-pkgconf
+PINGO_FRONTEND_DEPENDENCIES = sdl2 sdl2_ttf font-inter alsa-lib libzip host-pkgconf
 
 define PINGO_FRONTEND_BUILD_CMDS
 	$(TARGET_MAKE_ENV) $(MAKE) -C $(@D) \

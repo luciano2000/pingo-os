@@ -1,0 +1,6 @@
+# Opções do core que aparecem no menu do jogo (chave=nome mostrado).
+# As outras ficam com o padrão do core. Uma linha por opção.
+gambatte_gb_colorization=Cores do Game Boy
+gambatte_gb_internal_palette=Paleta
+gambatte_gbc_color_correction=Correção de cor (GBC)
+gambatte_mix_frames=Mistura de quadros

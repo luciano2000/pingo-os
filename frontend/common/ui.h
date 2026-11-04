@@ -43,8 +43,19 @@ enum font_id {
 	F_COUNT_N
 };
 
+/* Cria a janela e o renderer (launcher) */
 bool ui_init(void);
 void ui_quit(void);
+
+/* Usa um renderer que já existe (pingo-retro): carrega fontes e ícones */
+bool ui_attach(SDL_Renderer *renderer);
+void ui_detach(void);
+
+/* Bolinha de 10 px dos slots: cheia ou só o contorno */
+void ui_dot(int x, int y_center, bool filled, Uint32 rgb);
+
+/* Ícone "›" do item selecionado (menu do jogo) */
+void ui_icon_chevron(int x, int y_center, Uint32 rgb);
 
 SDL_Renderer *ui_renderer(void);
 void ui_clear(void);

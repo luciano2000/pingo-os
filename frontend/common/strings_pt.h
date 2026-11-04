@@ -36,4 +36,34 @@
 #define S_SETUP_FAIL_TXT "Tente gravar a imagem do Pingo OS de novo."
 #define S_UNKNOWN_PART   "O cartão tem uma partição que o Pingo OS não conhece. Para não apagar nada, ela não foi usada."
 
+/* menu do jogo */
+#define S_M_CONTINUE     "Continuar"
+#define S_M_SAVE         "Salvar"
+#define S_M_LOAD         "Carregar"
+#define S_M_OPTIONS      "Opções"
+#define S_M_QUIT         "Sair"
+#define S_SLOT           "Slot %d"
+#define S_SLOT_EMPTY     "Vazio"
+#define S_SAVED_TODAY    "Salvo hoje, %H:%M"
+#define S_SAVED_YDAY     "Salvo ontem, %H:%M"
+#define S_SAVED_DATE     "Salvo em %d/%m, %H:%M"
+#define S_HINT_SLOT      "slot"
+#define S_CONFIRM        "confirmar"
+#define S_SAVED_SLOT     "Salvo no slot %d"
+#define S_LOADED_SLOT    "Slot %d carregado"
+#define S_SLOT_IS_EMPTY  "O slot %d está vazio"
+#define S_SAVE_FAILED    "Não foi possível salvar"
+#define S_LOAD_FAILED    "Não foi possível carregar"
+#define S_NO_STATES      "Este core não tem save state"
+
+/* opções do jogo */
+#define S_O_SCALE        "Escala"
+#define S_O_SCALE_FIT    "Ajustada"
+#define S_O_SCALE_INT    "Inteira"
+#define S_O_SAVE_GAME    "Salvar para este jogo"
+#define S_O_SAVE_CONSOLE "Salvar para o console"
+#define S_O_SAVED_GAME   "Opções salvas para este jogo"
+#define S_O_SAVED_CONS   "Opções salvas para o console"
+#define S_HINT_CHANGE    "mudar"
+
 #endif

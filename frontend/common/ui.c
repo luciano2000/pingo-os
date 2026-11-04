@@ -244,7 +244,7 @@ static bool in_battery(float x, float y, const void *arg)
 
 static SDL_Texture *corner_tex;
 static float corner_r;
-static SDL_Texture *wifi_tex, *battery_tex;
+static SDL_Texture *wifi_tex, *battery_tex, *chevron_tex, *dot_fill_tex, *dot_ring_tex;
 
 void ui_rect(int x, int y, int w, int h, Uint32 rgb)
 {
@@ -282,6 +282,56 @@ static void draw_tex(SDL_Texture *t, int x, int y, int w, int h, Uint32 rgb)
 	SDL_RenderCopy(ren, t, NULL, &dst);
 }
 
+/* "›" do mockup (SVG 16x16: M6 3l5 5-5 5, traço 2) */
+static bool in_chevron(float x, float y, const void *arg)
+{
+	(void)arg;
+	/* distância aos dois segmentos (6,3)-(11,8) e (11,8)-(6,13) */
+	float best = 1e9f;
+	const float seg[2][4] = { { 6, 3, 11, 8 }, { 11, 8, 6, 13 } };
+	for (int i = 0; i < 2; i++) {
+		float ax = seg[i][0], ay = seg[i][1], bx = seg[i][2], by = seg[i][3];
+		float vx = bx - ax, vy = by - ay, wx = x - ax, wy = y - ay;
+		float t = (wx * vx + wy * vy) / (vx * vx + vy * vy);
+		t = t < 0 ? 0 : (t > 1 ? 1 : t);
+		float dx = x - (ax + t * vx), dy = y - (ay + t * vy);
+		float d = dx * dx + dy * dy;
+		if (d < best)
+			best = d;
+	}
+	return best <= 1.0f;
+}
+
+static bool in_dot(float x, float y, const void *arg)
+{
+	(void)arg;
+	return (x - 5) * (x - 5) + (y - 5) * (y - 5) <= 25;
+}
+
+/* contorno de 1,5 px, como no mockup */
+static bool in_ring(float x, float y, const void *arg)
+{
+	(void)arg;
+	float d = sqrtf((x - 5) * (x - 5) + (y - 5) * (y - 5));
+	return d <= 5 && d >= 3.5f;
+}
+
+void ui_dot(int x, int y_center, bool filled, Uint32 rgb)
+{
+	if (!dot_fill_tex) {
+		dot_fill_tex = raster(10, 10, in_dot, NULL);
+		dot_ring_tex = raster(10, 10, in_ring, NULL);
+	}
+	draw_tex(filled ? dot_fill_tex : dot_ring_tex, x, y_center - 5, 10, 10, rgb);
+}
+
+void ui_icon_chevron(int x, int y_center, Uint32 rgb)
+{
+	if (!chevron_tex)
+		chevron_tex = raster(16, 16, in_chevron, NULL);
+	draw_tex(chevron_tex, x, y_center - 8, 16, 16, rgb);
+}
+
 int ui_icon_wifi(int x, int y_center, Uint32 rgb)
 {
 	draw_tex(wifi_tex, x, y_center - 7, 18, 14, rgb);
@@ -306,7 +356,9 @@ int ui_icon_battery(int x, int y_center, int percent, bool charging, Uint32 rgb)
 
 /* ---- ciclo ----------------------------------------------------------- */
 
-bool ui_init(void)
+static bool attached; /* renderer de outro programa: não destruir */
+
+static bool load_assets(void)
 {
 	static const struct { const char *file; int size; } spec[F_COUNT_N] = {
 		[F_BAR]      = { "Inter-Medium.ttf",   15 },
@@ -320,28 +372,10 @@ bool ui_init(void)
 		[F_BIG]      = { "Inter-SemiBold.ttf", 28 },
 	};
 
-	/* Sem isto o SDL transforma o SIGTERM num evento que o launcher não lê,
-	 * e o processo não fecha (desligamento, fim da mensagem de boot) */
-	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
-	if (SDL_Init(SDL_INIT_VIDEO) < 0 || TTF_Init() < 0) {
-		fprintf(stderr, "pingo-launcher: SDL: %s\n", SDL_GetError());
+	if (!TTF_WasInit() && TTF_Init() < 0) {
+		fprintf(stderr, "pingo-ui: TTF: %s\n", TTF_GetError());
 		return false;
 	}
-	SDL_ShowCursor(SDL_DISABLE);
-	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
-	window = SDL_CreateWindow("pingo-launcher", 0, 0, 0, 0, SDL_WINDOW_FULLSCREEN_DESKTOP);
-	ren = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
-		     : NULL;
-	if (!ren) {
-		fprintf(stderr, "pingo-launcher: vídeo: %s\n", SDL_GetError());
-		return false;
-	}
-	int w, h;
-	SDL_GetRendererOutputSize(ren, &w, &h);
-	if (w != UI_W || h != UI_H)
-		SDL_RenderSetLogicalSize(ren, UI_W, UI_H);
-	SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
-
 	/* PINGO_FONT_DIR: para testar sem regravar o sistema */
 	const char *font_dir = getenv("PINGO_FONT_DIR");
 	if (!font_dir || !*font_dir)
@@ -362,7 +396,41 @@ bool ui_init(void)
 	return true;
 }
 
-void ui_quit(void)
+bool ui_attach(SDL_Renderer *renderer)
+{
+	ren = renderer;
+	attached = true;
+	SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
+	return load_assets();
+}
+
+bool ui_init(void)
+{
+	/* Sem isto o SDL transforma o SIGTERM num evento que o launcher não lê,
+	 * e o processo não fecha (desligamento, fim da mensagem de boot) */
+	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
+	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+		fprintf(stderr, "pingo-launcher: SDL: %s\n", SDL_GetError());
+		return false;
+	}
+	SDL_ShowCursor(SDL_DISABLE);
+	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "opengles2");
+	window = SDL_CreateWindow("pingo-launcher", 0, 0, 0, 0, SDL_WINDOW_FULLSCREEN_DESKTOP);
+	ren = window ? SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC)
+		     : NULL;
+	if (!ren) {
+		fprintf(stderr, "pingo-launcher: vídeo: %s\n", SDL_GetError());
+		return false;
+	}
+	int w, h;
+	SDL_GetRendererOutputSize(ren, &w, &h);
+	if (w != UI_W || h != UI_H)
+		SDL_RenderSetLogicalSize(ren, UI_W, UI_H);
+	SDL_SetRenderDrawBlendMode(ren, SDL_BLENDMODE_BLEND);
+	return load_assets();
+}
+
+static void free_assets(void)
 {
 	osd_quit();
 	for (int i = 0; i < TEXT_CACHE; i++) {
@@ -372,9 +440,31 @@ void ui_quit(void)
 	}
 	memset(cache, 0, sizeof(cache));
 	for (int i = 0; i < F_COUNT_N; i++)
-		if (fonts[i])
+		if (fonts[i]) {
 			TTF_CloseFont(fonts[i]);
+			fonts[i] = NULL;
+		}
+	SDL_Texture **tex[] = { &corner_tex, &wifi_tex, &battery_tex, &chevron_tex, &dot_fill_tex,
+				&dot_ring_tex };
+	for (unsigned i = 0; i < sizeof(tex) / sizeof(tex[0]); i++)
+		if (*tex[i]) {
+			SDL_DestroyTexture(*tex[i]);
+			*tex[i] = NULL;
+		}
+	corner_r = 0;
 	TTF_Quit();
+}
+
+void ui_detach(void)
+{
+	free_assets();
+	ren = NULL;
+	attached = false;
+}
+
+void ui_quit(void)
+{
+	free_assets();
 	SDL_Quit();
 }
 
