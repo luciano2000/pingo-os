@@ -49,10 +49,12 @@ Outros ajustes:
 
 - [x] Imagem sem o Clang (131 MB, 57 MB em `.xz`); `kmscube` e `pingo-retro` a 60 fps; cache de shaders na `ROMS`
 - [x] Primeiro boot cria e formata a `ROMS` (118,5 GB no cartão de 119 GB). Primeira versão criava a partição no buraco antes do boot; corrigido com início explícito
-- [ ] A `ROMS` aparece no PC (Linux, e se possível Windows) com as pastas
-- [ ] Regravar a imagem preserva a `ROMS` e o conteúdo
+- [x] A `ROMS` aparece no PC (Linux) com as pastas; Windows ainda sem teste
+- [x] Regravar a imagem preserva a `ROMS` e o conteúdo (ROM, cache e chave SSH sobreviveram)
 - [x] Chaves SSH iguais entre boots
-- [ ] Desligamento sujo: `fsck` corrige no boot seguinte
+- [x] Desligamento sujo (power segurado): arquivos íntegros (md5 igual) e `fsck.exfat` limpo no boot seguinte
+
+Nota para a fatia 3: o frontend deve gravar SRAM e save states com `fsync` logo em seguida; o cache de escrita do kernel leva alguns segundos para descer ao cartão.
 
 ## Formatos de jogos
 
