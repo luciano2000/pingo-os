@@ -123,6 +123,11 @@ Nintendo DS, N64, Dreamcast, PSP e Saturn. Rodam mal ou só parcialmente nesse h
 - O sistema precisa oferecer: bash, SDL2, GLES funcionando (Panfrost), `gptokeyb` para mapear botões e suporte aos runtimes em squashfs.
 - Usar a integração do ROCKNIX e do Knulli como referência.
 - Os ports rodam fora do frontend. Padronizar pelo menos um **atalho global de saída** (ex.: MENU + START) e o comportamento de salvar ao sair.
+- **Duas partes:**
+  - **App PortMaster** (interface própria, em Python): fica em **Menu do Início → Apps → PortMaster**, fora da lista de Ports. Precisa de internet para listar e baixar.
+  - **Ports instalados:** cada um é um script `.sh` + pasta de dados em `Ports/`. O item **Ports** do Início só lista e executa esses scripts (sem internet). Também dá para instalar pelo PC, copiando o `.zip` para a pasta de autoinstalação.
+- Ao rodar um port, o launcher sai da tela (como com os jogos) e volta quando o port fecha.
+- **Risco:** o PortMaster precisa reconhecer o sistema (ROCKNIX, muOS, Knulli... já são conhecidos; o Pingo não). Na Fase 2: camada de compatibilidade ou pedir a inclusão do Pingo ao time do PortMaster.
 
 ---
 
