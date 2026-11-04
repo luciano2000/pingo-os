@@ -31,6 +31,9 @@ bool osd_changed(void);
 /* Desenha por cima do que já está no renderer (coordenadas lógicas w x h) */
 void osd_draw(SDL_Renderer *ren, int w, int h);
 
+/* Liga/desliga a luz da tela (proteção de tela), sem mexer no brilho */
+void osd_screen(bool on);
+
 /* Libera as texturas (antes de destruir o renderer) */
 void osd_quit(void);
 

@@ -652,6 +652,21 @@ static bool press(int code)
 static bool power_down;
 static Uint32 power_down_at;
 
+/* Proteção de tela (só no launcher): apaga a luz depois de um tempo parado */
+#define SCREEN_OFF_MS (2 * 60 * 1000)
+static Uint32 last_input;
+static bool screen_off;
+
+static void screen_wake(void)
+{
+	last_input = SDL_GetTicks();
+	if (screen_off) {
+		screen_off = false;
+		osd_screen(true);
+		dirty = true;
+	}
+}
+
 /* Mensagem de tela cheia. Também vai para o fb0, para continuar na tela
  * depois que o launcher fechar (abrindo um jogo, desligando). */
 static void message_screen(const char *title, const char *hint)
@@ -688,6 +703,7 @@ static void suspend(void)
 	drain(fds[DEV_POWER].fd);
 	drain(fds[DEV_VOLUME].fd);
 	held = -1;
+	screen_wake();
 	status.clock[0] = 0; /* força atualizar */
 	status_update();
 	dirty = true;
@@ -856,8 +872,9 @@ int main(int argc, char **argv)
 	draw();
 	dirty = true;
 
+	last_input = SDL_GetTicks();
 	while (!quit) {
-		if (dirty)
+		if (dirty && !screen_off)
 			draw();
 
 		int timeout = 1000;
@@ -881,6 +898,16 @@ int main(int argc, char **argv)
 		       read(fds[DEV_PAD].fd, &ev, sizeof(ev)) == sizeof(ev)) {
 			if (ev.type != EV_KEY)
 				continue;
+			if (screen_off) {
+				/* o primeiro toque só acende a tela */
+				if (ev.value == 1)
+					screen_wake();
+				if (ev.code == BTN_MODE)
+					osd_key(ev.code, ev.value); /* mantém o estado do MENU */
+				osd_menu_tapped();
+				continue;
+			}
+			last_input = SDL_GetTicks();
 			if (osd_key(ev.code, ev.value))
 				continue;
 			if (ev.code == BTN_MODE) {
@@ -906,6 +933,7 @@ int main(int argc, char **argv)
 			if (ev.value == 1) {
 				power_down = true;
 				power_down_at = SDL_GetTicks();
+				last_input = power_down_at;
 				fprintf(stderr, "pingo-launcher: power apertado\n");
 			} else if (ev.value == 0 && power_down) {
 				fprintf(stderr, "pingo-launcher: power solto após %u ms: suspender\n",
@@ -920,9 +948,23 @@ int main(int argc, char **argv)
 		}
 
 		while (!quit && fds[DEV_VOLUME].fd >= 0 &&
-		       read(fds[DEV_VOLUME].fd, &ev, sizeof(ev)) == sizeof(ev))
-			if (ev.type == EV_KEY)
-				osd_key(ev.code, ev.value);
+		       read(fds[DEV_VOLUME].fd, &ev, sizeof(ev)) == sizeof(ev)) {
+			if (ev.type != EV_KEY)
+				continue;
+			if (screen_off) {
+				if (ev.value == 1)
+					screen_wake();
+				continue;
+			}
+			last_input = SDL_GetTicks();
+			osd_key(ev.code, ev.value);
+		}
+
+		if (!screen_off && SDL_GetTicks() - last_input >= SCREEN_OFF_MS) {
+			screen_off = true;
+			held = -1;
+			osd_screen(false);
+		}
 		if (osd_changed())
 			dirty = true;
 

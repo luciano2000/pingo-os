@@ -104,6 +104,20 @@ static void apply_bright(void)
 	}
 }
 
+void osd_screen(bool on)
+{
+	char path[300];
+	FILE *f;
+
+	if (!backlight[0])
+		find_backlight();
+	snprintf(path, sizeof(path), "%s/bl_power", backlight);
+	if ((f = fopen(path, "w"))) {
+		fprintf(f, "%d\n", on ? 0 : 4); /* FB_BLANK_UNBLANK / POWERDOWN */
+		fclose(f);
+	}
+}
+
 /* ---- configuração ---------------------------------------------------- */
 
 static void cfg_load(void)
@@ -137,6 +151,7 @@ static void cfg_save(void)
 void osd_init(void)
 {
 	find_backlight();
+	osd_screen(true); /* nunca começa com a tela apagada */
 	cfg_load();
 	apply_volume();
 	apply_bright();

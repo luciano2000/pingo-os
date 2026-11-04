@@ -293,8 +293,12 @@ Exemplos em tela 640x480 (4:3):
 
 ---
 
+## 8.0.1 Proteção de tela
+
+- Só no launcher: depois de 2 minutos sem tocar em nenhum botão, a luz da tela apaga. Qualquer botão acende de novo, e esse primeiro toque só acorda a tela (não abre nada). Dentro do jogo, nada muda.
+
 ## 9. Wi-Fi (usos previstos)
-- Conectar a redes pelo menu de configurações.
+- Conectar a redes pelo menu de configurações: lista das redes com o sinal, senha num teclado na tela. **Obrigatório na versão final.** Continua com o `wpa_supplicant` (sem NetworkManager/D-Bus), conversando pelo socket de controle; redes salvas no cartão. O `pingo-wifi.txt` na partição de boot continua valendo para configurar pelo PC.
 - Futuro: sincronizar saves (ex.: Syncthing) e baixar ports pelo PortMaster.
 - Desligar o Wi-Fi antes de suspender e religar ao retomar.
 
@@ -321,8 +325,9 @@ Exemplos em tela 640x480 (4:3):
 ### Fase 2: polimento
 1. Transições.
 2. PortMaster.
-3. Configurações de Wi-Fi.
-4. Suporte ao RG40XX.
+3. Configurações de Wi-Fi (obrigatório na versão final).
+4. Bluetooth **só para fones** (BlueZ + bluez-alsa, troca da saída de som). Controles Bluetooth fora do escopo.
+5. Suporte ao RG40XX.
 
 ### Fase 3: expansão
 1. TrimUI Brick (avaliar kernel do fabricante vs mainline).
