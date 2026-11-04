@@ -94,7 +94,7 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] Boot direto no launcher pela imagem (~7 s do power até a lista)
 - [x] Power: toque suspende ao soltar (launcher e jogo); segurar 2 s mostra "Desligando…" e desliga, sem estalo
 - [x] Transições sem o logo do boot: "Carregando…" ao abrir o jogo, preto ao voltar (a última tela é copiada para o `/dev/fb0`, que é o que aparece entre um programa e outro)
-- [ ] Assistente do primeiro boot testado num cartão "novo"
+- [x] Assistente do primeiro boot num cartão "novo": B desliga e volta a perguntar no boot seguinte; A prepara, mostra "Pronto!" e abre o launcher
 
 ### Botão power (AXP717)
 
