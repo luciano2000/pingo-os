@@ -29,12 +29,20 @@ root_disk() {
 	DATA_PART="${DISK}${PSEP}3"
 }
 
-# Espaço livre (setores) depois da última partição
+# Início da partição nova: logo depois do fim da última partição, alinhado a
+# 1 MiB. Precisa ser explícito: sozinho, o sfdisk usa o primeiro buraco livre,
+# que é o espaço entre o bootloader e a partição de boot.
+data_start() {
+	local last
+	last=$(sfdisk -l -o End "$DISK" 2>/dev/null | awk '/^ *[0-9]+ *$/ {if ($1 > e) e = $1} END {print e+0}')
+	echo $(( (last / 2048 + 1) * 2048 ))
+}
+
+# Espaço livre (setores) a partir desse início
 free_sectors() {
-	local size last
+	local size
 	size=$(cat /sys/class/block/$(basename "$DISK")/size)
-	last=$(sfdisk -l -o End "$DISK" 2>/dev/null | awk '/^ *[0-9]+ *$/ {e=$1} END {print e+0}')
-	echo $((size - last - 1))
+	echo $((size - $(data_start)))
 }
 
 create_data_partition() {
@@ -49,7 +57,7 @@ create_data_partition() {
 	screen "Preparando cartão... não desligue o aparelho."
 	say "criando $DATA_PART ($free setores livres)"
 	# Tipo 07 (exFAT/NTFS): é o que o Windows e o macOS esperam
-	echo ',,07' | sfdisk --append --no-reread --no-tell-kernel -q "$DISK" || return 1
+	echo "$(data_start),,07" | sfdisk --append --no-reread --no-tell-kernel -q "$DISK" || return 1
 	# O disco está em uso (raiz): registra só a partição nova no kernel
 	partx -a -n 3 "$DISK" 2>/dev/null || partx -u "$DISK"
 	for i in 1 2 3 4 5 6 7 8 9 10; do [ -b "$DATA_PART" ] && break; sleep 1; done
