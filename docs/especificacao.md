@@ -152,8 +152,9 @@ Vale só para aparelhos com dois slots (RG35XX-H, RG40XX). Nos aparelhos com um 
 - **Não há indicação de SD2 na tela inicial nem na lista de jogos.** A informação fica só no MENU da lista.
 - Se o SD2 não estiver presente e algum console apontar para ele: mostrar "SD2 não encontrado" e oferecer voltar para o SD1. **Nunca trocar sozinho.**
 - **Saves e save states ficam sempre no SD1**, qualquer que seja a origem do jogo.
-- **Recentes e favoritos** são salvos como `console + nome do arquivo`, nunca como caminho completo.
-- Inserir ou remover o SD2 dispara um novo scan. Usar cache das listas para o boot continuar rápido.
+- **Recentes e favoritos** são salvos como `console + caminho relativo à pasta do console` (ex.: `MD/1 US - A-F/Jogo.md`), nunca como caminho absoluto. Assim funcionam com subpastas e nos dois cartões.
+- Inserir ou remover o SD2 dispara um novo scan. Usar cache das listas (uma por pasta) para o boot e a navegação continuarem rápidos.
+- A estrutura de subpastas de cada console vale igual nos dois cartões.
 - Remover o cartão com um jogo rodando: pausar e avisar.
 
 Caso de uso típico: um cartão de 128 GB com todos os consoles e arcade (SD1) e outro só com ISOs de PS1 e PC Engine CD (SD2).
@@ -210,7 +211,10 @@ Mockup: https://claude.ai/artifact/Vz7H1VQirbdDkg7MoUSr6c
 - Rodapé: "A abrir · MENU opções".
 
 **2. Lista de jogos**
-- Barra superior: nome do console e "N jogos".
+- Funciona como um navegador de pastas, como o MinUI: cada console pode ter **subpastas em qualquer nível** (ex.: `Roms/MD/1 US - A-F/Jogo.md`). A abre a pasta, B volta um nível e a seleção fica na pasta de onde se saiu.
+- Ordem alfabética natural ("2" antes de "10"), pastas e jogos misturados. Prefixos numéricos ("1 US", "2 Europe") servem para controlar a ordem.
+- Pastas sem nenhum jogo (em qualquer nível abaixo) ficam ocultas.
+- Barra superior: nome do console ou da pasta atual e "N itens" daquele nível.
 - Nomes limpos: sem extensão e sem tags como "(USA) [!]". No arcade, nome vindo do DAT.
 - Jogos com vários discos: um item, com "N discos".
 - Rodapé: posição ("4 / 48") à esquerda; "A jogar · B voltar" à direita.
