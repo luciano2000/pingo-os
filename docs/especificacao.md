@@ -299,6 +299,8 @@ Exemplos em tela 640x480 (4:3):
 
 ## 9. Wi-Fi (usos previstos)
 - Conectar a redes pelo menu de configurações: lista das redes com o sinal, senha num teclado na tela. **Obrigatório na versão final.** Continua com o `wpa_supplicant` (sem NetworkManager/D-Bus), conversando pelo socket de controle; redes salvas no cartão. O `pingo-wifi.txt` na partição de boot continua valendo para configurar pelo PC.
+- **RetroAchievements** (principal uso do Wi-Fi): biblioteca oficial `rcheevos` (MIT) dentro do `pingo-retro`. Login pelo teclado na tela ou por arquivo no cartão; guarda só o token, nunca a senha. Aviso "Conquista desbloqueada" no jogo, item **Conquistas** no menu do jogo, modo hardcore opcional (bloqueia save states e fast-forward, regra do RetroAchievements). Sem rede na hora, as conquistas ficam pendentes e são enviadas quando a conexão voltar.
+- Netplay: fora do escopo (protocolo complexo, pouco uso em portátil).
 - Futuro: sincronizar saves (ex.: Syncthing) e baixar ports pelo PortMaster.
 - Desligar o Wi-Fi antes de suspender e religar ao retomar.
 
@@ -326,8 +328,9 @@ Exemplos em tela 640x480 (4:3):
 1. Transições.
 2. PortMaster.
 3. Configurações de Wi-Fi (obrigatório na versão final).
-4. Bluetooth **só para fones** (BlueZ + bluez-alsa, troca da saída de som). Controles Bluetooth fora do escopo.
-5. Suporte ao RG40XX.
+4. RetroAchievements (depois da tela de Wi-Fi e do menu do jogo).
+5. Bluetooth **só para fones** (BlueZ + bluez-alsa, troca da saída de som). Controles Bluetooth fora do escopo.
+6. Suporte ao RG40XX.
 
 ### Fase 3: expansão
 1. TrimUI Brick (avaliar kernel do fabricante vs mainline).
