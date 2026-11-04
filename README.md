@@ -8,6 +8,10 @@ A interface segue a filosofia do MinUI: direta ao ponto, sem boxart, temas ou me
 
 Um projeto do Retrogamer Brasil.
 
+Gostou do projeto? Ajude a manter o desenvolvimento:
+
+<a href="https://www.buymeacoffee.com/wiawfsakny"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=wiawfsakny&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="42"></a>
+
 ## Aparelhos
 
 | Aparelho | SoC | Estado |
