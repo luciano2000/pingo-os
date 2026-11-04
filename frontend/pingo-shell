@@ -16,7 +16,8 @@ while true; do
 		echo "== $(date '+%F %T') $rom"
 		/usr/bin/pingo-retro "$core" "$rom"
 		if [ $? -eq 3 ]; then # power segurado no jogo
-			/usr/bin/pingo-launcher --message "Desligando…" &
+			# desenha e deixa no fb0 (fica na tela até apagar)
+			/usr/bin/pingo-launcher --message "Desligando…"
 			sync
 			/sbin/poweroff
 			exit 0

@@ -91,7 +91,10 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] Abrir jogo, voltar para a lista, Recentes
 - [x] Power suspende e volta para a mesma tela
 - [x] Volume e brilho com sobreposição, no launcher e no jogo; valores persistem
-- [ ] Boot direto no launcher pela imagem (testado até aqui com cópia na RAM)
+- [x] Boot direto no launcher pela imagem (~7 s do power até a lista)
+- [x] Power: toque suspende ao soltar (launcher e jogo); segurar 2 s mostra "Desligando…" e desliga, sem estalo
+- [x] Transições sem o logo do boot: "Carregando…" ao abrir o jogo, preto ao voltar (a última tela é copiada para o `/dev/fb0`, que é o que aparece entre um programa e outro)
+- [ ] Assistente do primeiro boot testado num cartão "novo"
 
 ### Botão power (AXP717)
 

@@ -24,6 +24,7 @@
 #include <SDL2/SDL.h>
 
 #include "libretro.h"
+#include "fbcopy.h"
 #include "osd.h"
 
 #define GAMEPAD_NAME "H700 Gamepad"
@@ -458,6 +459,8 @@ int main(int argc, char **argv)
 	core.deinit();
 	if (audio_dev)
 		SDL_CloseAudioDevice(audio_dev);
+	/* Entre o jogo e o launcher aparece o fb0: preto, não o logo do boot */
+	fb_clear();
 	osd_quit();
 	SDL_Quit();
 	free((void *)game.data);

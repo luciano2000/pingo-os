@@ -25,6 +25,7 @@
 #include <SDL2/SDL.h>
 
 #include "library.h"
+#include "fbcopy.h"
 #include "osd.h"
 #include "strings_pt.h"
 #include "ui.h"
@@ -463,6 +464,8 @@ static void draw(void)
 
 /* ---- ações ------------------------------------------------------------ */
 
+static void message_screen(const char *title, const char *hint);
+
 static bool launch(struct node *game)
 {
 	char core[512];
@@ -479,6 +482,8 @@ static bool launch(struct node *game)
 	}
 
 	recents_add(game);
+	/* "Carregando…" fica no fb0 até o jogo abrir (senão aparece o logo) */
+	message_screen(S_LOADING, game->label);
 	mkdir(RUN_DIR, 0755);
 	FILE *f = fopen(NEXT_FILE ".tmp", "w");
 	if (!f)
@@ -647,6 +652,8 @@ static bool press(int code)
 static bool power_down;
 static Uint32 power_down_at;
 
+/* Mensagem de tela cheia. Também vai para o fb0, para continuar na tela
+ * depois que o launcher fechar (abrindo um jogo, desligando). */
 static void message_screen(const char *title, const char *hint)
 {
 	for (int i = 0; i < 2; i++) { /* dois quadros: ver draw() */
@@ -655,6 +662,8 @@ static void message_screen(const char *title, const char *hint)
 			UI_W - 2 * PAD_X);
 		if (hint)
 			ui_text(F_BAR, hint, UI_W / 2, UI_H / 2 + 20, COL_DIM, 2, UI_W - 2 * PAD_X);
+		if (i == 1)
+			fb_copy_from(ui_renderer());
 		ui_present();
 	}
 }
@@ -800,8 +809,8 @@ int main(int argc, char **argv)
 		if (!ui_init())
 			return 1;
 		message_screen(argv[2], argc >= 4 ? argv[3] : NULL);
-		for (;;)
-			pause();
+		ui_quit();
+		return 0;
 	}
 
 	if (!ui_init())

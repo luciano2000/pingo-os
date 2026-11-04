@@ -7,8 +7,8 @@ SDL_CFLAGS = $(shell $(PKG_CONFIG) --cflags sdl2)
 SDL_LIBS = $(shell $(PKG_CONFIG) --libs sdl2)
 TTF_LIBS = $(shell $(PKG_CONFIG) --libs SDL2_ttf)
 ALSA_LIBS = $(shell $(PKG_CONFIG) --libs alsa)
-COMMON_SRC = common/osd.c
-COMMON_HDR = common/osd.h
+COMMON_SRC = common/osd.c common/fbcopy.c
+COMMON_HDR = common/osd.h common/fbcopy.h
 
 LAUNCHER_SRC = launcher/main.c launcher/library.c launcher/ui.c
 LAUNCHER_HDR = launcher/library.h launcher/ui.h launcher/strings_pt.h

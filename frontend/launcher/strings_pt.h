@@ -22,6 +22,7 @@
 #define S_NO_CORE        "Este console ainda não tem emulador"
 #define S_MISSING_GAME   "Jogo não encontrado"
 #define S_SHUTDOWN       "Desligando…"
+#define S_LOADING        "Carregando…"
 #define S_PREPARING      "Preparando o cartão…"
 #define S_DONT_TURN_OFF  "Não desligue o aparelho"
 #define S_WELCOME        "Bem-vindo ao Pingo OS"
