@@ -15,7 +15,8 @@
 
 1. **Cartão:** partição `ROMS` (exFAT) no primeiro boot, `fsck` em todo boot, pastas, dados do sistema persistentes, imagem sem o Clang.
 2. **Launcher:** Início, lista de jogos como navegador de pastas (subpastas em qualquer nível, como o MinUI), cache por pasta, fonte Inter, barra com relógio, Wi-Fi e bateria. Boot direto no launcher.
-3. **Jogo completo:** menu dentro do jogo, 4 slots com prévia, SRAM, escala Ajustada/Inteira, sincronização pelo áudio.
+3. **Jogo completo:** menu dentro do jogo (MENU ao soltar), 4 slots com prévia, SRAM, escala Ajustada/Inteira, sincronização pelo áudio, opções por jogo ou por console.
+   Volume e brilho (Vol± e MENU+Vol±, com sobreposição) entram junto com o launcher e valem também no jogo.
 4. **Energia:** Power suspende/retoma, auto-resume, segurar 2 s salva e desliga.
 5. **Cores:** todos da seção 4 da especificação, BIOS, PS1 (`.chd`, `.m3u`), filtros de tela.
 6. **Arcade:** FBNeo com nomes vindos do DAT.

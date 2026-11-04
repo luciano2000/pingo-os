@@ -221,8 +221,10 @@ Mockup: https://claude.ai/artifact/Vz7H1VQirbdDkg7MoUSr6c
 - MENU nesta tela: opções do console, incluindo **"Origem: SD1 / SD2"**.
 
 **3. Menu dentro do jogo**
+- Abre com o botão **MENU**, que age **ao soltar** (como no MinUI): segurar MENU e usar outro botão (ex.: Vol± para o brilho) não abre o menu. O MENU não sai do jogo; sair é a opção "Sair".
 - Barra superior: nome do jogo e disco atual.
 - Itens: **Continuar, Salvar, Carregar, Opções, Sair**.
+- **Opções** (remapeamento de botões, filtro de tela, escala, opções do core): ao salvar, o usuário escolhe se vale **só para este jogo** ou **para todos os jogos do console**. A configuração do jogo, quando existe, tem prioridade sobre a do console.
 - À direita: prévia do save (captura da tela no momento salvo), número do slot e data/hora.
 - **4 slots**, trocados com ◀ ▶.
 - Rodapé: "◀ ▶ slot · A confirmar · B voltar".
@@ -239,6 +241,14 @@ Mockup: https://claude.ai/artifact/Vz7H1VQirbdDkg7MoUSr6c
 Boxart, temas, sons de navegação, animação ao abrir jogos e excesso de configurações.
 
 ---
+
+## 8.0 Volume e brilho
+
+- **Vol+ / Vol−**: volume em 20 passos (um controle para alto-falante e fone).
+- **MENU (segurado) + Vol+ / Vol−**: brilho em 10 passos, com um mínimo acima de zero (a tela nunca apaga de vez).
+- Sobreposição: barra vertical arredondada no lado direito, que enche de baixo para cima, com o ícone embaixo: alto-falante no volume, sol no brilho. Some ~1,5 s depois do último toque.
+- Funciona no launcher e dentro do jogo (desenhada por cima da imagem do emulador).
+- Os valores ficam salvos no cartão (`/Config`) e voltam no próximo boot.
 
 ## 8.1 Filtros de tela
 
