@@ -316,7 +316,8 @@ bool ui_init(void)
 		[F_COUNT]    = { "Inter-Medium.ttf",   16 },
 		[F_SMALL]    = { "Inter-Medium.ttf",   14 },
 		[F_TITLE]    = { "Inter-SemiBold.ttf", 23 },
-		[F_BODY]     = { "Inter-Regular.ttf",  18 },
+		[F_BODY]     = { "Inter-Regular.ttf",  21 },
+		[F_BIG]      = { "Inter-SemiBold.ttf", 28 },
 	};
 
 	/* Sem isto o SDL transforma o SIGTERM num evento que o launcher não lê,

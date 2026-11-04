@@ -658,10 +658,10 @@ static void message_screen(const char *title, const char *hint)
 {
 	for (int i = 0; i < 2; i++) { /* dois quadros: ver draw() */
 		ui_clear();
-		ui_text(F_TITLE, title, UI_W / 2, UI_H / 2 - (hint ? 14 : 0), COL_TEXT, 2,
+		ui_text(F_BIG, title, UI_W / 2, UI_H / 2 - (hint ? 18 : 0), COL_TEXT, 2,
 			UI_W - 2 * PAD_X);
 		if (hint)
-			ui_text(F_BAR, hint, UI_W / 2, UI_H / 2 + 20, COL_DIM, 2, UI_W - 2 * PAD_X);
+			ui_text(F_BODY, hint, UI_W / 2, UI_H / 2 + 24, COL_DIM, 2, UI_W - 2 * PAD_X);
 		if (i == 1)
 			fb_copy_from(ui_renderer());
 		ui_present();
@@ -725,10 +725,10 @@ static void setup_screen(const char *title, const char *text, const char *hint_a
 {
 	for (int i = 0; i < 2; i++) { /* dois quadros: ver draw() */
 		ui_clear();
-		int y = 150;
-		ui_text(F_TITLE, title, UI_W / 2, y, COL_TEXT, 2, UI_W - 2 * PAD_X);
+		int y = 145;
+		ui_text(F_BIG, title, UI_W / 2, y, COL_TEXT, 2, UI_W - 2 * PAD_X);
 		if (text)
-			ui_text_wrap(F_BODY, text, UI_W / 2, y + 30, 480, 26, COL_DIM);
+			ui_text_wrap(F_BODY, text, UI_W / 2, y + 36, 520, 31, COL_DIM);
 		int right = UI_W - PAD_X;
 		if (hint_b)
 			right -= draw_hint(right, "B", hint_b) + 22;

@@ -38,7 +38,8 @@ enum font_id {
 	F_COUNT,     /* 16 px, 500 */
 	F_SMALL,     /* 14 px, 500 */
 	F_TITLE,     /* 23 px, 600 (mensagens) */
-	F_BODY,      /* 18 px, 400 (textos do assistente) */
+	F_BODY,      /* 21 px, 400 (textos do assistente e mensagens) */
+	F_BIG,       /* 28 px, 600 (títulos do assistente e mensagens) */
 	F_COUNT_N
 };
 
