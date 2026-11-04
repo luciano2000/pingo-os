@@ -644,7 +644,8 @@ static bool press(int code)
 
 #define POWER_HOLD_MS 2000
 
-static Uint32 power_down_at; /* 0: power solto */
+static bool power_down;
+static Uint32 power_down_at;
 
 static void message_screen(const char *title, const char *hint)
 {
@@ -733,7 +734,7 @@ static int wait_ab(void)
 {
 	struct input_event ev;
 	for (;;) {
-		poll(fds, DEV_N, power_down_at ? 50 : 1000);
+		poll(fds, DEV_N, power_down ? 50 : 1000);
 		while (fds[DEV_PAD].fd >= 0 && read(fds[DEV_PAD].fd, &ev, sizeof(ev)) == sizeof(ev))
 			if (ev.type == EV_KEY && ev.value == 1 &&
 			    (ev.code == BTN_EAST || ev.code == BTN_SOUTH))
@@ -742,15 +743,16 @@ static int wait_ab(void)
 		       read(fds[DEV_POWER].fd, &ev, sizeof(ev)) == sizeof(ev)) {
 			if (ev.type != EV_KEY || ev.code != KEY_POWER)
 				continue;
-			if (ev.value == 1)
-				power_down_at = SDL_GetTicks() | 1;
-			else if (ev.value == 0 && power_down_at) {
-				power_down_at = 0;
+			if (ev.value == 1) {
+				power_down = true;
+				power_down_at = SDL_GetTicks();
+			} else if (ev.value == 0 && power_down) {
+				power_down = false;
 				suspend();
 				return -1; /* redesenha a tela */
 			}
 		}
-		if (power_down_at && SDL_GetTicks() - power_down_at >= POWER_HOLD_MS)
+		if (power_down && SDL_GetTicks() - power_down_at >= POWER_HOLD_MS)
 			shutdown_now();
 	}
 }
@@ -858,7 +860,7 @@ int main(int argc, char **argv)
 			timeout = timeout > 200 ? 200 : timeout;
 		if (osd_visible())
 			timeout = timeout > 100 ? 100 : timeout;
-		if (power_down_at)
+		if (power_down)
 			timeout = timeout > 50 ? 50 : timeout;
 		if (!SDL_AtomicGet(&scan_done) && from_cache)
 			timeout = timeout > 100 ? 100 : timeout;
@@ -893,16 +895,17 @@ int main(int argc, char **argv)
 			if (ev.type != EV_KEY || ev.code != KEY_POWER)
 				continue;
 			if (ev.value == 1) {
-				power_down_at = SDL_GetTicks() | 1;
+				power_down = true;
+				power_down_at = SDL_GetTicks();
 				fprintf(stderr, "pingo-launcher: power apertado\n");
-			} else if (ev.value == 0 && power_down_at) {
+			} else if (ev.value == 0 && power_down) {
 				fprintf(stderr, "pingo-launcher: power solto após %u ms: suspender\n",
 					SDL_GetTicks() - power_down_at);
-				power_down_at = 0;
+				power_down = false;
 				suspend(); /* toque curto: suspende ao soltar */
 			}
 		}
-		if (power_down_at && SDL_GetTicks() - power_down_at >= POWER_HOLD_MS) {
+		if (power_down && SDL_GetTicks() - power_down_at >= POWER_HOLD_MS) {
 			fprintf(stderr, "pingo-launcher: power segurado %d ms: desligar\n", POWER_HOLD_MS);
 			shutdown_now();
 		}

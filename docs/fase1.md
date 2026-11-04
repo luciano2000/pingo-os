@@ -92,3 +92,10 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] Power suspende e volta para a mesma tela
 - [x] Volume e brilho com sobreposição, no launcher e no jogo; valores persistem
 - [ ] Boot direto no launcher pela imagem (testado até aqui com cópia na RAM)
+
+### Botão power (AXP717)
+
+- O chip manda "apertou" e "soltou" corretamente (medido: segurar 3,5 s gera os dois eventos, 3,51 s de diferença).
+- Segurando por mais tempo (> 3,5 s), o próprio chip corta a energia, sem avisar o sistema: desligamento sujo. Por isso o "segurar 2 s" do Pingo desliga antes.
+- Bug corrigido: o instante do aperto era guardado com o bit mais baixo ligado para distinguir de "solto"; metade das vezes ficava 1 ms no futuro, a conta sem sinal dava um número enorme e o toque virava "segurou 2 s".
+- Log da interface no cartão: `.system/logs/ui.log` (eventos do power, jogos abertos, fps).

@@ -9,5 +9,9 @@ case "$1" in
     amixer -q sset 'Line Out' 20 on
     amixer -q sset 'Speaker' on
     ;;
+  stop)
+    # Sem isto o alto-falante estala quando o codec perde a energia
+    amixer -q cset name='DAC Playback Switch' off
+    ;;
 esac
 exit 0

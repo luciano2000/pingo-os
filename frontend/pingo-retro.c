@@ -143,6 +143,7 @@ static void audio_sample(int16_t left, int16_t right)
 /* ---- controles (evdev) ----------------------------------------------- */
 
 static int pad_fd = -1, vol_fd = -1, power_fd = -1;
+static bool power_down;
 static Uint32 power_down_at;
 static bool power_off_requested, suspend_requested;
 static bool pad_state[16];
@@ -206,19 +207,20 @@ static void input_poll(void)
 		if (ev.type != EV_KEY || ev.code != KEY_POWER)
 			continue;
 		if (ev.value == 1) {
-			power_down_at = SDL_GetTicks() | 1;
-		} else if (ev.value == 0 && power_down_at) {
+			power_down = true;
+			power_down_at = SDL_GetTicks();
+		} else if (ev.value == 0 && power_down) {
 			fprintf(stderr, "pingo-retro: power solto após %u ms: suspender\n",
 				SDL_GetTicks() - power_down_at);
-			power_down_at = 0;
+			power_down = false;
 			suspend_requested = true; /* toque curto, ao soltar */
 		}
 	}
 	/* Segurar 2 s: sai e desliga (na fatia 4, grava o save state antes) */
-	if (power_down_at && SDL_GetTicks() - power_down_at >= 2000) {
+	if (power_down && SDL_GetTicks() - power_down_at >= 2000) {
 		fprintf(stderr, "pingo-retro: power segurado 2000 ms: desligar\n");
 		power_off_requested = quit_requested = true;
-		power_down_at = 0;
+		power_down = false;
 	}
 	while (vol_fd >= 0 && read(vol_fd, &ev, sizeof(ev)) == sizeof(ev))
 		if (ev.type == EV_KEY)
