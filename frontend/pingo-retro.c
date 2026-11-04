@@ -30,6 +30,7 @@
 #include <strings.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -806,6 +807,76 @@ static bool state_load(int s)
 	return ok;
 }
 
+/* ---- retomar (energia) ----------------------------------------------- *
+ * Antes de suspender ou desligar pelo power, grava um save state automático
+ * (<jogo>.auto) e a marca .system/resume. No próximo boot o launcher abre o
+ * jogo de novo com "resume" e ele volta exatamente de onde parou. Sair pelo
+ * menu (ou acordar o aparelho) apaga a marca.
+ */
+
+#define RESUME_FILE DATA_ROOT "/.system/resume"
+
+static char resume_core[4096], resume_rom[4096];
+
+static bool auto_state_save(void)
+{
+	size_t size = core.serialize_size();
+	char path[4096], dir[4096];
+	if (!size)
+		return false;
+	void *buf = malloc(size);
+	bool ok = buf && core.serialize(buf, size);
+	snprintf(dir, sizeof(dir), "%s/States/%s", DATA_ROOT, console_code);
+	mkdir_p(dir);
+	data_path(path, sizeof(path), "States", ".auto");
+	ok = ok && write_file(path, buf, size);
+	free(buf);
+	return ok;
+}
+
+static bool auto_state_load(void)
+{
+	char path[4096];
+	size_t len = 0;
+	data_path(path, sizeof(path), "States", ".auto");
+	void *buf = read_file(path, &len);
+	bool ok = buf && core.unserialize(buf, len);
+	free(buf);
+	return ok;
+}
+
+static void save_for_resume(void)
+{
+	sram_save();
+	if (auto_state_save()) {
+		char marker[12000];
+		int n = snprintf(marker, sizeof(marker), "%s\n%s\n%s\n", resume_core, resume_rom,
+				 console_code);
+		write_file(RESUME_FILE, marker, (size_t)n);
+	}
+	sync();
+}
+
+static void clear_resume(void)
+{
+	unlink(RESUME_FILE);
+}
+
+/* Suspende; se o pingo-suspend pedir (bateria/24 h), desliga */
+static void do_suspend(void)
+{
+	save_for_resume();
+	audio_pause(true);
+	int rc = system("/usr/bin/pingo-suspend");
+	if (rc != -1 && WIFEXITED(rc) && WEXITSTATUS(rc) == 10) {
+		fprintf(stderr, "pingo-retro: suspenso por muito tempo ou bateria fraca: desligar\n");
+		power_off_requested = quit_requested = true; /* a marca fica: retoma no boot */
+		return;
+	}
+	clear_resume(); /* acordou: o jogo continua da RAM */
+	audio_pause(false);
+}
+
 /* ---- menu do jogo ---------------------------------------------------- */
 
 static char toast[128];
@@ -1074,8 +1145,10 @@ static bool run_menu(void)
 			break;
 		if (suspend_requested) { /* power no menu: suspende também */
 			suspend_requested = false;
-			if (system("/usr/bin/pingo-suspend") < 0)
-				perror("pingo-suspend");
+			do_suspend();
+			audio_pause(true); /* continua no menu, sem som */
+			if (quit_requested)
+				break;
 		}
 		if (was_pressed(BTN_DPAD_UP))
 			sel = (sel - 1 + MI_N) % MI_N;
@@ -1217,10 +1290,13 @@ int main(int argc, char **argv)
 	struct retro_game_info game = { 0 };
 
 	if (argc < 3) {
-		fprintf(stderr, "uso: %s <core_libretro.so> <rom> [console]\n", argv[0]);
+		fprintf(stderr, "uso: %s <core_libretro.so> <rom> [console] [resume]\n", argv[0]);
 		return 2;
 	}
 	names_from_path(argv[2], argc > 3 ? argv[3] : NULL);
+	bool resume = argc > 4 && !strcmp(argv[4], "resume");
+	snprintf(resume_core, sizeof(resume_core), "%s", argv[1]);
+	snprintf(resume_rom, sizeof(resume_rom), "%s", argv[2]);
 	snprintf(system_dir, sizeof(system_dir), "%s/Bios", DATA_ROOT);
 	snprintf(save_dir, sizeof(save_dir), "%s/Saves/%s", DATA_ROOT, console_code);
 	mkdir_p(save_dir);
@@ -1317,8 +1393,14 @@ int main(int argc, char **argv)
 	sram_load();
 	slots_refresh();
 	slot_pick_latest();
+	if (resume) {
+		if (auto_state_load())
+			fprintf(stderr, "pingo-retro: retomado do estado automático\n");
+		clear_resume(); /* um só retorno: se travar, não entra em laço */
+	}
 
 	Uint32 t0 = SDL_GetTicks(), frames = 0, last_sram = SDL_GetTicks();
+	bool low_battery_warned = false;
 	double acc = 0;
 	while (!quit_requested) {
 		SDL_Event e;
@@ -1334,11 +1416,7 @@ int main(int argc, char **argv)
 		}
 		if (suspend_requested) {
 			suspend_requested = false;
-			sram_save();
-			audio_pause(true);
-			if (system("/usr/bin/pingo-suspend") < 0)
-				perror("pingo-suspend");
-			audio_pause(false);
+			do_suspend();
 		}
 
 		if (lockstep) {
@@ -1351,6 +1429,11 @@ int main(int argc, char **argv)
 			}
 		}
 		draw_game();
+		if (toast[0] && SDL_GetTicks() < toast_until) {
+			int w = ui_text_width(F_BAR, toast) + 2 * ROW_PAD;
+			ui_round_rect((UI_W - w) / 2, PAD_Y, w, BAR_H + 4, ROW_RADIUS, 0x000000);
+			ui_text(F_BAR, toast, UI_W / 2, PAD_Y + (BAR_H + 4) / 2, COL_TEXT, 2, 0);
+		}
 		osd_draw(renderer, screen_w, screen_h);
 		SDL_RenderPresent(renderer);
 
@@ -1359,6 +1442,17 @@ int main(int argc, char **argv)
 		if (now - last_sram >= 5000) { /* SRAM: grava sozinha quando muda */
 			sram_save();
 			last_sram = now;
+			bool chg;
+			int bat = battery_percent(&chg);
+			if (!chg && bat >= 0 && bat <= 3) {
+				fprintf(stderr, "pingo-retro: bateria em %d%%: salvar e desligar\n", bat);
+				power_off_requested = quit_requested = true;
+			} else if (!chg && bat >= 0 && bat <= 10 && !low_battery_warned) {
+				low_battery_warned = true;
+				show_toast(S_LOW_BATTERY);
+			} else if (chg || bat > 12) {
+				low_battery_warned = false;
+			}
 		}
 		if (now - t0 >= 10000) {
 			fprintf(stderr, "pingo-retro: %.1f fps, som na fila %u bytes\n",
@@ -1368,6 +1462,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (power_off_requested)
+		save_for_resume();
+	else
+		clear_resume();
 	sram_save();
 	core.unload_game();
 	core.deinit();

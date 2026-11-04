@@ -5,16 +5,17 @@
 export HOME=/root
 mountpoint -q /mnt/sd1 && export XDG_CACHE_HOME=/mnt/sd1/.system/cache
 mkdir -p /run/pingo
-rm -f /run/pingo/next /run/pingo/launcher.state
+rm -f /run/pingo/next /run/pingo/launcher.state /run/pingo/booted
 
 while true; do
 	/usr/bin/pingo-launcher
 	rc=$?
 	if [ -f /run/pingo/next ]; then
-		{ read -r core; read -r rom; read -r console; } < /run/pingo/next
+		mode=""
+		{ read -r core; read -r rom; read -r console; read -r mode; } < /run/pingo/next
 		rm -f /run/pingo/next
 		echo "== $(date '+%F %T') $rom"
-		/usr/bin/pingo-retro "$core" "$rom" "$console"
+		/usr/bin/pingo-retro "$core" "$rom" "$console" $mode
 		if [ $? -eq 3 ]; then # power segurado no jogo
 			# desenha e deixa no fb0 (fica na tela até apagar)
 			/usr/bin/pingo-launcher --message "Desligando…"

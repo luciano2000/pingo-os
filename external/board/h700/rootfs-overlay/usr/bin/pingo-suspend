@@ -1,48 +1,101 @@
 #!/bin/sh
 # Suspende o aparelho com os ajustes de antes/depois que o H700 precisa.
-# Uso: pingo-suspend            (acorda pelo botão power)
-#      pingo-suspend <segundos> (acorda também pelo RTC)
+#
+#   pingo-suspend            suspende até o botão power
+#   pingo-suspend <segundos> acorda também pelo relógio depois desse tempo
+#                            (teste de consumo: pingo-suspend-test)
+#
+# Suspensão prolongada: a cada hora o aparelho acorda sozinho, com a tela
+# apagada, confere a bateria e volta a dormir. Com 10 % de bateria ou 24 h
+# suspenso, sai com o código 10: quem chamou grava o que precisar e desliga.
+#
+# Código de saída: 0 acordou pelo usuário (ou pelo tempo pedido); 10 desligar.
+#
 # Baseado nos hooks sleep.d do ROCKNIX para o H700.
 SECS="$1"
+CHECK_EVERY=3600          # 1 h
+MAX_SUSPEND=$((24 * 3600)) # 24 h
+LOW_BATTERY=10
+# Teste: /run/pingo/suspend-test pode redefinir CHECK_EVERY e MAX_SUSPEND
+# (some no reboot)
+[ -r /run/pingo/suspend-test ] && . /run/pingo/suspend-test
+BAT=/sys/class/power_supply/battery
+BL=$(ls -d /sys/class/backlight/* 2>/dev/null | head -1)
 
-# Antes: muta o DAC (evita estalo no alto-falante)
+# RTC que acorda o H700 (o rtc0, PCF8563, não acorda)
+RTC=""
+for r in /sys/class/rtc/rtc*; do
+  [ "$(cat "$r/device/power/wakeup" 2>/dev/null)" = enabled ] && { RTC="$r"; break; }
+done
+
+backlight() { [ -n "$BL" ] && echo "$1" > "$BL/bl_power" 2>/dev/null; }
+
+# ---- antes de dormir ----------------------------------------------------
+# DAC mudo (evita estalo no alto-falante)
 amixer -q cset name='DAC Playback Switch' off 2>/dev/null
 
 # Wi-Fi (RTL8821CS no SDIO): o chip perde a energia no suspend profundo e, com
 # o rádio ligado, o rtw88 trava o resume em timeouts do SDIO (-110). Como o
-# ROCKNIX (wifictl disable), bloqueamos o rádio por rfkill: o driver desliga o
-# chip direito e o reinicializa do zero quando o rádio volta.
+# ROCKNIX (wifictl disable), bloqueamos o rádio por rfkill.
 WLAN_RFKILL=""
 for r in /sys/class/rfkill/rfkill*; do
   [ "$(cat "$r/type" 2>/dev/null)" = wlan ] && [ "$(cat "$r/soft")" = 0 ] && {
     WLAN_RFKILL="$r"; echo 1 > "$r/soft"; }
 done
+# Luz da tela apagada antes de dormir: nas checagens de hora em hora a tela
+# não pisca; só volta quando o usuário acorda o aparelho
+backlight 4
 sync
 
-if [ -n "$SECS" ]; then
-  # rtc0 (PCF8563) não acorda o H700; usa o RTC com wakeup habilitado
-  RTC=""
-  for r in /sys/class/rtc/rtc*; do
-    [ "$(cat "$r/device/power/wakeup" 2>/dev/null)" = enabled ] && { RTC="$(basename "$r")"; break; }
-  done
-  rtcwake -d "${RTC:-rtc0}" -m mem -s "$SECS"
-else
-  echo mem > /sys/power/state
-fi
-
-# Depois: som de volta
-amixer -q cset name='DAC Playback Switch' on 2>/dev/null
-
-# O musb derruba a sessão USB no suspend e não a retoma: religa o gadget
-G=/sys/kernel/config/usb_gadget/pingo
-UDC=$(ls /sys/class/udc 2>/dev/null | head -n1)
-if [ -n "$UDC" ] && [ "$(cat $G/UDC 2>/dev/null)" = "$UDC" ]; then
-  sleep 3
-  if [ "$(cat /sys/class/udc/$UDC/state)" = "not attached" ]; then
-    echo "" > $G/UDC; sleep 1; echo "$UDC" > $G/UDC
+# ---- dormir -------------------------------------------------------------
+start=$(date +%s)
+result=0
+while :; do
+  if [ -n "$SECS" ]; then
+    wait_s=$SECS
+  else
+    wait_s=$CHECK_EVERY
   fi
-fi
+  if [ -n "$RTC" ]; then
+    echo 0 > "$RTC/wakealarm"
+    echo "+$wait_s" > "$RTC/wakealarm"
+  fi
+  echo mem > /sys/power/state
 
-# Wi-Fi de volta: o wpa_supplicant reconecta sozinho quando o rádio volta
-[ -n "$WLAN_RFKILL" ] && echo 0 > "$WLAN_RFKILL/soft"
-exit 0
+  # Alarme ainda armado: quem acordou foi o botão (o alarme vira 0 quando dispara)
+  alarm=$(cat "$RTC/wakealarm" 2>/dev/null)
+  [ -n "$RTC" ] && echo 0 > "$RTC/wakealarm"
+  [ -n "$alarm" ] && break       # o usuário acordou
+  [ -n "$SECS" ] && break        # tempo pedido (teste de consumo)
+  [ -z "$RTC" ] && break         # sem relógio que acorde: não dá para checar
+
+  # Acordou pelo relógio: confere com a tela apagada
+  cap=$(cat $BAT/capacity 2>/dev/null || echo 100)
+  status=$(cat $BAT/status 2>/dev/null)
+  elapsed=$(( $(date +%s) - start ))
+  echo "pingo-suspend: checagem: bateria $cap%, $status, $elapsed s suspenso" > /dev/kmsg
+  if [ "$status" != Charging ] && { [ "$cap" -le $LOW_BATTERY ] || [ $elapsed -ge $MAX_SUSPEND ]; }; then
+    result=10
+    break
+  fi
+done
+
+# ---- depois de acordar --------------------------------------------------
+if [ $result -eq 0 ]; then
+  backlight 0
+  amixer -q cset name='DAC Playback Switch' on 2>/dev/null
+
+  # O musb derruba a sessão USB no suspend e não a retoma: religa o gadget
+  G=/sys/kernel/config/usb_gadget/pingo
+  UDC=$(ls /sys/class/udc 2>/dev/null | head -n1)
+  if [ -n "$UDC" ] && [ "$(cat $G/UDC 2>/dev/null)" = "$UDC" ]; then
+    sleep 3
+    if [ "$(cat /sys/class/udc/$UDC/state)" = "not attached" ]; then
+      echo "" > $G/UDC; sleep 1; echo "$UDC" > $G/UDC
+    fi
+  fi
+
+  # Wi-Fi de volta: o wpa_supplicant reconecta sozinho quando o rádio volta
+  [ -n "$WLAN_RFKILL" ] && echo 0 > "$WLAN_RFKILL/soft"
+fi
+exit $result

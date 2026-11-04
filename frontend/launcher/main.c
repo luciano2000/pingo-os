@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -696,9 +697,11 @@ static void shutdown_now(void)
 
 static void suspend(void)
 {
-	/* pingo-suspend devolve quando o aparelho acorda */
-	if (system("/usr/bin/pingo-suspend") < 0)
-		perror("pingo-suspend");
+	/* pingo-suspend devolve quando o aparelho acorda; 10: ficou suspenso
+	 * tempo demais ou a bateria ficou fraca, então desliga */
+	int rc = system("/usr/bin/pingo-suspend");
+	if (rc != -1 && WIFEXITED(rc) && WEXITSTATUS(rc) == 10)
+		shutdown_now();
 	drain(fds[DEV_PAD].fd);
 	drain(fds[DEV_POWER].fd);
 	drain(fds[DEV_VOLUME].fd);
@@ -707,6 +710,42 @@ static void suspend(void)
 	status.clock[0] = 0; /* força atualizar */
 	status_update();
 	dirty = true;
+}
+
+/* ---- retomar o último jogo ------------------------------------------- */
+
+#define RESUME_FILE "/mnt/sd1/.system/resume"
+
+static bool resume_last_game(void)
+{
+	char core[4096], rom[4096], code[64];
+	struct stat st;
+	FILE *f = fopen(RESUME_FILE, "r");
+	if (!f)
+		return false;
+	bool ok = fgets(core, sizeof(core), f) && fgets(rom, sizeof(rom), f) &&
+		  fgets(code, sizeof(code), f);
+	fclose(f);
+	if (!ok)
+		return false;
+	core[strcspn(core, "\n")] = rom[strcspn(rom, "\n")] = code[strcspn(code, "\n")] = 0;
+	if (stat(core, &st) < 0 || stat(rom, &st) < 0) {
+		unlink(RESUME_FILE);
+		return false;
+	}
+	const char *slash = strrchr(rom, '/');
+	char *label = library_clean_name(slash ? slash + 1 : rom, false);
+	message_screen(S_LOADING, label);
+	free(label);
+
+	FILE *n = fopen(NEXT_FILE ".tmp", "w");
+	if (!n)
+		return false;
+	fprintf(n, "%s\n%s\n%s\nresume\n", core, rom, code);
+	fclose(n);
+	rename(NEXT_FILE ".tmp", NEXT_FILE);
+	fprintf(stderr, "pingo-launcher: retomando %s\n", rom);
+	return true;
 }
 
 /* ---- assistente do primeiro boot ------------------------------------- *
@@ -845,6 +884,17 @@ int main(int argc, char **argv)
 		show_toast(S_UNKNOWN_PART);
 
 	osd_init(); /* depois da ROMS: os valores ficam em Config/ */
+
+	/* Primeira abertura depois do boot: retoma o jogo que estava aberto
+	 * (desligou pelo power, bateria acabou suspenso...) */
+	if (access(RUN_DIR "/booted", F_OK) != 0) {
+		mkdir(RUN_DIR, 0755);
+		FILE *b = fopen(RUN_DIR "/booted", "w");
+		if (b)
+			fclose(b);
+		if (resume_last_game())
+			return 0;
+	}
 	have_roms = stat(ROMS_DIR, &st) == 0;
 	recents_load();
 

@@ -123,3 +123,21 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] Escala Ajustada/Inteira e opções do Gambatte (só as úteis)
 - [x] `.zip` de Game Boy
 - [ ] Remapeamento de botões nas Opções (fica para depois dos cores, fatia 5)
+
+## Fatia 4: energia
+
+- **Toque no power no jogo:** grava a SRAM, um save state automático (`States/<console>/<jogo>.auto`) e a marca `.system/resume`; suspende. Acordou pelo botão: o jogo continua da RAM e a marca é apagada.
+- **Suspensão prolongada** (`pingo-suspend`): a luz da tela apaga antes de dormir; a cada 1 h o RTC acorda o aparelho com a tela apagada, confere a bateria e volta a dormir. Com 10 % (sem carregador) ou 24 h suspenso, sai com código 10 e o launcher/jogo desliga (a marca fica).
+- Quem acordou: o alarme do RTC ainda armado = botão; zerado = relógio.
+- **Segurar o power 2 s no jogo:** salva para retomar e desliga.
+- **Bateria no jogo:** aviso "Bateria fraca" com 10 %; com 3 %, salva para retomar e desliga.
+- **Boot:** na primeira abertura, o launcher acha a marca e abre o jogo com `resume` ("Carregando…"); o `pingo-retro` carrega o `.auto` e apaga a marca (um só retorno, para não entrar em laço se travar).
+- **Sair pelo menu** apaga a marca: não retoma.
+- Teste rápido: `/run/pingo/suspend-test` com `CHECK_EVERY=60` e `MAX_SUSPEND=120` (some no reboot).
+
+### Checklist
+
+- [ ] Toque no power no jogo: suspende e volta
+- [ ] Segurar no jogo: desliga e, no boot, volta para o jogo no mesmo ponto
+- [ ] Suspensão prolongada (teste curto): desliga sozinho e retoma no boot
+- [ ] Sair pelo menu: o boot seguinte abre o launcher normal

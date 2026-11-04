@@ -55,6 +55,7 @@
 #define S_SAVE_FAILED    "Não foi possível salvar"
 #define S_LOAD_FAILED    "Não foi possível carregar"
 #define S_NO_STATES      "Este core não tem save state"
+#define S_LOW_BATTERY    "Bateria fraca: conecte o carregador"
 
 /* opções do jogo */
 #define S_O_SCALE        "Escala"
