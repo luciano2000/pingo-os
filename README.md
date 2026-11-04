@@ -39,7 +39,7 @@ Outros alvos do Buildroot: `scripts/build.sh rg35xxh menuconfig`, `scripts/build
 ## Estrutura
 
 ```
-docs/                  especificação, mockup da interface, notas de cada fase
+docs/                  especificação, mockup da interface, notas de cada fase, BIOS (bios.md)
 docker/                ambiente de build
 frontend/              pingo-retro, o frontend libretro (Fase 0: mínimo)
 scripts/build.sh       build dentro do Docker
