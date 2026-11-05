@@ -8,6 +8,10 @@ A interface segue a filosofia do MinUI: direta ao ponto, sem boxart, temas ou me
 
 Um projeto do Retrogamer Brasil.
 
+**Comunidade:** dúvidas, sugestões e notícias do Pingo no [Discord do Retrogamer Brasil](https://discord.gg/5qfSc6JR6J).
+
+<a href="https://discord.gg/5qfSc6JR6J"><img src="https://img.shields.io/badge/Discord-Retrogamer%20Brasil-5865F2?logo=discord&logoColor=white" alt="Discord do Retrogamer Brasil" height="28"></a>
+
 Gostou do projeto? Ajude a manter o desenvolvimento:
 
 <a href="https://www.buymeacoffee.com/wiawfsakny"><img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=wiawfsakny&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" height="42"></a>
