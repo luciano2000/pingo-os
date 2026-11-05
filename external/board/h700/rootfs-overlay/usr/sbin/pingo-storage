@@ -78,6 +78,11 @@ make_folders() {
 		ls "$MNT/Roms" 2>/dev/null | grep -qi -E "^([0-9]+[ ._)-]+)?$c\$" || mkdir -p "$MNT/Roms/$c"
 	done
 	mkdir -p "$MNT/Bios" "$MNT/Saves" "$MNT/States" "$MNT/Ports" "$MNT/Config"
+	# Arcade (FBNeo): samples e recordes. O hiscore.dat da imagem só entra se
+	# o usuário não tiver posto o dele
+	mkdir -p "$MNT/Bios/fbneo/samples"
+	[ -f "$MNT/Bios/fbneo/hiscore.dat" ] || [ ! -f /usr/share/pingo/arcade/hiscore.dat ] ||
+		cp /usr/share/pingo/arcade/hiscore.dat "$MNT/Bios/fbneo/hiscore.dat"
 	# Dados internos do sistema (chaves SSH, cache de shaders, logs)
 	mkdir -p "$MNT/.system/dropbear" "$MNT/.system/cache" "$MNT/.system/logs"
 }

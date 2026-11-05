@@ -43,6 +43,6 @@ Game Boy, Game Boy Color, NES, Super Nintendo, Virtual Boy, Master System, Game 
 - BIOS de arcade ficam **na mesma pasta dos jogos** (`Roms/ARCADE`) e não aparecem na lista: `neogeo.zip` (Neo Geo), `pgm.zip` (PGM), `skns.zip`, `decocass.zip` etc.
 - O launcher mostra o nome do jogo vindo do DAT ("Street Fighter II: The World Warrior" em vez de `sf2.zip`).
 - **Samples** (sons gravados de jogos antigos, como Donkey Kong, Galaga, Space Invaders): em `Bios/fbneo/samples/`, um `.zip` por jogo, com o nome do jogo e sem descompactar (`Bios/fbneo/samples/dkong.zip`). Sem eles o jogo roda, só faltam alguns sons.
-- **Recordes** (opcional): `Bios/fbneo/hiscore.dat` faz o FBNeo guardar a tabela de recordes de cada jogo.
-- O FBNeo cria `Bios/fbneo/` e `Bios/fbneo/samples/` sozinho na primeira vez que roda.
+- **Recordes**: o `hiscore.dat` diz ao FBNeo onde cada jogo guarda a tabela de recordes na memória (não é um arquivo de recordes). O Pingo OS já traz o do FBNeo (5857 jogos) e copia para `Bios/fbneo/hiscore.dat` no boot, se não houver um; um `hiscore.dat` mais novo posto ali é mantido.
+- As pastas `Bios/fbneo/` e `Bios/fbneo/samples/` são criadas no boot.
 - Quando o FBNeo for atualizado no Pingo OS, a versão do romset muda junto; ela fica registrada aqui.

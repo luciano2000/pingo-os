@@ -20,6 +20,9 @@ define LIBRETRO_FBNEO_ARCADE_NAMES
 	python3 -I $(BR2_EXTERNAL_PINGO_PATH)/../scripts/fbneo-names.py \
 		"$(@D)/dats/FinalBurn Neo (ClrMame Pro XML, Arcade only).dat" \
 		$(TARGET_DIR)/usr/share/pingo/arcade/fbneo.tsv
+	# Banco de endereços dos recordes (o pingo-storage copia para Bios/fbneo/)
+	$(INSTALL) -D -m 0644 $(@D)/metadata/hiscore.dat \
+		$(TARGET_DIR)/usr/share/pingo/arcade/hiscore.dat
 endef
 LIBRETRO_FBNEO_POST_INSTALL_TARGET_HOOKS += LIBRETRO_FBNEO_ARCADE_NAMES
 
