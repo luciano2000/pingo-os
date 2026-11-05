@@ -88,18 +88,18 @@ static int console_by_code(const char *code)
 	return -1;
 }
 
-/* caminho relativo à pasta do console ("MD/1 US/Jogo.md" -> "1 US/Jogo.md");
- * fora dela (.m3u gerado no cache), o caminho completo */
+/* caminho relativo à pasta do console ("MD/1 US/Jogo.md" -> "1 US/Jogo.md"),
+ * em qualquer um dos dois cartões; fora delas (.m3u gerado), o completo */
 static const char *rel_path(const struct node *game)
 {
-	char prefix[1100];
-	const char *root = library_console_root(lib, game->console);
-	if (!root)
-		return game->path;
-	snprintf(prefix, sizeof(prefix), "%s/", root);
-	if (strncmp(game->path, prefix, strlen(prefix)))
-		return game->path;
-	return game->path + strlen(prefix);
+	const struct node *cn = library_console(lib, game->console);
+	const char *roots[2] = { cn ? cn->path : NULL, cn ? cn->path2 : NULL };
+	for (int i = 0; i < 2; i++) {
+		size_t n = roots[i] ? strlen(roots[i]) : 0;
+		if (n && !strncmp(game->path, roots[i], n) && game->path[n] == '/')
+			return game->path + n + 1;
+	}
+	return game->path;
 }
 
 static void recents_load(void)
@@ -128,14 +128,21 @@ static void recents_load(void)
 			continue;
 		char path[4096];
 		struct stat st;
-		const char *root = library_console_root(lib, c);
-		if (tab[1] == '/')
+		const struct node *cn = library_console(lib, c);
+		bool found = false;
+		if (tab[1] == '/') {
 			snprintf(path, sizeof(path), "%s", tab + 1);
-		else if (root)
-			snprintf(path, sizeof(path), "%s/%s", root, tab + 1);
-		else
-			continue; /* console sem jogos agora */
-		if (stat(path, &st) < 0) /* jogo apagado ou renomeado */
+			found = stat(path, &st) == 0;
+		} else if (cn) { /* o jogo pode estar em qualquer um dos dois cartões */
+			const char *roots[2] = { cn->path, cn->path2 };
+			for (int r = 0; r < 2 && !found; r++) {
+				if (!roots[r])
+					continue;
+				snprintf(path, sizeof(path), "%s/%s", roots[r], tab + 1);
+				found = stat(path, &st) == 0;
+			}
+		}
+		if (!found) /* jogo apagado, renomeado ou no cartão que saiu */
 			continue;
 		struct node *g = library_game_node(c, path);
 		recents->kids = realloc(recents->kids, sizeof(*recents->kids) * (recents->nkids + 1));
@@ -571,7 +578,7 @@ static void draw(void)
 		ui_text(F_TITLE, have_roms ? S_EMPTY_TITLE : S_NO_CARD, UI_W / 2, UI_H / 2 - 16,
 			COL_TEXT, 2, UI_W - 2 * PAD_X);
 		if (have_roms)
-			ui_text(F_BAR, (!at_home && l->dir->console >= 0) ? S_EMPTY_ORIGIN : S_EMPTY_HINT,
+			ui_text(F_BAR, S_EMPTY_HINT,
 				UI_W / 2, UI_H / 2 + 18, COL_DIM, 2, UI_W - 2 * PAD_X);
 	}
 	for (int row = 0; row < ROWS && l->top + row < n; row++) {
@@ -593,10 +600,7 @@ static void draw(void)
 		}
 		if (at_home) { /* contagem à direita */
 			char cnt[16];
-			if (it->missing)
-				snprintf(cnt, sizeof(cnt), "—");
-			else
-				snprintf(cnt, sizeof(cnt), "%d", it->games);
+			snprintf(cnt, sizeof(cnt), "%d", it->games);
 			right = ui_text(F_COUNT, cnt, x + w - ROW_PAD, y + ROW_H / 2,
 					sel ? COL_SEL_FG : COL_DIM, 1, 0) + 12;
 		}
@@ -815,27 +819,42 @@ static void change_origin(int c, int to)
 	origin[c] = to;
 	origin_save();
 	pending_console = c;
-	show_toast(to == 2 ? S_READING_SD2 : S_READING_SD1);
+	show_toast(S_READING);
 	start_scan();
 }
 
-/* MENU dentro de um console: "Origem: SD1 / SD2" */
+static const char *origin_name(int o)
+{
+	return o == 1 ? "SD1" : (o == 2 ? "SD2" : S_BOTH);
+}
+
+/* MENU dentro de um console: "Origem: Ambos / SD1 / SD2". Um cartão sem
+ * jogos deste console é recusado, com aviso. */
 static void console_menu(int c)
 {
-	int cur_src = cur()->dir && cur()->dir->source ? cur()->dir->source : 1;
-	int to = origin[c] ? origin[c] : cur_src;
+	const struct node *cn = library_console(lib, c);
+	int g1 = cn ? cn->games1 : 0, g2 = cn && sd2_present ? cn->games2 : 0;
+	int to = origin[c];
+	char warn[160] = "";
+	if (!sd2_present)
+		to = 1;
+	else if ((to == 1 && g1 == 0) || (to == 2 && g2 == 0))
+		to = 0; /* a escolha salva aponta para um cartão sem jogos */
+
 	for (;;) {
 		ui_clear();
-		int bar_y = PAD_Y + BAR_H / 2;
-		ui_text(F_BAR_BOLD, consoles[c].name, PAD_X, bar_y, COL_TEXT, 0, 420);
+		ui_text(F_BAR_BOLD, consoles[c].name, PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 420);
 		int y = PAD_Y + BAR_H + LIST_GAP;
 		ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
 		ui_text(F_ITEM_SEL, S_ORIGIN, PAD_X + ROW_PAD, y + ROW_H / 2, COL_SEL_FG, 0, 0);
-		ui_text(F_COUNT, to == 2 ? "SD2" : "SD1", UI_W - PAD_X - ROW_PAD, y + ROW_H / 2,
-			COL_SEL_FG, 1, 0);
-		if (to == 2 && !sd2_present)
-			ui_text(F_BAR, S_SD2_MISSING, PAD_X + ROW_PAD, y + ROW_H + 24, COL_DIM, 0,
-				UI_W - 2 * PAD_X);
+		ui_text(F_COUNT, origin_name(to), UI_W - PAD_X - ROW_PAD, y + ROW_H / 2, COL_SEL_FG,
+			1, 0);
+		char info[96];
+		snprintf(info, sizeof(info), S_ORIGIN_COUNTS, g1, g2);
+		ui_text(F_BAR, sd2_present ? info : S_ONLY_SD1, PAD_X + ROW_PAD, y + ROW_H + 24,
+			COL_DIM, 0, UI_W - 2 * PAD_X);
+		if (warn[0])
+			ui_text(F_BAR, warn, PAD_X, UI_H - PAD_Y - BAR_H / 2, COL_TEXT, 0, 380);
 		int right = UI_W - PAD_X;
 		right -= draw_hint(right, "B", S_BACK) + 22;
 		draw_hint(right, "◀ ▶", S_HINT_CHANGE);
@@ -843,35 +862,27 @@ static void console_menu(int c)
 		ui_present();
 
 		int k = wait_key();
-		if (k == BTN_DPAD_LEFT || k == BTN_DPAD_RIGHT || k == BTN_EAST)
-			to = to == 2 ? 1 : 2;
-		else if (k == BTN_SOUTH || k == BTN_MODE)
-			break;
-	}
-	if (to != cur_src || origin[c])
-		change_origin(c, to); /* a escolha fica fixada */
-	dirty = true;
-}
-
-/* Console aponta para o SD2 e o SD2 não está: avisa e oferece o SD1 */
-static void sd2_missing_screen(int c)
-{
-	for (;;) {
-		ui_clear();
-		ui_text(F_BIG, S_SD2_MISSING, UI_W / 2, UI_H / 2 - 30, COL_TEXT, 2, UI_W - 2 * PAD_X);
-		ui_text_wrap(F_BODY, S_SD2_MISSING_TXT, UI_W / 2, UI_H / 2 + 4, 520, 31, COL_DIM);
-		int right = UI_W - PAD_X;
-		right -= draw_hint(right, "B", S_BACK) + 22;
-		draw_hint(right, "A", S_USE_SD1);
-		ui_present();
-		int k = wait_key();
-		if (k == BTN_EAST) {
-			change_origin(c, 1);
+		int d = (k == BTN_DPAD_LEFT) ? -1 : (k == BTN_DPAD_RIGHT || k == BTN_EAST) ? 1 : 0;
+		if (d && !sd2_present) {
+			snprintf(warn, sizeof(warn), "%s", S_ONLY_SD1);
+		} else if (d) {
+			int next = (to + d + 3) % 3; /* 0 ambos, 1 SD1, 2 SD2 */
+			warn[0] = 0;
+			if ((next == 1 && g1 == 0) || (next == 2 && g2 == 0)) {
+				/* pula o cartão vazio e avisa */
+				snprintf(warn, sizeof(warn), S_NO_GAMES_ON, consoles[c].name,
+					 next == 1 ? "SD1" : "SD2");
+				next = (next + d + 3) % 3;
+				if ((next == 1 && g1 == 0) || (next == 2 && g2 == 0))
+					next = 0;
+			}
+			to = next;
+		} else if (k == BTN_SOUTH || k == BTN_MODE) {
 			break;
 		}
-		if (k == BTN_SOUTH || k == BTN_MODE)
-			break;
 	}
+	if (sd2_present)
+		change_origin(c, to);
 	dirty = true;
 }
 
@@ -880,10 +891,7 @@ static bool open_selected(void)
 	struct node *it = selected();
 	if (!it)
 		return false;
-	if (it->missing) {
-		sd2_missing_screen(it->console);
-		return false;
-	}
+
 	if (it == &random_item)
 		return open_random(lib);
 	if (it->dir) {

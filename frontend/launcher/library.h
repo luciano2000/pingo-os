@@ -38,16 +38,19 @@ struct node {
 	bool dir;
 	int games;    /* jogos nesta pasta e abaixo (1 para arquivo) */
 	int discs;    /* jogos de vários discos (.m3u): quantos discos */
-	int source;   /* pasta de console: 1 = SD1, 2 = SD2 */
-	bool missing; /* console aponta para o SD2, mas o SD2 não está no aparelho */
+	/* pasta de console: de onde vêm os jogos e quantos há em cada cartão */
+	int source;   /* 1 = SD1, 2 = SD2, 3 = os dois */
+	char *path2;  /* pasta do console no outro cartão (ou NULL) */
+	int games1, games2;
 	struct node **kids;
 	int nkids;
 };
 
 /* Raiz: um filho por console que tem jogos, na ordem do Início.
- * origin[c] = 1 (SD1), 2 (SD2) ou 0 (não escolhida: SD1 se lá tiver jogos do
- * console, senão SD2); sd2: o SD2 está montado.
- * Console com origem SD2 e sem SD2 aparece com missing = true. */
+ * origin[c] = 0 (ambos os cartões, o padrão), 1 (só SD1) ou 2 (só SD2).
+ * Sem o SD2 no aparelho, tudo vem do SD1. Com os dois e origem "ambos", a
+ * lista junta os jogos dos dois cartões (o mesmo arquivo aparece uma vez,
+ * do SD1). Cada pasta de console guarda quantos jogos há em cada cartão. */
 struct node *library_scan(const int *origin, bool sd2);
 struct node *library_load_cache(const char *path);
 bool library_save_cache(const struct node *root, const char *path);
@@ -60,8 +63,8 @@ int library_find_kid(const struct node *dir, const char *path);
 /* Pasta de console ("01 - NES" -> NES, ordem 1); -1 se não for de console */
 int library_console_folder(const char *name, int *order);
 
-/* Caminho da pasta do console na biblioteca (NULL se ele não tem jogos) */
-const char *library_console_root(const struct node *root, int console);
+/* Pasta do console na biblioteca (NULL se ele não tem jogos) */
+const struct node *library_console(const struct node *root, int console);
 
 /* Jogo avulso (usado pelos Recentes) */
 struct node *library_game_node(int console, const char *path);

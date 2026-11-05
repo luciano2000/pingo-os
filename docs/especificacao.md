@@ -156,11 +156,12 @@ Escrever um frontend próprio, inspirado no **MinUI** (launcher + `minarch`):
 
 Vale só para aparelhos com dois slots (RG35XX-H, RG40XX). Nos aparelhos com um slot, a opção fica oculta.
 
-- **A origem é escolhida por console**, no MENU da lista de jogos: item **"Origem: SD1 / SD2"**.
-- Ao mudar a origem, o launcher faz na hora o scan da pasta correspondente no outro cartão.
-- A escolha é **salva por console** em `/Config` no SD1 e vale depois de reiniciar. Sem escolha, o console usa o SD1 se lá houver jogos dele, senão o SD2 (um SD1 só com o sistema e os saves funciona sem configurar nada).
+- **Só o SD1 no aparelho:** os jogos vêm do SD1.
+- **SD1 e SD2:** o padrão é **Ambos**: a lista de cada console junta os jogos dos dois cartões. O mesmo arquivo nos dois aparece uma vez, vindo do SD1.
+- **A origem pode ser fixada por console**, no MENU da lista de jogos: item **"Origem: Ambos / SD1 / SD2"**, com quantos jogos daquele console há em cada cartão. Ao mudar, o launcher lê na hora a pasta do outro cartão.
+- **Escolher um cartão sem jogos daquele console é recusado**, com aviso ("Sem jogos de Atari 2600 no SD2"), e a escolha anterior fica.
+- A escolha é **salva por console** em `/Config` no SD1 e vale depois de reiniciar. Se o cartão escolhido sair (ou ficar sem jogos do console), o console mostra os jogos do outro; ao voltar, a escolha volta a valer. Nenhuma tela de erro.
 - **Não há indicação de SD2 na tela inicial nem na lista de jogos.** A informação fica só no MENU da lista.
-- Se o SD2 não estiver presente e algum console apontar para ele: mostrar "SD2 não encontrado" e oferecer voltar para o SD1. **Nunca trocar sozinho.**
 - **Saves e save states ficam sempre no SD1**, qualquer que seja a origem do jogo.
 - **Recentes e favoritos** são salvos como `console + caminho relativo à pasta do console` (ex.: `MD/1 US - A-F/Jogo.md`), nunca como caminho absoluto. Assim funcionam com subpastas e nos dois cartões.
 - Inserir ou remover o SD2 dispara um novo scan. Usar cache das listas (uma por pasta) para o boot e a navegação continuarem rápidos.
@@ -210,7 +211,7 @@ Mockup: https://claude.ai/artifact/Vz7H1VQirbdDkg7MoUSr6c
 | Texto principal | `#E8E8E8` (branco suave; branco puro cansa a vista em telas IPS pequenas) |
 | Texto secundário | `#8C8C8C` (contagem de jogos, dicas de botões, status) |
 | Seleção | barra `#E8E8E8` com texto `#000000` e cantos arredondados (10 px) |
-| Cor de destaque | no máximo uma, só para alertas (bateria baixa, "SD2 não encontrado") |
+| Cor de destaque | no máximo uma, só para alertas (bateria baixa) |
 | Fonte | Inter (livre), pesos 400/500/600 |
 | Resolução de referência | 640x480; itens de lista com 44 px de altura e texto de 23 px |
 
@@ -230,7 +231,7 @@ Mockup: https://claude.ai/artifact/Vz7H1VQirbdDkg7MoUSr6c
 - Nomes limpos: sem extensão e sem tags como "(USA) [!]". No arcade, nome vindo do DAT.
 - Jogos com vários discos: um item, com "N discos".
 - Rodapé: posição ("4 / 48") à esquerda; "A jogar · B voltar" à direita.
-- MENU nesta tela: opções do console, incluindo **"Origem: SD1 / SD2"**.
+- MENU nesta tela: opções do console, incluindo **"Origem: Ambos / SD1 / SD2"**.
 
 **3. Menu dentro do jogo**
 - Abre com o botão **MENU**, que age **ao soltar** (como no MinUI): segurar MENU e usar outro botão (ex.: Vol± para o brilho) não abre o menu. O MENU não sai do jogo; sair é a opção "Sair".

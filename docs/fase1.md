@@ -183,15 +183,16 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 ## Fatia 7: SD1/SD2
 
 - `pingo-storage sd2`: acha o cartão do slot 2 (o `mmcblk` que não é o do sistema), escolhe a partição `ROMS` (ou a primeira exFAT/FAT32), roda `fsck` e monta em `/mnt/sd2`. No boot e a cada inserção/remoção (regra do udev `80-pingo-sd2.rules`, em segundo plano). Estado em `/run/pingo/sd2`; `/run/pingo/sd2.changed` avisa o launcher.
-- Origem por console em `Config/origem.cfg` (`PS=sd2` ou `PS=sd1`). Sem escolha: SD1 se lá houver jogos do console, senão SD2 (sem isso, um SD1 só com saves deixaria o Início vazio). A escolha feita pelo MENU fica fixada. No launcher, MENU dentro de um console abre "Origem: SD1 / SD2"; ao trocar, a pasta do outro cartão é lida na hora e o console reabre.
-- Console com origem SD2 e sem o SD2: continua no Início (contagem "—"); ao abrir, "SD2 não encontrado" com A = usar o SD1. Nunca troca sozinho.
+- Origem por console em `Config/origem.cfg` (`PS=sd1` ou `PS=sd2`; sem linha = Ambos). Com os dois cartões, o padrão Ambos junta as duas pastas do console (pastas de mesmo nome se fundem; arquivo repetido fica o do SD1). MENU dentro de um console: "Origem: Ambos / SD1 / SD2" (◀ ▶), com a contagem de jogos em cada cartão; um cartão sem jogos do console é pulado com o aviso "Sem jogos de <console> no SDx". Só com o SD1, a origem fica fixa em SD1.
+- Origem salva num cartão que saiu ou sem jogos do console: vale o outro cartão, sem tela de erro (a escolha continua salva).
 - SD2 inserido ou tirado: a lista é refeita sozinha. Tirar o SD2 com um jogo dele aberto pausa no menu do jogo, com aviso.
 - O SD2 é montado **somente leitura**: tudo que é gravado fica no SD1, então tirar o SD2 a qualquer momento é seguro.
 - Cartão sem `Roms/` no slot 2 (novo, de fábrica): o launcher pergunta "Cartão novo no slot 2 — usar para jogos?". A: `pingo-storage sd2-prepare` libera a escrita por um instante, cria `Roms/` e as pastas dos consoles, `sync`, volta a somente leitura. Nunca formata. B: não pergunta mais sobre aquele cartão (número de série em `Config/sd2-ignorados.txt`); dá para preparar depois pelo MENU do Início.
 - Cartão já preparado: se faltar a pasta de um console novo (depois de uma atualização), ela é criada sozinha do mesmo jeito.
 - Cartões de até 32 GB vêm em FAT32 (arquivos até 4 GB): não atrapalha nenhum console do Pingo.
 - Saves, save states, configurações e BIOS ficam sempre no SD1.
-- Recentes guardam o caminho relativo à pasta do console: valem na origem que estiver ativa.
+- Recentes guardam o caminho relativo à pasta do console e procuram o jogo nas pastas do console nos dois cartões.
+- Cache da biblioteca (versão 6) com o caminho completo de cada item e, por console, a origem, a pasta no outro cartão e as contagens.
 
 ### Checklist
 
@@ -199,7 +200,9 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] Pastas dos consoles no SD2 (sem duplicar as numeradas)
 - [ ] Cartão novo (FAT32 de fábrica) no slot 2: pergunta, prepara, "agora não" lembrado
 - [x] Saves, states e remapeamento migrados para o SD1; Recentes voltam
-- [x] Sem escolha, todos os consoles vêm do SD2 (SD1 só com sistema e saves); trocar a origem pelo MENU; origem vazia mantém o console no Início
+- [x] Sem escolha, todos os consoles vêm do SD2 (SD1 só com sistema e saves); trocar a origem pelo MENU
+- [ ] Ambos (padrão com dois cartões): listas juntas; SD1/SD2 pelo MENU; cartão sem jogos recusado com aviso
+- [ ] Sem o SD2, console que só tem jogos nele some do Início
 - [x] Tirar o SD2 com o aparelho ligado: a lista se atualiza
 - [x] Recolocar o SD2: a lista volta sozinha
 - [x] Tirar o SD2 com um jogo dele aberto: pausa e aviso
