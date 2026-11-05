@@ -74,11 +74,18 @@ static int console_by_code(const char *code)
 	return -1;
 }
 
-/* caminho relativo à pasta do console ("MD/1 US/Jogo.md" -> "1 US/Jogo.md") */
+/* caminho relativo à pasta do console ("MD/1 US/Jogo.md" -> "1 US/Jogo.md");
+ * fora dela (.m3u gerado no cache), o caminho completo */
 static const char *rel_path(const struct node *game)
 {
-	size_t base = strlen(ROMS_DIR) + 1 + strlen(consoles[game->console].code) + 1;
-	return strlen(game->path) > base ? game->path + base : game->fname;
+	char prefix[1100];
+	const char *root = library_console_root(lib, game->console);
+	if (!root)
+		return game->path;
+	snprintf(prefix, sizeof(prefix), "%s/", root);
+	if (strncmp(game->path, prefix, strlen(prefix)))
+		return game->path;
+	return game->path + strlen(prefix);
 }
 
 static void recents_load(void)
@@ -107,7 +114,13 @@ static void recents_load(void)
 			continue;
 		char path[4096];
 		struct stat st;
-		snprintf(path, sizeof(path), "%s/%s/%s", ROMS_DIR, consoles[c].code, tab + 1);
+		const char *root = library_console_root(lib, c);
+		if (tab[1] == '/')
+			snprintf(path, sizeof(path), "%s", tab + 1);
+		else if (root)
+			snprintf(path, sizeof(path), "%s/%s", root, tab + 1);
+		else
+			continue; /* console sem jogos agora */
 		if (stat(path, &st) < 0) /* jogo apagado ou renomeado */
 			continue;
 		struct node *g = library_game_node(c, path);
@@ -267,6 +280,7 @@ static void swap_library(struct node *fresh)
 	}
 	struct node *old = lib;
 	lib = fresh;
+	recents_load();
 	home_build();
 	restore_paths(paths, n);
 	library_free(old);
@@ -425,6 +439,12 @@ static void draw(void)
 			ui_round_rect(x, y, w, ROW_H, ROW_RADIUS, COL_SEL_BG);
 
 		int right = 0;
+		if (!at_home && it->discs > 1) { /* "3 discos", como no mockup */
+			char d[32];
+			snprintf(d, sizeof(d), S_DISCS_N, it->discs);
+			right = ui_text(F_SMALL, d, x + w - ROW_PAD, y + ROW_H / 2,
+					sel ? COL_SEL_FG : COL_DIM, 1, 0) + 12;
+		}
 		if (at_home) { /* contagem à direita */
 			char cnt[16];
 			snprintf(cnt, sizeof(cnt), "%d", it->games);
@@ -896,7 +916,6 @@ int main(int argc, char **argv)
 			return 0;
 	}
 	have_roms = stat(ROMS_DIR, &st) == 0;
-	recents_load();
 
 	lib = have_roms ? library_load_cache(CACHE_FILE) : NULL;
 	bool from_cache = lib != NULL;
@@ -904,6 +923,7 @@ int main(int argc, char **argv)
 		lib = have_roms ? library_scan() : NULL;
 	if (lib && !from_cache)
 		library_save_cache(lib, CACHE_FILE);
+	recents_load(); /* depois da biblioteca: precisa das pastas dos consoles */
 	home_build();
 	stack[0] = (struct level){ &home, 0, 0 };
 	state_load();

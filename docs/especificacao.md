@@ -69,7 +69,7 @@ O sistema somente leitura é a principal defesa contra corrupção: ele nunca é
 ### Estrutura de pastas na partição ROMS
 ```
 /Roms/
-  GB/  GBC/  GBA/  NES/  SNES/  VB/  POKEMINI/
+  GB/  GBC/  GBA/  NES/  FDS/  SNES/  VB/  POKEMINI/
   MS/  GG/  MD/  SEGACD/  32X/
   PCE/  PCECD/  NGP/  WS/  MSX/
   A2600/  A7800/  LYNX/
@@ -81,7 +81,9 @@ O sistema somente leitura é a principal defesa contra corrupção: ele nunca é
 /Ports/      ← PortMaster
 /Config/     ← configurações do sistema e de cada console
 ```
-Os nomes finais das pastas ainda podem mudar, mas a estrutura deve ser idêntica no SD1 e no SD2.
+A estrutura deve ser idêntica no SD1 e no SD2. O Famicom Disk System tem pasta própria (`FDS`).
+
+**Ordem dos consoles no Início:** por padrão, alfabética pelo nome mostrado. Para escolher a ordem, como no MinUI, basta pôr um número na frente do nome da pasta: `01 - NES`, `02 - FDS`, `03 - SNES` (também valem `01 NES`, `01) NES`, `01.NES`). As pastas numeradas vêm primeiro, na ordem dos números; o launcher continua mostrando o nome completo ("Nintendo"). Saves, save states e configurações seguem o código do console, então renomear a pasta não perde nada.
 
 ---
 

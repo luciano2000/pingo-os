@@ -1,0 +1,5 @@
+# Opções do core que aparecem no menu do jogo (chave=nome mostrado|padrão do Pingo).
+# As outras ficam com o padrão do core. Uma linha por opção.
+pcsx_rearmed_show_bios_bootlogo=Abertura da BIOS|enabled
+pcsx_rearmed_dithering=Pontilhado (dithering)
+pcsx_rearmed_frameskip_type=Pular quadros

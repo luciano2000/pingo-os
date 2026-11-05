@@ -19,7 +19,7 @@ LABEL=ROMS
 STATE=/run/pingo/storage
 
 # Códigos curtos no cartão; o launcher mostra o nome completo
-CONSOLES="GB GBC GBA NES SNES VB POKEMINI MS GG MD SEGACD 32X PCE PCECD NGP WS MSX A2600 A7800 LYNX PS ARCADE"
+CONSOLES="GB GBC GBA NES FDS SNES VB POKEMINI MS GG MD SEGACD 32X PCE PCECD NGP WS MSX A2600 A7800 LYNX PS ARCADE"
 
 say() { echo "pingo-storage: $*" > /dev/kmsg; }
 state() { mkdir -p /run/pingo; echo "$*" > "$STATE"; }
@@ -72,7 +72,11 @@ size_gb() {
 
 make_folders() {
 	local c
-	for c in $CONSOLES; do mkdir -p "$MNT/Roms/$c"; done
+	mkdir -p "$MNT/Roms"
+	for c in $CONSOLES; do
+		# Pasta já existe, com ou sem número na frente ("01 - NES")? Não recria
+		ls "$MNT/Roms" 2>/dev/null | grep -qi -E "^([0-9]+[ ._)-]+)?$c\$" || mkdir -p "$MNT/Roms/$c"
+	done
 	mkdir -p "$MNT/Bios" "$MNT/Saves" "$MNT/States" "$MNT/Ports" "$MNT/Config"
 	# Dados internos do sistema (chaves SSH, cache de shaders, logs)
 	mkdir -p "$MNT/.system/dropbear" "$MNT/.system/cache" "$MNT/.system/logs"

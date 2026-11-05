@@ -236,10 +236,17 @@ static void vars_curate(void)
 		if (nl)
 			*nl = 0;
 		*eq = 0;
+		/* "chave=Nome mostrado|valor padrão do Pingo" (o padrão é opcional) */
+		char *def = strchr(eq + 1, '|');
+		if (def)
+			*def++ = 0;
 		for (int i = 0; i < nvars; i++)
 			if (!strcmp(vars[i].key, line) && !vars[i].label) {
 				vars[i].label = strdup(eq + 1);
 				shown[nshown++] = i;
+				for (int k = 0; def && k < vars[i].nvalues; k++)
+					if (!strcmp(vars[i].values[k], def))
+						vars[i].cur = k;
 			}
 	}
 	fclose(f);
@@ -339,6 +346,10 @@ static void vars_define(const struct retro_variable *v)
 			nvars++;
 	}
 }
+
+/* interface de troca de disco do core (jogos de vários discos) */
+static struct retro_disk_control_callback disk;
+static bool has_disk;
 
 /* ---- vídeo ----------------------------------------------------------- */
 
@@ -587,10 +598,42 @@ static void poll_devices(void)
 	}
 }
 
+/* Sequência de botões apertada pelo próprio frontend ("Virar o disquete"
+ * do FDS: o FCEUmm troca o lado pelos botões R e L). Cada passo: botão e
+ * quantos quadros dura (botão -1: nenhum). */
+static const struct { int id, frames; } fds_flip[] = {
+	{ RETRO_DEVICE_ID_JOYPAD_R, 6 }, { -1, 30 },   /* tira o disquete */
+	{ RETRO_DEVICE_ID_JOYPAD_L, 6 }, { -1, 30 },   /* vira o lado */
+	{ RETRO_DEVICE_ID_JOYPAD_R, 6 }, { -1, 6 },    /* coloca de novo */
+};
+static int macro_step = -1, macro_left;
+
 static void input_poll(void)
 {
-	/* os dispositivos são lidos no laço principal */
+	/* os dispositivos são lidos no laço principal; aqui só a sequência */
+	if (macro_step < 0)
+		return;
+	if (macro_left-- <= 0) {
+		macro_step++;
+		if (macro_step >= (int)(sizeof(fds_flip) / sizeof(fds_flip[0]))) {
+			macro_step = -1;
+			memset(pad_state, 0, sizeof(pad_state));
+			return;
+		}
+		macro_left = fds_flip[macro_step].frames;
+	}
+	memset(pad_state, 0, sizeof(pad_state));
+	if (fds_flip[macro_step].id >= 0)
+		pad_state[fds_flip[macro_step].id] = true;
 }
+
+static void macro_start(void)
+{
+	macro_step = 0;
+	macro_left = fds_flip[0].frames;
+}
+
+static bool is_fds;
 
 static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id)
 {
@@ -667,6 +710,10 @@ static bool environment(unsigned cmd, void *data)
 		v->value = NULL;
 		return false;
 	}
+	case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
+		disk = *(const struct retro_disk_control_callback *)data;
+		has_disk = true;
+		return true;
 	case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
 		*(bool *)data = vars_dirty;
 		vars_dirty = false;
@@ -674,6 +721,29 @@ static bool environment(unsigned cmd, void *data)
 	default:
 		return false;
 	}
+}
+
+/* ---- discos (jogos de vários discos) ---------------------------------- */
+
+static unsigned disc_count(void)
+{
+	return has_disk && disk.get_num_images ? disk.get_num_images() : 0;
+}
+
+static unsigned disc_index(void)
+{
+	return has_disk && disk.get_image_index ? disk.get_image_index() : 0;
+}
+
+/* Troca para o próximo disco: abre a tampa, troca, fecha */
+static bool disc_next(void)
+{
+	unsigned n = disc_count();
+	if (n < 2 || !disk.set_eject_state || !disk.set_image_index)
+		return false;
+	unsigned next = (disc_index() + 1) % n;
+	return disk.set_eject_state(true) && disk.set_image_index(next) &&
+	       disk.set_eject_state(false);
 }
 
 /* ---- SRAM ------------------------------------------------------------ */
@@ -957,23 +1027,63 @@ static void hint_slot(void)
 	ui_text(F_BAR, S_HINT_SLOT, PAD_X + w + ui_text_width(F_BAR, " "), y, COL_DIM, 0, 0);
 }
 
-static const char *menu_items[] = { S_M_CONTINUE, S_M_SAVE, S_M_LOAD, S_M_OPTIONS, S_M_QUIT };
-enum { MI_CONTINUE, MI_SAVE, MI_LOAD, MI_OPTIONS, MI_QUIT, MI_N };
+enum { MI_CONTINUE, MI_SAVE, MI_LOAD, MI_OPTIONS, MI_DISC, MI_FLIP, MI_QUIT };
+static int menu_ids[7], menu_n;
+
+static void menu_build(void)
+{
+	menu_n = 0;
+	menu_ids[menu_n++] = MI_CONTINUE;
+	menu_ids[menu_n++] = MI_SAVE;
+	menu_ids[menu_n++] = MI_LOAD;
+	menu_ids[menu_n++] = MI_OPTIONS;
+	if (disc_count() > 1)
+		menu_ids[menu_n++] = MI_DISC;
+	if (is_fds)
+		menu_ids[menu_n++] = MI_FLIP;
+	menu_ids[menu_n++] = MI_QUIT;
+}
+
+static const char *menu_label(int id, char *buf, size_t n)
+{
+	switch (id) {
+	case MI_CONTINUE: return S_M_CONTINUE;
+	case MI_SAVE:     return S_M_SAVE;
+	case MI_LOAD:     return S_M_LOAD;
+	case MI_OPTIONS:  return S_M_OPTIONS;
+	case MI_DISC:
+		snprintf(buf, n, S_M_DISC, disc_index() + 1, disc_count());
+		return buf;
+	case MI_FLIP:     return S_M_FLIP;
+	default:          return S_M_QUIT;
+	}
+}
 
 static void draw_menu(int sel)
 {
 	draw_dimmed_game();
-	draw_bar(game_label);
+	if (disc_count() > 1) { /* "Final Fantasy VII  Disco 1", como no mockup */
+		char d[32];
+		snprintf(d, sizeof(d), S_DISC_N, disc_index() + 1);
+		draw_bar(game_label);
+		int w = ui_text_width(F_BAR_BOLD, game_label);
+		if (w > 420)
+			w = 420;
+		ui_text(F_BAR, d, PAD_X + w + 10, PAD_Y + BAR_H / 2, COL_DIM, 0, 0);
+	} else {
+		draw_bar(game_label);
+	}
 
 	int top = PAD_Y + BAR_H + LIST_GAP;
-	for (int i = 0; i < MI_N; i++) {
-		int y = top + i * (ROW_H + ROW_GAP);
+	char lbuf[64];
+	for (int i = 0; i < menu_n; i++) {
+		int y = top + i * (ROW_H + ROW_GAP), id = menu_ids[i];
 		bool s = i == sel;
 		if (s)
 			ui_round_rect(PAD_X, y, 252, ROW_H, ROW_RADIUS, COL_SEL_BG);
-		ui_text(s ? F_ITEM_SEL : F_ITEM, menu_items[i], PAD_X + ROW_PAD, y + ROW_H / 2,
-			s ? COL_SEL_FG : COL_TEXT, 0, 0);
-		if (s && (i == MI_SAVE || i == MI_LOAD || i == MI_OPTIONS))
+		ui_text(s ? F_ITEM_SEL : F_ITEM, menu_label(id, lbuf, sizeof(lbuf)), PAD_X + ROW_PAD,
+			y + ROW_H / 2, s ? COL_SEL_FG : COL_TEXT, 0, 252 - 2 * ROW_PAD - 20);
+		if (s && (id == MI_SAVE || id == MI_LOAD || id == MI_OPTIONS))
 			ui_icon_chevron(PAD_X + 252 - ROW_PAD - 16, y + ROW_H / 2, COL_SEL_FG);
 	}
 
@@ -1137,6 +1247,7 @@ static bool run_menu(void)
 	audio_pause(true);
 	sram_save();
 	slots_refresh();
+	menu_build();
 	toast[0] = 0;
 
 	for (;;) {
@@ -1151,9 +1262,9 @@ static bool run_menu(void)
 				break;
 		}
 		if (was_pressed(BTN_DPAD_UP))
-			sel = (sel - 1 + MI_N) % MI_N;
+			sel = (sel - 1 + menu_n) % menu_n;
 		if (was_pressed(BTN_DPAD_DOWN))
-			sel = (sel + 1) % MI_N;
+			sel = (sel + 1) % menu_n;
 		if (was_pressed(BTN_DPAD_LEFT))
 			slot = (slot - 1 + SLOTS) % SLOTS;
 		if (was_pressed(BTN_DPAD_RIGHT))
@@ -1163,27 +1274,41 @@ static bool run_menu(void)
 			break;
 		}
 		if (was_pressed(BTN_EAST)) {
-			if (sel == MI_CONTINUE)
+			int id = menu_ids[sel];
+			if (id == MI_CONTINUE)
 				break;
-			if (sel == MI_QUIT) {
+			if (id == MI_FLIP) {
+				macro_start(); /* acontece já no jogo, quadro a quadro */
+				show_toast(S_FLIPPING);
+				break;
+			}
+			if (id == MI_DISC) {
+				if (disc_next()) {
+					show_toast(S_DISC_CHANGED, disc_index() + 1);
+					break; /* volta ao jogo já com o disco novo */
+				}
+				show_toast(S_LOAD_FAILED);
+				continue;
+			}
+			if (id == MI_QUIT) {
 				quit_requested = true;
 				break;
 			}
-			if (sel == MI_OPTIONS) {
+			if (id == MI_OPTIONS) {
 				if (!run_options())
 					break;
 				continue;
 			}
 			if (!has_states) {
 				show_toast(S_NO_STATES);
-			} else if (sel == MI_SAVE) {
+			} else if (id == MI_SAVE) {
 				if (state_save(slot)) {
 					show_toast(S_SAVED_SLOT, slot + 1);
 					slots_refresh();
 					break; /* volta ao jogo, como no MinUI */
 				}
 				show_toast(S_SAVE_FAILED);
-			} else if (sel == MI_LOAD) {
+			} else if (id == MI_LOAD) {
 				if (!slot_used[slot])
 					show_toast(S_SLOT_IS_EMPTY, slot + 1);
 				else if (state_load(slot))
@@ -1207,7 +1332,50 @@ static bool has_ext(const char *name, const char *ext)
 	return dot && !strcasecmp(dot + 1, ext);
 }
 
+#define TMP_ROM_DIR "/run/pingo/rom"
 static char zip_inner_path[4096];
+
+/* .m3u com caminhos completos: aceita nomes relativos, absolutos e o erro
+ * comum de "/Nome do disco.chd" (barra no começo sem ser caminho real) */
+static char m3u_fixed[4096];
+
+static const char *fix_m3u(const char *m3u)
+{
+	FILE *in = fopen(m3u, "r");
+	if (!in)
+		return m3u;
+	char dir[4096], line[4096], full[8300];
+	snprintf(dir, sizeof(dir), "%s", m3u);
+	char *slash = strrchr(dir, '/');
+	if (slash)
+		*slash = 0;
+	mkdir_p(TMP_ROM_DIR);
+	const char *b = strrchr(m3u, '/');
+	snprintf(m3u_fixed, sizeof(m3u_fixed), "%s/%s", TMP_ROM_DIR, b ? b + 1 : m3u);
+	FILE *out = fopen(m3u_fixed, "w");
+	if (!out) {
+		fclose(in);
+		return m3u;
+	}
+	while (fgets(line, sizeof(line), in)) {
+		line[strcspn(line, "\r\n")] = 0;
+		if (!line[0] || line[0] == '#')
+			continue;
+		struct stat st;
+		const char *name = line;
+		if (line[0] == '/' && stat(line, &st) == 0) {
+			snprintf(full, sizeof(full), "%s", line);
+		} else {
+			while (*name == '/')
+				name++;
+			snprintf(full, sizeof(full), "%s/%s", dir, name);
+		}
+		fprintf(out, "%s\n", full);
+	}
+	fclose(in);
+	fclose(out);
+	return m3u_fixed;
+}
 
 /* Maior arquivo do .zip, na memória */
 static void *unzip_game(const char *path, size_t *size)
@@ -1242,15 +1410,18 @@ static void *unzip_game(const char *path, size_t *size)
 		if (f)
 			zip_fclose(f);
 		if (buf) {
-			/* caminho "virtual" com o nome de dentro: alguns cores olham a extensão */
+			/* Também em arquivo de verdade (na RAM): alguns cores abrem o
+			 * caminho de novo (FCEUmm no Famicom Disk System, NeoPop) */
 			const char *inner = zip_get_name(z, best, 0);
 			const char *b = strrchr(inner, '/');
-			char dir[4096];
-			snprintf(dir, sizeof(dir), "%s", path);
-			char *slash = strrchr(dir, '/');
-			if (slash)
-				*slash = 0;
-			snprintf(zip_inner_path, sizeof(zip_inner_path), "%s/%s", dir, b ? b + 1 : inner);
+			mkdir_p(TMP_ROM_DIR);
+			snprintf(zip_inner_path, sizeof(zip_inner_path), "%s/%s", TMP_ROM_DIR,
+				 b ? b + 1 : inner);
+			FILE *o = fopen(zip_inner_path, "wb");
+			if (o) {
+				fwrite(buf, 1, best_size, o);
+				fclose(o);
+			}
 			*size = best_size;
 		}
 	}
@@ -1318,17 +1489,37 @@ int main(int argc, char **argv)
 		sysinfo.library_version, console_code);
 
 	game.path = argv[2];
+	if (has_ext(argv[2], "m3u"))
+		game.path = fix_m3u(argv[2]);
+	is_fds = has_ext(argv[2], "fds");
+
+	/* .zip: o core que aceita .zip (FBNeo: o romset é o próprio .zip) recebe
+	 * como está; os outros recebem o jogo extraído, na RAM */
+	bool core_zip = sysinfo.valid_extensions && strstr(sysinfo.valid_extensions, "zip");
+	void *zip_data = NULL;
+	size_t zip_size = 0;
+	if (has_ext(argv[2], "zip") && !core_zip) {
+		zip_data = unzip_game(argv[2], &zip_size);
+		if (!zip_data) {
+			fprintf(stderr, "pingo-retro: não consegui abrir o .zip %s\n", argv[2]);
+			return 1;
+		}
+		game.path = zip_inner_path;
+		is_fds = has_ext(zip_inner_path, "fds");
+	}
 	if (!sysinfo.need_fullpath) {
-		if (has_ext(argv[2], "zip")) {
-			game.data = unzip_game(argv[2], &game.size);
-			game.path = zip_inner_path;
+		if (zip_data) {
+			game.data = zip_data;
+			game.size = zip_size;
 		} else {
-			game.data = read_file(argv[2], &game.size);
+			game.data = read_file(game.path, &game.size);
 		}
 		if (!game.data) {
 			fprintf(stderr, "pingo-retro: não consegui ler %s\n", argv[2]);
 			return 1;
 		}
+	} else {
+		free(zip_data); /* o core abre o arquivo extraído pelo caminho */
 	}
 
 	SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
@@ -1479,6 +1670,10 @@ int main(int argc, char **argv)
 	ui_detach();
 	SDL_Quit();
 	free((void *)game.data);
+	if (zip_inner_path[0])
+		unlink(zip_inner_path);
+	if (m3u_fixed[0])
+		unlink(m3u_fixed);
 	/* 3: o pingo-shell mostra "Desligando…" e desliga */
 	return power_off_requested ? 3 : 0;
 }

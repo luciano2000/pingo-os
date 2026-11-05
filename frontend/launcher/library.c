@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -20,6 +21,7 @@ const struct console consoles[] = {
 	{ "GBC",      "Game Boy Color",    "gbc gb zip",              "gambatte" },
 	{ "GBA",      "Game Boy Advance",  "gba zip",                 "mgba" },
 	{ "NES",      "Nintendo",          "nes fds unf unif zip",    "fceumm" },
+	{ "FDS",      "Famicom Disk System", "fds zip",               "fceumm" },
 	{ "SNES",     "Super Nintendo",    "sfc smc swc fig bs zip",  "snes9x" },
 	{ "VB",       "Virtual Boy",       "vb vboy zip",             "mednafen_vb" },
 	{ "POKEMINI", "Pokémon mini",      "min zip",                 "pokemini" },
@@ -188,6 +190,8 @@ void library_free(struct node *n)
 	free(n);
 }
 
+static void group_discs(struct node *dir, int console);
+
 static void scan_dir(struct node *dir, int console)
 {
 	DIR *d = opendir(dir->path);
@@ -223,12 +227,224 @@ static void scan_dir(struct node *dir, int console)
 		}
 	}
 	closedir(d);
+	if (strstr(consoles[console].exts, "m3u"))
+		group_discs(dir, console);
 	qsort(dir->kids, dir->nkids, sizeof(*dir->kids), kid_cmp);
 }
 
+/* ---- jogos de vários discos ------------------------------------------ */
+
+static void kid_remove(struct node *dir, int i)
+{
+	dir->games -= dir->kids[i]->games;
+	library_free(dir->kids[i]);
+	memmove(&dir->kids[i], &dir->kids[i + 1], sizeof(*dir->kids) * (dir->nkids - i - 1));
+	dir->nkids--;
+}
+
+static bool is_ext(const char *name, const char *ext)
+{
+	const char *dot = strrchr(name, '.');
+	return dot && !strcasecmp(dot + 1, ext);
+}
+
+/* "(Disc 2)", "(Disco 2)", "(CD2)": número do disco e onde a tag começa/termina */
+static int disc_tag(const char *name, const char **start, const char **end)
+{
+	for (const char *p = strchr(name, '('); p; p = strchr(p + 1, '(')) {
+		const char *q = p + 1;
+		if (!strncasecmp(q, "disc ", 5))
+			q += 5;
+		else if (!strncasecmp(q, "disco ", 6))
+			q += 6;
+		else if (!strncasecmp(q, "cd", 2))
+			q += 2;
+		else
+			continue;
+		if (!isdigit((unsigned char)*q))
+			continue;
+		int n = atoi(q);
+		while (isdigit((unsigned char)*q))
+			q++;
+		if (*q == ' ' && !strncasecmp(q, " of ", 4)) { /* "(Disc 1 of 2)" */
+			q += 4;
+			while (isdigit((unsigned char)*q))
+				q++;
+		}
+		if (*q != ')')
+			continue;
+		*start = p;
+		*end = q + 1;
+		return n;
+	}
+	return 0;
+}
+
+/* Base do jogo sem a tag do disco e sem a extensão */
+static void disc_key(const char *name, char *out, size_t n)
+{
+	const char *a, *b;
+	char tmp[1024];
+	if (disc_tag(name, &a, &b))
+		snprintf(tmp, sizeof(tmp), "%.*s%s", (int)(a - name), name, b);
+	else
+		snprintf(tmp, sizeof(tmp), "%s", name);
+	char *dot = strrchr(tmp, '.');
+	if (dot)
+		*dot = 0;
+	/* espaços que sobraram onde estava a tag */
+	size_t w = 0;
+	for (size_t r = 0; tmp[r]; r++) {
+		if (tmp[r] == ' ' && (w == 0 || tmp[w - 1] == ' '))
+			continue;
+		tmp[w++] = tmp[r];
+	}
+	while (w > 0 && tmp[w - 1] == ' ')
+		w--;
+	tmp[w] = 0;
+	snprintf(out, n, "%s", tmp);
+}
+
+static void mkdir_p(const char *path)
+{
+	char tmp[4096];
+	snprintf(tmp, sizeof(tmp), "%s", path);
+	for (char *p = tmp + 1; *p; p++)
+		if (*p == '/') {
+			*p = 0;
+			mkdir(tmp, 0755);
+			*p = '/';
+		}
+	mkdir(tmp, 0755);
+}
+
+struct disc { int n; struct node *node; };
+
+static int disc_cmp(const void *a, const void *b)
+{
+	return ((const struct disc *)a)->n - ((const struct disc *)b)->n;
+}
+
+/* Um item por jogo: .m3u existente esconde os discos que cita; sem .m3u,
+ * arquivos "(Disc N)" com a mesma base viram um .m3u gerado no cache. */
+static void group_discs(struct node *dir, int console)
+{
+	/* 1) .m3u do usuário */
+	for (int i = 0; i < dir->nkids; i++) {
+		struct node *m = dir->kids[i];
+		if (m->dir || !is_ext(m->fname, "m3u"))
+			continue;
+		FILE *f = fopen(m->path, "r");
+		char line[4096];
+		if (!f)
+			continue;
+		while (fgets(line, sizeof(line), f)) {
+			line[strcspn(line, "\r\n")] = 0;
+			if (!line[0] || line[0] == '#')
+				continue;
+			const char *b = strrchr(line, '/');
+			b = b ? b + 1 : line;
+			m->discs++;
+			for (int k = 0; k < dir->nkids; k++)
+				if (k != i && !dir->kids[k]->dir && !strcmp(dir->kids[k]->fname, b)) {
+					kid_remove(dir, k);
+					if (k < i)
+						i--;
+					break;
+				}
+		}
+		fclose(f);
+	}
+
+	/* 2) grupos "(Disc N)" sem .m3u */
+	for (int i = 0; i < dir->nkids; i++) {
+		struct node *a = dir->kids[i];
+		const char *s, *e;
+		if (a->dir || a->discs || is_ext(a->fname, "m3u") || !disc_tag(a->fname, &s, &e))
+			continue;
+		char key[1024];
+		disc_key(a->fname, key, sizeof(key));
+		struct disc group[16];
+		int ng = 0;
+		for (int k = i; k < dir->nkids && ng < 16; k++) {
+			struct node *b = dir->kids[k];
+			char kb[1024];
+			if (b->dir || is_ext(b->fname, "m3u"))
+				continue;
+			disc_key(b->fname, kb, sizeof(kb));
+			int n = disc_tag(b->fname, &s, &e);
+			if (n && !strcmp(kb, key))
+				group[ng++] = (struct disc){ n, b };
+		}
+		if (ng < 2)
+			continue;
+		qsort(group, ng, sizeof(group[0]), disc_cmp);
+
+		char mdir[4096], mpath[4600];
+		snprintf(mdir, sizeof(mdir), "%s/%s", M3U_DIR, consoles[console].code);
+		mkdir_p(mdir);
+		snprintf(mpath, sizeof(mpath), "%s/%s.m3u", mdir, key);
+		FILE *f = fopen(mpath, "w");
+		if (!f)
+			continue;
+		for (int g = 0; g < ng; g++)
+			fprintf(f, "%s\n", group[g].node->path);
+		fclose(f);
+
+		char fname[1100];
+		snprintf(fname, sizeof(fname), "%s.m3u", key);
+		struct node *m = node_new(fname, mpath, console, false);
+		m->discs = ng;
+		/* tira os discos e põe o item do jogo */
+		for (int g = 0; g < ng; g++)
+			for (int k = 0; k < dir->nkids; k++)
+				if (dir->kids[k] == group[g].node) {
+					kid_remove(dir, k);
+					break;
+				}
+		node_add(dir, m);
+		i = -1; /* recomeça: a lista mudou */
+	}
+}
+
+/* Pasta de console: o código ("NES") com um número opcional na frente para
+ * escolher a ordem, como no MinUI: "01 - NES", "01 NES", "01) NES", "01.NES".
+ * Devolve o console (ou -1) e o número (-1 sem número). */
+int library_console_folder(const char *name, int *order)
+{
+	const char *p = name;
+	*order = -1;
+	if (isdigit((unsigned char)*p)) {
+		const char *q = p;
+		while (isdigit((unsigned char)*q))
+			q++;
+		const char *r = q;
+		while (*r == ' ' || *r == '-' || *r == '.' || *r == ')' || *r == '_')
+			r++;
+		if (r > q && *r) { /* precisa de separador: "32X" não é "3" + "2X" */
+			*order = atoi(p);
+			p = r;
+		}
+	}
+	for (int c = 0; c < n_consoles; c++)
+		if (!strcasecmp(p, consoles[c].code))
+			return c;
+	*order = -1;
+	return -1;
+}
+
+/* Ordem do Início: primeiro as pastas numeradas (pelo número), depois as
+ * outras pelo nome mostrado */
 static int console_cmp(const void *a, const void *b)
 {
 	const struct node *x = *(const struct node *const *)a, *y = *(const struct node *const *)b;
+	int ox, oy;
+	library_console_folder(x->fname, &ox);
+	library_console_folder(y->fname, &oy);
+	if ((ox >= 0) != (oy >= 0))
+		return ox >= 0 ? -1 : 1;
+	if (ox >= 0 && ox != oy)
+		return ox - oy;
 	return natural_cmp(consoles[x->console].name, consoles[y->console].name);
 }
 
@@ -237,11 +453,12 @@ static struct node *root_new(void)
 	return node_new("", ROMS_DIR, -1, true);
 }
 
-static struct node *console_node(int c)
+/* folder: o nome da pasta em Roms/ (com ou sem número na frente) */
+static struct node *console_node(int c, const char *folder)
 {
-	char path[512];
-	snprintf(path, sizeof(path), "%s/%s", ROMS_DIR, consoles[c].code);
-	struct node *n = node_new(consoles[c].code, path, c, true);
+	char path[1024];
+	snprintf(path, sizeof(path), "%s/%s", ROMS_DIR, folder);
+	struct node *n = node_new(folder, path, c, true);
 	free(n->label);
 	n->label = strdup(consoles[c].name);
 	return n;
@@ -250,17 +467,48 @@ static struct node *console_node(int c)
 struct node *library_scan(void)
 {
 	struct node *root = root_new();
+	struct node *seen[64] = { 0 };
+	DIR *d = opendir(ROMS_DIR);
+	struct dirent *e;
 
-	for (int c = 0; c < n_consoles; c++) {
-		struct node *cn = console_node(c);
+	while (d && (e = readdir(d))) {
+		int order, c = library_console_folder(e->d_name, &order);
+		if (c < 0 || c >= 64)
+			continue;
+		struct node *cn = console_node(c, e->d_name);
 		scan_dir(cn, c);
-		if (cn->games > 0)
-			node_add(root, cn);
+		/* duas pastas do mesmo console (ex.: "NES" e "01 - NES"): fica a
+		 * numerada, ou a que tem jogos */
+		if (seen[c]) {
+			int o_old;
+			library_console_folder(seen[c]->fname, &o_old);
+			bool better = (order >= 0 && o_old < 0) || (seen[c]->games == 0 && cn->games > 0);
+			if (!better) {
+				library_free(cn);
+				continue;
+			}
+			library_free(seen[c]);
+		}
+		seen[c] = cn;
+	}
+	if (d)
+		closedir(d);
+	for (int c = 0; c < n_consoles && c < 64; c++) {
+		if (seen[c] && seen[c]->games > 0)
+			node_add(root, seen[c]);
 		else
-			library_free(cn);
+			library_free(seen[c]);
 	}
 	qsort(root->kids, root->nkids, sizeof(*root->kids), console_cmp);
 	return root;
+}
+
+const char *library_console_root(const struct node *root, int console)
+{
+	for (int i = 0; root && i < root->nkids; i++)
+		if (root->kids[i]->console == console)
+			return root->kids[i]->path;
+	return NULL;
 }
 
 int library_find_kid(const struct node *dir, const char *path)
@@ -300,7 +548,13 @@ bool library_equal(const struct node *a, const struct node *b)
 
 static void save_node(FILE *f, const struct node *n, int depth)
 {
-	fprintf(f, "%d\t%c\t%d\t%s\n", depth, n->dir ? 'D' : 'F', n->console, n->fname);
+	/* .m3u gerado: o caminho fica no cache (não está na pasta do jogo) */
+	bool virt = !n->dir && !strncmp(n->path, M3U_DIR, strlen(M3U_DIR));
+	fprintf(f, "%d\t%c\t%d\t%d\t%s", depth, n->dir ? 'D' : (virt ? 'M' : 'F'), n->console,
+		n->discs, n->fname);
+	if (virt)
+		fprintf(f, "\t%s", n->path);
+	fputc('\n', f);
 	for (int i = 0; i < n->nkids; i++)
 		save_node(f, n->kids[i], depth + 1);
 }
@@ -312,7 +566,7 @@ bool library_save_cache(const struct node *root, const char *path)
 	FILE *f = fopen(tmp, "w");
 	if (!f)
 		return false;
-	fprintf(f, "pingo-library 1\n");
+	fprintf(f, "pingo-library 3\n");
 	for (int i = 0; i < root->nkids; i++)
 		save_node(f, root->kids[i], 1);
 	if (fflush(f) || fsync(fileno(f)) || fclose(f)) {
@@ -340,7 +594,7 @@ struct node *library_load_cache(const char *path)
 
 	if (!f)
 		return NULL;
-	if (!fgets(line, sizeof(line), f) || strcmp(line, "pingo-library 1\n")) {
+	if (!fgets(line, sizeof(line), f) || strcmp(line, "pingo-library 3\n")) {
 		fclose(f);
 		return NULL;
 	}
@@ -357,25 +611,34 @@ struct node *library_load_cache(const char *path)
 			break;
 		}
 		*nl = 0;
-		int depth, console;
+		int depth, console, discs;
 		char type;
 		int off = 0;
-		if (sscanf(line, "%d\t%c\t%d\t%n", &depth, &type, &console, &off) != 3 || !off ||
+		if (sscanf(line, "%d\t%c\t%d\t%d\t%n", &depth, &type, &console, &discs, &off) != 4 || !off ||
 		    depth < 1 || depth > top + 1 || depth >= 64 || console < 0 || console >= n_consoles) {
 			ok = false;
 			break;
 		}
-		const char *name = line + off;
+		char *name = line + off;
 		struct node *parent = stack[depth - 1];
 		struct node *n;
 
 		if (depth == 1) {
-			n = console_node(console);
+			n = console_node(console, name);
+		} else if (type == 'M') { /* .m3u gerado: "nome\tcaminho" */
+			char *tab = strchr(name, '\t');
+			if (!tab) {
+				ok = false;
+				break;
+			}
+			*tab = 0;
+			n = node_new(name, tab + 1, console, false);
 		} else {
 			char p[4096];
 			snprintf(p, sizeof(p), "%s/%s", parent->path, name);
 			n = node_new(name, p, console, type == 'D');
 		}
+		n->discs = discs;
 		/* o total de jogos é refeito ao subir */
 		n->games = n->dir ? 0 : 1;
 		parent->kids = realloc(parent->kids, sizeof(*parent->kids) * (parent->nkids + 1));

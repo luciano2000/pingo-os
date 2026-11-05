@@ -9,8 +9,13 @@
 
 #include <stdbool.h>
 
+#ifndef ROMS_DIR
 #define ROMS_DIR "/mnt/sd1/Roms"
+#endif
 #define CORES_DIR "/usr/lib/libretro"
+#ifndef M3U_DIR
+#define M3U_DIR "/mnt/sd1/.system/cache/m3u" /* .m3u gerados para jogos sem .m3u */
+#endif
 
 struct console {
 	const char *code; /* nome da pasta em Roms/ */
@@ -29,6 +34,7 @@ struct node {
 	int console;  /* índice em consoles[] */
 	bool dir;
 	int games;    /* jogos nesta pasta e abaixo (1 para arquivo) */
+	int discs;    /* jogos de vários discos (.m3u): quantos discos */
 	struct node **kids;
 	int nkids;
 };
@@ -42,6 +48,12 @@ void library_free(struct node *n);
 
 /* Procura um filho pelo caminho completo; -1 se não houver */
 int library_find_kid(const struct node *dir, const char *path);
+
+/* Pasta de console ("01 - NES" -> NES, ordem 1); -1 se não for de console */
+int library_console_folder(const char *name, int *order);
+
+/* Caminho da pasta do console na biblioteca (NULL se ele não tem jogos) */
+const char *library_console_root(const struct node *root, int console);
 
 /* Jogo avulso (usado pelos Recentes) */
 struct node *library_game_node(int console, const char *path);

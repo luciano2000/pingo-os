@@ -172,8 +172,10 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 
 ### Pendente nesta fatia
 
-- [ ] Testar um jogo de cada console no aparelho
-- [ ] PS1 com vários discos: `.m3u` como um item ("N discos") e troca de disco no menu
+- [x] Testar um jogo de cada console no aparelho: todos abrem; corrigidos FDS e NGP (cores com `need_fullpath` recebiam o `.zip`; agora o jogo é extraído para `/run/pingo/rom`, a não ser que o core aceite `.zip`) e `.m3u` com barra no começo das linhas
+- [x] FDS: pasta própria e "Virar o disquete" no menu (o FCEUmm vira o lado pelos botões R e L; o menu aperta R, L, R)
+- [x] Ordem dos consoles por número na pasta (`01 - NES`), como no MinUI
+- [x] PS1 com vários discos: `.m3u` como um item ("N discos"), agrupamento automático de "(Disc N)" sem `.m3u`, troca de disco no menu e "Disco N" na barra; abertura da BIOS ligada
 - [ ] Listas curadas de opções dos cores novos (por enquanto só a Escala)
 - [ ] Filtros de tela (seção 8.1)
 - [ ] Remapeamento de botões
