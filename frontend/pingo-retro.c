@@ -737,19 +737,42 @@ static void video_refresh(const void *data, unsigned width, unsigned height, siz
 }
 
 /* Retângulo do jogo na tela: proporção original sempre */
+/* Rotação pedida pelo core (SET_ROTATION), em passos de 90° no sentido
+ * anti-horário: jogos verticais do arcade vêm deitados e são girados aqui.
+ * A proporção informada pelo core já é a da tela girada. */
+static int rotation;
+
+/* Copia uma textura para o retângulo final, girada se for o caso */
+static void blit_rotated(SDL_Texture *t, const SDL_Rect *dst)
+{
+	if (!rotation) {
+		SDL_RenderCopy(renderer, t, NULL, dst);
+		return;
+	}
+	SDL_Rect r = *dst;
+	if (rotation & 1) { /* 90° ou 270°: antes de girar, largura e altura trocadas */
+		r.w = dst->h;
+		r.h = dst->w;
+		r.x = dst->x + (dst->w - r.w) / 2;
+		r.y = dst->y + (dst->h - r.h) / 2;
+	}
+	SDL_RenderCopyEx(renderer, t, NULL, &r, -90.0 * rotation, NULL, SDL_FLIP_NONE);
+}
+
 static SDL_Rect game_rect(void)
 {
-	float a = aspect > 0 ? aspect : (float)tex_w / tex_h;
+	int gw = rotation & 1 ? tex_h : tex_w, gh = rotation & 1 ? tex_w : tex_h;
+	float a = aspect > 0 ? aspect : (float)gw / gh;
 	SDL_Rect r;
 	if (scale_mode == SCALE_INT) {
 		/* múltiplos exatos da altura; a largura segue a proporção */
-		int s = SDL_min(screen_w / tex_w, screen_h / tex_h);
+		int s = SDL_min(screen_w / gw, screen_h / gh);
 		if (s < 1)
 			s = 1;
-		r.h = tex_h * s;
+		r.h = gh * s;
 		r.w = (int)(r.h * a + 0.5f);
 		if (r.w > screen_w)
-			r.w = tex_w * s;
+			r.w = gw * s;
 	} else {
 		r.w = screen_w;
 		r.h = (int)(screen_w / a + 0.5f);
@@ -808,8 +831,8 @@ static void draw_game(void)
 	SDL_RenderClear(renderer);
 	if (texture) {
 		SDL_Rect dst = game_rect();
-		SDL_RenderCopy(renderer, texture, NULL, &dst);
-		if (scr && grid_on && scale_mode == SCALE_INT)
+		blit_rotated(texture, &dst);
+		if (scr && grid_on && scale_mode == SCALE_INT && !rotation)
 			draw_grid(&dst);
 	}
 }
@@ -1199,6 +1222,11 @@ static bool environment(unsigned cmd, void *data)
 	/* Sem estas duas respostas, o FBNeo acha que é partida em rede (netplay)
 	 * na primeira vez que o save state é consultado e desliga os recordes
 	 * (hiscore.dat). Aqui é sempre: vídeo e som ligados, save state normal. */
+	case RETRO_ENVIRONMENT_SET_ROTATION:
+		if (!data)
+			return false;
+		rotation = (int)(*(const unsigned *)data & 3);
+		return true;
 	case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
 		if (data)
 			*(int *)data = 1 | 2;
@@ -1587,6 +1615,11 @@ static void draw_menu(int sel)
 	if (slot_preview[slot]) {
 		int tw, th;
 		SDL_QueryTexture(slot_preview[slot], NULL, NULL, &tw, &th);
+		if (rotation & 1) {
+			int t = tw;
+			tw = th;
+			th = t;
+		}
 		float a = aspect > 0 ? aspect : (float)tw / th;
 		int iw = pw - 16, ih = (int)(iw / a);
 		if (ih > ph - 16) {
@@ -1594,7 +1627,7 @@ static void draw_menu(int sel)
 			iw = (int)(ih * a);
 		}
 		SDL_Rect d = { px + (pw - iw) / 2, top + (ph - ih) / 2, iw, ih };
-		SDL_RenderCopy(renderer, slot_preview[slot], NULL, &d);
+		blit_rotated(slot_preview[slot], &d);
 	} else {
 		ui_text(F_BAR, S_SLOT_EMPTY, px + pw / 2, top + ph / 2, COL_DIM, 2, 0);
 	}
@@ -2344,8 +2377,9 @@ int main(int argc, char **argv)
 	bool lockstep = fps > 58.5 && fps < 61.5;
 	double runs_per_sec = lockstep ? 60.0 : fps;
 	audio_step = core_rate * (runs_per_sec / fps) / AUDIO_RATE;
-	fprintf(stderr, "pingo-retro: %ux%u, %.2f fps, som %.0f Hz, %s\n", av.geometry.base_width,
-		av.geometry.base_height, fps, core_rate, lockstep ? "1 quadro por vsync" : "acumulando");
+	fprintf(stderr, "pingo-retro: %ux%u, %.2f fps, som %.0f Hz, %s%s\n", av.geometry.base_width,
+		av.geometry.base_height, fps, core_rate, lockstep ? "1 quadro por vsync" : "acumulando",
+		rotation ? ", tela girada" : "");
 
 	SDL_AudioSpec want = { 0 }, have;
 	want.freq = AUDIO_RATE;

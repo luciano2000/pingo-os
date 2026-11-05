@@ -112,6 +112,7 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - **SRAM**: `Saves/<console>/<jogo>.srm` (nome do RetroArch); grava sozinha quando muda (a cada 5 s), ao abrir o menu, antes de suspender e ao sair. Tudo com arquivo temporário + `fsync` + `rename`.
 - **Som** a 48 kHz com reamostragem e controle dinâmico de taxa (±0,5 %): o Game Boy (59,73 Hz) roda um quadro por vsync (60 Hz) sem picotar; consoles longe de 60 Hz (PAL) acumulam tempo.
 - **Escala** Ajustada (padrão) ou Inteira, sempre com a proporção do core.
+- **Rotação** (`SET_ROTATION`): jogos verticais do arcade (1941, shmups) vêm deitados do FBNeo e são girados no desenho, em pé com bordas laterais; a prévia do save state também.
 - **`.zip`** de cartucho aberto na memória (`libzip`, maior arquivo do `.zip`); cores com `need_fullpath` (FBNeo) recebem o `.zip` como está.
 - **Opções**: Escala + lista curada por core (`frontend/cores/<core>.opts`, `chave=Nome|padrão do Pingo|valor=Nome;valor=Nome`: o padrão e a lista de valores são opcionais; com a lista, só esses valores aparecem, com nome em português; sem ela, ligado/desligado/automático já saem traduzidos); "Salvar para este jogo" (`Config/<console>/<jogo>.cfg`) ou "para o console" (`Config/<console>/console.cfg`), o do jogo tem prioridade. Só as opções mostradas são gravadas.
 - O launcher passa o código do console ao `pingo-retro` (3ª linha de `/run/pingo/next`).
