@@ -113,7 +113,7 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - **Som** a 48 kHz com reamostragem e controle dinâmico de taxa (±0,5 %): o Game Boy (59,73 Hz) roda um quadro por vsync (60 Hz) sem picotar; consoles longe de 60 Hz (PAL) acumulam tempo.
 - **Escala** Ajustada (padrão) ou Inteira, sempre com a proporção do core.
 - **`.zip`** de cartucho aberto na memória (`libzip`, maior arquivo do `.zip`); cores com `need_fullpath` (FBNeo) recebem o `.zip` como está.
-- **Opções**: Escala + lista curada por core (`frontend/cores/<core>.opts`, "chave=Nome em português"); "Salvar para este jogo" (`Config/<console>/<jogo>.cfg`) ou "para o console" (`Config/<console>/console.cfg`), o do jogo tem prioridade. Só as opções mostradas são gravadas.
+- **Opções**: Escala + lista curada por core (`frontend/cores/<core>.opts`, `chave=Nome|padrão do Pingo|valor=Nome;valor=Nome`: o padrão e a lista de valores são opcionais; com a lista, só esses valores aparecem, com nome em português; sem ela, ligado/desligado/automático já saem traduzidos); "Salvar para este jogo" (`Config/<console>/<jogo>.cfg`) ou "para o console" (`Config/<console>/console.cfg`), o do jogo tem prioridade. Só as opções mostradas são gravadas.
 - O launcher passa o código do console ao `pingo-retro` (3ª linha de `/run/pingo/next`).
 
 ### Checklist
@@ -176,7 +176,9 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] FDS: pasta própria e "Virar o disquete" no menu (o FCEUmm vira o lado pelos botões R e L; o menu aperta R, L, R)
 - [x] Ordem dos consoles por número na pasta (`01 - NES`), como no MinUI
 - [x] PS1 com vários discos: `.m3u` como um item ("N discos"), agrupamento automático de "(Disc N)" sem `.m3u`, troca de disco no menu e "Disco N" na barra; abertura da BIOS ligada
-- [ ] Listas curadas de opções dos cores novos (por enquanto só a Escala)
+- [ ] Listas curadas de opções de todos os cores: feitas, falta conferir no aparelho
+  - Poucas por core, só as que o jogador entende: "Menos piscadas" (sem limite de sprites: FCEUmm, Snes9x, Genesis Plus GX, PicoDrive, PCE, blueMSX; mistura de quadros no Stella), Região (NES, SNES, Mega Drive/MS/GG, 32X), Paleta (NES, Atari, Virtual Boy, Pokémon mini, WonderSwan), Girar a tela (WonderSwan, Lynx), Rastro da tela (Game Gear, Lynx, Pokémon mini), Idioma (NGP), Modelo (MSX), Sensor solar (GBA, Boktai), Neo Geo: versão MVS/AES/UniBIOS e memory card (FBNeo), Suavizar alta resolução (SNES).
+  - ProSystem (Atari 7800) sem opções: nenhuma faz diferença para o jogador.
 - [ ] Filtros de tela (seção 8.1): implementados, falta testar no aparelho com jogos de GB, GBC e GBA
   - Opções → **Tela** (GB: Original/DMG; GBC: Original/GBC; GBA: Original/GBA/SP 101), **Grade LCD** e **Rastro da tela**; gravados com as outras opções (`pingo.tela`, `pingo.grade`, `pingo.rastro`). Padrão: GB em DMG, o resto Original, grade e rastro desligados.
   - GB e GBC: a cor vem do Gambatte (`gambatte_gb_colorization`/`gambatte_gb_internal_palette`, `gambatte_gbc_color_correction`), forçada por baixo; essas opções saíram da lista curada do Gambatte.

@@ -1,5 +1,8 @@
-# Opções do core que aparecem no menu do jogo (chave=nome mostrado|padrão do Pingo).
-# As outras ficam com o padrão do core. Uma linha por opção.
+# Opções do core no menu do jogo, uma por linha:
+#   chave=Nome mostrado|padrão do Pingo|valor=Nome;valor=Nome
+# O padrão e a lista de valores são opcionais (sem a lista, todos os valores
+# do core aparecem; ligado/desligado/automático já saem em português).
+# As outras opções ficam com o padrão do core.
 pcsx_rearmed_show_bios_bootlogo=Abertura da BIOS|enabled
-pcsx_rearmed_dithering=Pontilhado (dithering)
-pcsx_rearmed_frameskip_type=Pular quadros
+pcsx_rearmed_dithering=Pontilhado (dithering)||disabled=Desligado;enabled=Ligado
+pcsx_rearmed_frameskip_type=Pular quadros||disabled=Desligado;auto=Automático

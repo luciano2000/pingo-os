@@ -1,0 +1,6 @@
+# Opções do core no menu do jogo, uma por linha:
+#   chave=Nome mostrado|padrão do Pingo|valor=Nome;valor=Nome
+# O padrão e a lista de valores são opcionais (sem a lista, todos os valores
+# do core aparecem; ligado/desligado/automático já saem em português).
+# As outras opções ficam com o padrão do core.
+ngp_language=Idioma dos jogos||english=Inglês;japanese=Japonês

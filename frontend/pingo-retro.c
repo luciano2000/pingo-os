@@ -218,6 +218,8 @@ static struct var {
 	char *values[32];
 	int nvalues, cur;
 	char *label; /* nome mostrado (lista curada); NULL: fica oculta */
+	char *vlabel[32]; /* nome mostrado de cada valor (NULL: o do core) */
+	bool vhide[32];   /* valores fora da lista curada */
 } vars[MAX_VARS];
 static int nvars;
 static bool vars_dirty;
@@ -246,18 +248,48 @@ static void vars_curate(void)
 		if (nl)
 			*nl = 0;
 		*eq = 0;
-		/* "chave=Nome mostrado|valor padrão do Pingo" (o padrão é opcional) */
-		char *def = strchr(eq + 1, '|');
-		if (def)
+		/* "chave=Nome mostrado|padrão do Pingo|valor=Nome;valor=Nome"
+		 * O padrão e a lista de valores são opcionais; com a lista, só os
+		 * valores dela aparecem, com esses nomes. */
+		char *def = strchr(eq + 1, '|'), *list = NULL;
+		if (def) {
 			*def++ = 0;
-		for (int i = 0; i < nvars; i++)
-			if (!strcmp(vars[i].key, line) && !vars[i].label) {
-				vars[i].label = strdup(eq + 1);
-				shown[nshown++] = i;
-				for (int k = 0; def && k < vars[i].nvalues; k++)
-					if (!strcmp(vars[i].values[k], def))
-						vars[i].cur = k;
+			if ((list = strchr(def, '|')))
+				*list++ = 0;
+			if (!*def)
+				def = NULL;
+		}
+		for (int i = 0; i < nvars; i++) {
+			struct var *v = &vars[i];
+			if (strcmp(v->key, line) || v->label)
+				continue;
+			bool any = false;
+			if (list) {
+				char *copy = strdup(list), *save = NULL;
+				for (int k = 0; k < v->nvalues; k++)
+					v->vhide[k] = true;
+				for (char *t = strtok_r(copy, ";", &save); t; t = strtok_r(NULL, ";", &save)) {
+					char *e = strchr(t, '=');
+					if (e)
+						*e++ = 0;
+					for (int k = 0; k < v->nvalues; k++)
+						if (!strcmp(v->values[k], t)) {
+							v->vhide[k] = false;
+							v->vlabel[k] = e ? strdup(e) : NULL;
+							any = true;
+						}
+				}
+				free(copy);
+				if (!any) /* nenhum valor bate (core mudou): mostra todos */
+					for (int k = 0; k < v->nvalues; k++)
+						v->vhide[k] = false;
 			}
+			v->label = strdup(eq + 1);
+			shown[nshown++] = i;
+			for (int k = 0; def && k < v->nvalues; k++)
+				if (!strcmp(v->values[k], def))
+					v->cur = k;
+		}
 	}
 	fclose(f);
 }
@@ -289,6 +321,22 @@ static void screen_init(void)
 			scr = &screen_consoles[i];
 	screen_preset = scr ? scr->def : 0;
 	grid_on = ghost_on = false;
+}
+
+/* Nome de um valor no menu: o da lista curada, os comuns em português ou
+ * o do core */
+static const char *var_value_text(const struct var *v)
+{
+	const char *val = v->values[v->cur];
+	if (v->vlabel[v->cur])
+		return v->vlabel[v->cur];
+	if (!strcasecmp(val, "enabled") || !strcasecmp(val, "on"))
+		return S_O_ON;
+	if (!strcasecmp(val, "disabled") || !strcasecmp(val, "off"))
+		return S_O_OFF;
+	if (!strcasecmp(val, "auto"))
+		return S_O_AUTO;
+	return val;
 }
 
 static void var_set_value(const char *key, const char *value)
@@ -1549,7 +1597,7 @@ static void draw_options(int sel, int top_item)
 		case OPT_VAR: {
 			struct var *v = &vars[shown[opt_arg[i]]];
 			label = v->label;
-			value = v->values[v->cur];
+			value = var_value_text(v);
 			break;
 		}
 		case OPT_SAVE_GAME:
@@ -1593,7 +1641,11 @@ static void option_change(int i, int d)
 		ghost_on = !ghost_on;
 	} else if (opt_kind[i] == OPT_VAR) {
 		struct var *v = &vars[shown[opt_arg[i]]];
-		v->cur = (v->cur + d + v->nvalues) % v->nvalues;
+		int k = v->cur;
+		do /* pula os valores fora da lista curada */
+			k = (k + d + v->nvalues) % v->nvalues;
+		while (v->vhide[k] && k != v->cur);
+		v->cur = k;
 		vars_dirty = true;
 	}
 }

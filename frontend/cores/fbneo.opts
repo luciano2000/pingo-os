@@ -1,0 +1,7 @@
+# Opções do core no menu do jogo, uma por linha:
+#   chave=Nome mostrado|padrão do Pingo|valor=Nome;valor=Nome
+# O padrão e a lista de valores são opcionais (sem a lista, todos os valores
+# do core aparecem; ligado/desligado/automático já saem em português).
+# As outras opções ficam com o padrão do core.
+fbneo-neogeo-mode=Neo Geo: versão||DIPSWITCH=Arcade (MVS);AES_EUR=Console (AES);AES_JAP=Console japonês (AES);MVS_JAP=Arcade japonês (MVS);UNIBIOS=UniBIOS
+fbneo-memcard-mode=Neo Geo: memory card||disabled=Desligado;per-game=Um por jogo;shared=Um para todos

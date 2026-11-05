@@ -94,6 +94,7 @@
 #define S_O_OFF          "Desligado"
 #define S_O_ON_F         "Ligada"
 #define S_O_OFF_F        "Desligada"
+#define S_O_AUTO         "Automático"
 #define S_O_SAVE_GAME    "Salvar para este jogo"
 #define S_O_SAVE_CONSOLE "Salvar para o console"
 #define S_O_SAVED_GAME   "Opções salvas para este jogo"

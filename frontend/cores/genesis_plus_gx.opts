@@ -1,0 +1,9 @@
+# Opções do core no menu do jogo, uma por linha:
+#   chave=Nome mostrado|padrão do Pingo|valor=Nome;valor=Nome
+# O padrão e a lista de valores são opcionais (sem a lista, todos os valores
+# do core aparecem; ligado/desligado/automático já saem em português).
+# As outras opções ficam com o padrão do core.
+genesis_plus_gx_no_sprite_limit=Menos piscadas (sem limite de sprites)
+genesis_plus_gx_ym2413=Som FM do Master System
+genesis_plus_gx_lcd_filter=Rastro da tela (Game Gear)
+genesis_plus_gx_region_detect=Região||auto=Automática;ntsc-u=EUA;pal=Europa;ntsc-j=Japão

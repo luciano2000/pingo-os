@@ -1,0 +1,8 @@
+# Opções do core no menu do jogo, uma por linha:
+#   chave=Nome mostrado|padrão do Pingo|valor=Nome;valor=Nome
+# O padrão e a lista de valores são opcionais (sem a lista, todos os valores
+# do core aparecem; ligado/desligado/automático já saem em português).
+# As outras opções ficam com o padrão do core.
+snes9x_reduce_sprite_flicker=Menos piscadas
+snes9x_hires_blend=Suavizar alta resolução||disabled=Desligado;merge=Misturar;blur=Desfocar
+snes9x_region=Região||auto=Automática;ntsc=NTSC (EUA/Japão);pal=PAL (Europa)
