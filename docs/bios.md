@@ -40,7 +40,8 @@ Game Boy, Game Boy Color, NES, Super Nintendo, Virtual Boy, Master System, Game 
 - Romset: **FinalBurn Neo 1.0.0.03 (Arcade)**, de preferência **non-merged** (cada `.zip` completo e independente). Split/merged também funcionam, com o `.zip` pai junto.
 - Romsets de **MAME** não servem: os nomes coincidem, mas o conteúdo dos `.zip` muitas vezes não.
 - Para conferir ou reconstruir a coleção (RomVault, ClrMamePro), use o DAT exato desta versão: [FinalBurn Neo (ClrMame Pro XML, Arcade only).dat](https://github.com/libretro/FBNeo/blob/72af9e23b766b6ad6d2a30042fc8d83eadd25b61/dats/FinalBurn%20Neo%20(ClrMame%20Pro%20XML,%20Arcade%20only).dat).
-- BIOS de arcade ficam **na mesma pasta dos jogos** (`Roms/ARCADE`) e não aparecem na lista: `neogeo.zip` (Neo Geo), `pgm.zip` (PGM), `skns.zip`, `decocass.zip` etc.
+- BIOS de arcade ficam **na mesma pasta dos jogos** e não aparecem na lista: `neogeo.zip` (Neo Geo), `pgm.zip` (PGM), `skns.zip`, `decocass.zip` etc.
+- **Neo Geo separado:** a pasta `Roms/NEOGEO` aparece como "Neo Geo" no Início, com o mesmo core (FBNeo). O `neogeo.zip` vai dentro dela, junto com os jogos. No arcade a pasta só organiza: o FBNeo reconhece o jogo pelo nome do `.zip`.
 - O launcher mostra o nome do jogo vindo do DAT ("Street Fighter II: The World Warrior" em vez de `sf2.zip`).
 - **Samples** (sons gravados de jogos antigos, como Donkey Kong, Galaga, Space Invaders): em `Bios/fbneo/samples/`, um `.zip` por jogo, com o nome do jogo e sem descompactar (`Bios/fbneo/samples/dkong.zip`). Sem eles o jogo roda, só faltam alguns sons.
 - **Recordes**: o `hiscore.dat` diz ao FBNeo onde cada jogo guarda a tabela de recordes na memória (não é um arquivo de recordes). O Pingo OS já traz o do FBNeo (5857 jogos) e copia para `Bios/fbneo/hiscore.dat` no boot, se não houver um; um `hiscore.dat` mais novo posto ali é mantido.

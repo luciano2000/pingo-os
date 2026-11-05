@@ -74,7 +74,7 @@ O sistema somente leitura é a principal defesa contra corrupção: ele nunca é
   PCE/  PCECD/  NGP/  WS/  MSX/
   A2600/  A7800/  LYNX/
   PS/
-  ARCADE/
+  ARCADE/  NEOGEO/
 /Bios/
 /Saves/      ← SRAM (sempre no SD1)
 /States/     ← save states (sempre no SD1)

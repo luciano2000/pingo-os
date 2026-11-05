@@ -40,6 +40,7 @@ const struct console consoles[] = {
 	{ "LYNX",     "Atari Lynx",        "lnx zip",                 "handy" },
 	{ "PS",       "PlayStation",       "chd cue pbp m3u",         "pcsx_rearmed" },
 	{ "ARCADE",   "Arcade",            "zip",                     "fbneo" },
+	{ "NEOGEO",   "Neo Geo",           "zip",                     "fbneo" },
 };
 const int n_consoles = sizeof(consoles) / sizeof(consoles[0]);
 
@@ -279,7 +280,7 @@ static void scan_dir(struct node *dir, int console)
 				library_free(sub);
 		} else if (ext_ok(&consoles[console], e->d_name)) {
 			struct node *g = node_new(e->d_name, path, console, false);
-			if (!strcmp(consoles[console].code, "ARCADE")) {
+			if (!strcmp(consoles[console].core, "fbneo")) {
 				const struct arcade_name *a = arcade_find(e->d_name);
 				if (a && a->bios) { /* BIOS (neogeo.zip...): fica na pasta, fora da lista */
 					library_free(g);
@@ -633,7 +634,7 @@ bool library_save_cache(const struct node *root, const char *path)
 	FILE *f = fopen(tmp, "w");
 	if (!f)
 		return false;
-	fprintf(f, "pingo-library 3\n");
+	fprintf(f, "pingo-library 4\n");
 	for (int i = 0; i < root->nkids; i++)
 		save_node(f, root->kids[i], 1);
 	if (fflush(f) || fsync(fileno(f)) || fclose(f)) {
@@ -661,7 +662,7 @@ struct node *library_load_cache(const char *path)
 
 	if (!f)
 		return NULL;
-	if (!fgets(line, sizeof(line), f) || strcmp(line, "pingo-library 3\n")) {
+	if (!fgets(line, sizeof(line), f) || strcmp(line, "pingo-library 4\n")) {
 		fclose(f);
 		return NULL;
 	}
@@ -704,7 +705,7 @@ struct node *library_load_cache(const char *path)
 			char p[4096];
 			snprintf(p, sizeof(p), "%s/%s", parent->path, name);
 			n = node_new(name, p, console, type == 'D');
-			if (!n->dir && !strcmp(consoles[console].code, "ARCADE")) {
+			if (!n->dir && !strcmp(consoles[console].core, "fbneo")) {
 				const struct arcade_name *a = arcade_find(name);
 				if (a) {
 					free(n->label);

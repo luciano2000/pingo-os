@@ -19,7 +19,7 @@ LABEL=ROMS
 STATE=/run/pingo/storage
 
 # Códigos curtos no cartão; o launcher mostra o nome completo
-CONSOLES="GB GBC GBA NES FDS SNES VB POKEMINI MS GG MD SEGACD 32X PCE PCECD NGP WS MSX A2600 A7800 LYNX PS ARCADE"
+CONSOLES="GB GBC GBA NES FDS SNES VB POKEMINI MS GG MD SEGACD 32X PCE PCECD NGP WS MSX A2600 A7800 LYNX PS ARCADE NEOGEO"
 
 say() { echo "pingo-storage: $*" > /dev/kmsg; }
 state() { mkdir -p /run/pingo; echo "$*" > "$STATE"; }
