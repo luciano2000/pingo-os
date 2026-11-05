@@ -39,6 +39,18 @@
 #define RECENTS_MAX   30
 #define RECENTS_PATH  "pingo:recentes"
 
+/* entrada (evdev), usada também pelas telas modais */
+enum { DEV_PAD, DEV_POWER, DEV_VOLUME, DEV_N };
+static struct pollfd fds[DEV_N];
+static void suspend(void);
+static void shutdown_now(void);
+
+#define POWER_HOLD_MS 2000
+static bool power_down;
+static Uint32 power_down_at;
+
+static int pending_console = -1; /* entrar neste console quando a lista nova chegar */
+
 /* ---- estado da navegação --------------------------------------------- */
 
 struct level {
@@ -293,21 +305,99 @@ static void swap_library(struct node *fresh)
 	recents_load();
 	home_build();
 	restore_paths(paths, n);
+	if (pending_console >= 0) { /* acabou de trocar a origem: abre o console de novo */
+		depth = 0;
+		for (int i = 0; i < home.nkids; i++)
+			if (home.kids[i]->console == pending_console && home.kids[i] != recents) {
+				stack[0].sel = i;
+				clamp_level(&stack[0]);
+				stack[++depth] = (struct level){ home.kids[i], 0, 0 };
+				break;
+			}
+		pending_console = -1;
+	}
 	library_free(old);
 	dirty = true;
+}
+
+static bool read_word(const char *path, const char *word);
+
+/* ---- origem dos jogos (SD1/SD2) por console --------------------------- *
+ * Config/origem.cfg: "PS=sd2". Padrão: SD1. */
+
+#define ORIGIN_FILE "/mnt/sd1/Config/origem.cfg"
+#define SD2_STATE   RUN_DIR "/sd2"
+#define SD2_CHANGED RUN_DIR "/sd2.changed"
+
+static int origin[64];
+static bool sd2_present;
+
+static void origin_load(void)
+{
+	FILE *f = fopen(ORIGIN_FILE, "r");
+	char line[128];
+	for (int c = 0; c < 64; c++)
+		origin[c] = 1;
+	if (!f)
+		return;
+	while (fgets(line, sizeof(line), f)) {
+		char *eq = strchr(line, '=');
+		if (!eq)
+			continue;
+		*eq = 0;
+		int c = console_by_code(line);
+		if (c >= 0 && c < 64)
+			origin[c] = !strncmp(eq + 1, "sd2", 3) ? 2 : 1;
+	}
+	fclose(f);
+}
+
+static void origin_save(void)
+{
+	FILE *f = fopen(ORIGIN_FILE ".tmp", "w");
+	if (!f)
+		return;
+	for (int c = 0; c < n_consoles && c < 64; c++)
+		if (origin[c] == 2)
+			fprintf(f, "%s=sd2\n", consoles[c].code);
+	fflush(f);
+	fsync(fileno(f));
+	fclose(f);
+	rename(ORIGIN_FILE ".tmp", ORIGIN_FILE);
+}
+
+static void sd2_read(void)
+{
+	sd2_present = read_word(SD2_STATE, "ok");
 }
 
 /* ---- varredura em segundo plano -------------------------------------- */
 
 static SDL_atomic_t scan_done;
 static struct node *scan_result;
+static bool scanning, scan_again;
 
 static int scan_thread(void *arg)
 {
 	(void)arg;
-	scan_result = library_scan();
+	scan_result = library_scan(origin, sd2_present);
 	SDL_AtomicSet(&scan_done, 1);
 	return 0;
+}
+
+static void start_scan(void)
+{
+	if (scanning) {
+		scan_again = true; /* a lista vai mudar de novo: refaz quando esta terminar */
+		return;
+	}
+	scanning = true;
+	SDL_AtomicSet(&scan_done, 0);
+	SDL_Thread *t = SDL_CreateThread(scan_thread, "scan", NULL);
+	if (t)
+		SDL_DetachThread(t);
+	else
+		scanning = false;
 }
 
 /* ---- status: relógio, bateria e Wi-Fi --------------------------------- */
@@ -457,7 +547,10 @@ static void draw(void)
 		}
 		if (at_home) { /* contagem à direita */
 			char cnt[16];
-			snprintf(cnt, sizeof(cnt), "%d", it->games);
+			if (it->missing)
+				snprintf(cnt, sizeof(cnt), "—");
+			else
+				snprintf(cnt, sizeof(cnt), "%d", it->games);
 			right = ui_text(F_COUNT, cnt, x + w - ROW_PAD, y + ROW_H / 2,
 					sel ? COL_SEL_FG : COL_DIM, 1, 0) + 12;
 		}
@@ -626,11 +719,123 @@ static bool open_random(struct node *dir)
 	return launch(g);
 }
 
+/* Lê o próximo botão apertado (com power: toque suspende, segurar desliga) */
+static int wait_key(void)
+{
+	struct input_event ev;
+	for (;;) {
+		poll(fds, DEV_N, power_down ? 50 : 1000);
+		while (fds[DEV_PAD].fd >= 0 && read(fds[DEV_PAD].fd, &ev, sizeof(ev)) == sizeof(ev)) {
+			if (ev.type != EV_KEY)
+				continue;
+			if (osd_key(ev.code, ev.value))
+				return -1; /* volume: redesenha */
+			if (ev.code == BTN_MODE) {
+				if (osd_menu_tapped())
+					return BTN_MODE;
+				continue;
+			}
+			if (ev.value == 1)
+				return ev.code;
+		}
+		while (fds[DEV_VOLUME].fd >= 0 &&
+		       read(fds[DEV_VOLUME].fd, &ev, sizeof(ev)) == sizeof(ev))
+			if (ev.type == EV_KEY && osd_key(ev.code, ev.value))
+				return -1;
+		while (fds[DEV_POWER].fd >= 0 &&
+		       read(fds[DEV_POWER].fd, &ev, sizeof(ev)) == sizeof(ev)) {
+			if (ev.type != EV_KEY || ev.code != KEY_POWER)
+				continue;
+			if (ev.value == 1) {
+				power_down = true;
+				power_down_at = SDL_GetTicks();
+			} else if (ev.value == 0 && power_down) {
+				power_down = false;
+				suspend();
+				return -1;
+			}
+		}
+		if (power_down && SDL_GetTicks() - power_down_at >= POWER_HOLD_MS)
+			shutdown_now();
+		if (osd_visible() || osd_changed())
+			return -1;
+	}
+}
+
+static void change_origin(int c, int to)
+{
+	if (origin[c] == to)
+		return;
+	origin[c] = to;
+	origin_save();
+	pending_console = c;
+	show_toast(to == 2 ? S_READING_SD2 : S_READING_SD1);
+	start_scan();
+}
+
+/* MENU dentro de um console: "Origem: SD1 / SD2" */
+static void console_menu(int c)
+{
+	int to = origin[c];
+	for (;;) {
+		ui_clear();
+		int bar_y = PAD_Y + BAR_H / 2;
+		ui_text(F_BAR_BOLD, consoles[c].name, PAD_X, bar_y, COL_TEXT, 0, 420);
+		int y = PAD_Y + BAR_H + LIST_GAP;
+		ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+		ui_text(F_ITEM_SEL, S_ORIGIN, PAD_X + ROW_PAD, y + ROW_H / 2, COL_SEL_FG, 0, 0);
+		ui_text(F_COUNT, to == 2 ? "SD2" : "SD1", UI_W - PAD_X - ROW_PAD, y + ROW_H / 2,
+			COL_SEL_FG, 1, 0);
+		if (to == 2 && !sd2_present)
+			ui_text(F_BAR, S_SD2_MISSING, PAD_X + ROW_PAD, y + ROW_H + 24, COL_DIM, 0,
+				UI_W - 2 * PAD_X);
+		int right = UI_W - PAD_X;
+		right -= draw_hint(right, "B", S_BACK) + 22;
+		draw_hint(right, "◀ ▶", S_HINT_CHANGE);
+		osd_draw(ui_renderer(), UI_W, UI_H);
+		ui_present();
+
+		int k = wait_key();
+		if (k == BTN_DPAD_LEFT || k == BTN_DPAD_RIGHT || k == BTN_EAST)
+			to = to == 2 ? 1 : 2;
+		else if (k == BTN_SOUTH || k == BTN_MODE)
+			break;
+	}
+	change_origin(c, to);
+	dirty = true;
+}
+
+/* Console aponta para o SD2 e o SD2 não está: avisa e oferece o SD1 */
+static void sd2_missing_screen(int c)
+{
+	for (;;) {
+		ui_clear();
+		ui_text(F_BIG, S_SD2_MISSING, UI_W / 2, UI_H / 2 - 30, COL_TEXT, 2, UI_W - 2 * PAD_X);
+		ui_text_wrap(F_BODY, S_SD2_MISSING_TXT, UI_W / 2, UI_H / 2 + 4, 520, 31, COL_DIM);
+		int right = UI_W - PAD_X;
+		right -= draw_hint(right, "B", S_BACK) + 22;
+		draw_hint(right, "A", S_USE_SD1);
+		ui_present();
+		int k = wait_key();
+		if (k == BTN_EAST) {
+			change_origin(c, 1);
+			break;
+		}
+		if (k == BTN_SOUTH || k == BTN_MODE)
+			break;
+	}
+	dirty = true;
+}
+
 static bool open_selected(void)
 {
 	struct node *it = selected();
 	if (!it)
 		return false;
+	if (it->missing) {
+		sd2_missing_screen(it->console);
+		return false;
+	}
 	if (it == &random_item)
 		return open_random(lib);
 	if (it->dir) {
@@ -653,8 +858,6 @@ static void go_back(void)
 
 /* ---- entrada (evdev) -------------------------------------------------- */
 
-enum { DEV_PAD, DEV_POWER, DEV_VOLUME, DEV_N };
-static struct pollfd fds[DEV_N];
 
 static int open_by_name(const char *want)
 {
@@ -718,10 +921,6 @@ static bool press(int code)
 	return false;
 }
 
-#define POWER_HOLD_MS 2000
-
-static bool power_down;
-static Uint32 power_down_at;
 
 /* Proteção de tela (só no launcher): apaga a luz depois de um tempo parado */
 #define SCREEN_OFF_MS (2 * 60 * 1000)
@@ -967,11 +1166,13 @@ int main(int argc, char **argv)
 			return 0;
 	}
 	have_roms = stat(ROMS_DIR, &st) == 0;
+	origin_load();
+	sd2_read();
 
 	lib = have_roms ? library_load_cache(CACHE_FILE) : NULL;
 	bool from_cache = lib != NULL;
 	if (!lib)
-		lib = have_roms ? library_scan() : NULL;
+		lib = have_roms ? library_scan(origin, sd2_present) : NULL;
 	if (lib && !from_cache)
 		library_save_cache(lib, CACHE_FILE);
 	recents_load(); /* depois da biblioteca: precisa das pastas dos consoles */
@@ -982,7 +1183,8 @@ int main(int argc, char **argv)
 
 	/* a lista veio do cache: confere o cartão em segundo plano */
 	if (from_cache)
-		SDL_CreateThread(scan_thread, "scan", NULL);
+		start_scan();
+	time_t sd2_mtime = stat(SD2_CHANGED, &st) == 0 ? st.st_mtime : 0;
 
 	status_update();
 	Uint32 last_status = SDL_GetTicks();
@@ -1009,7 +1211,7 @@ int main(int argc, char **argv)
 			timeout = timeout > 100 ? 100 : timeout;
 		if (power_down)
 			timeout = timeout > 50 ? 50 : timeout;
-		if (!SDL_AtomicGet(&scan_done) && from_cache)
+		if (scanning)
 			timeout = timeout > 100 ? 100 : timeout;
 
 		poll(fds, DEV_N, timeout);
@@ -1032,9 +1234,13 @@ int main(int argc, char **argv)
 			if (osd_key(ev.code, ev.value))
 				continue;
 			if (ev.code == BTN_MODE) {
-				/* MENU age ao soltar (MENU+Vol± é brilho); opções do Início
-				 * ainda não existem */
-				osd_menu_tapped();
+				/* MENU age ao soltar (MENU+Vol± é brilho). Dentro de um console:
+				 * origem SD1/SD2. No Início ainda não há opções. */
+				if (osd_menu_tapped() && depth > 0 && cur()->dir->console >= 0 &&
+				    cur()->dir != recents) {
+					held = -1;
+					console_menu(cur()->dir->console);
+				}
 				continue;
 			}
 			if (ev.value == 1) {
@@ -1096,13 +1302,22 @@ int main(int argc, char **argv)
 
 		if (SDL_AtomicGet(&scan_done) == 1) {
 			SDL_AtomicSet(&scan_done, 2);
+			scanning = false;
 			if (!library_equal(scan_result, lib)) {
 				library_save_cache(scan_result, CACHE_FILE);
 				swap_library(scan_result);
 			} else {
 				library_free(scan_result);
+				if (pending_console >= 0) {
+					pending_console = -1;
+					dirty = true;
+				}
 			}
 			scan_result = NULL;
+			if (scan_again) {
+				scan_again = false;
+				start_scan();
+			}
 		}
 
 		if (toast[0] && SDL_GetTicks() >= toast_until)
@@ -1111,6 +1326,13 @@ int main(int argc, char **argv)
 		if (SDL_GetTicks() - last_status >= 1000) {
 			status_update();
 			last_status = SDL_GetTicks();
+			/* SD2 inserido ou tirado: refaz a lista */
+			if (stat(SD2_CHANGED, &st) == 0 && st.st_mtime != sd2_mtime) {
+				sd2_mtime = st.st_mtime;
+				sd2_read();
+				fprintf(stderr, "pingo-launcher: SD2 %s\n", sd2_present ? "presente" : "ausente");
+				start_scan();
+			}
 		}
 	}
 

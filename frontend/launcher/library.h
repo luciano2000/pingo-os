@@ -12,6 +12,9 @@
 #ifndef ROMS_DIR
 #define ROMS_DIR "/mnt/sd1/Roms"
 #endif
+#ifndef ROMS_DIR_SD2
+#define ROMS_DIR_SD2 "/mnt/sd2/Roms" /* segundo cartão: só jogos */
+#endif
 #define CORES_DIR "/usr/lib/libretro"
 #ifndef M3U_DIR
 #define M3U_DIR "/mnt/sd1/.system/cache/m3u" /* .m3u gerados para jogos sem .m3u */
@@ -35,12 +38,16 @@ struct node {
 	bool dir;
 	int games;    /* jogos nesta pasta e abaixo (1 para arquivo) */
 	int discs;    /* jogos de vários discos (.m3u): quantos discos */
+	int source;   /* pasta de console: 1 = SD1, 2 = SD2 */
+	bool missing; /* console aponta para o SD2, mas o SD2 não está no aparelho */
 	struct node **kids;
 	int nkids;
 };
 
-/* Raiz: um filho por console que tem jogos, na ordem do nome mostrado */
-struct node *library_scan(void);
+/* Raiz: um filho por console que tem jogos, na ordem do Início.
+ * origin[c] = 1 (SD1) ou 2 (SD2) para cada console; sd2: o SD2 está montado.
+ * Console com origem SD2 e sem SD2 aparece com missing = true. */
+struct node *library_scan(const int *origin, bool sd2);
 struct node *library_load_cache(const char *path);
 bool library_save_cache(const struct node *root, const char *path);
 bool library_equal(const struct node *a, const struct node *b);

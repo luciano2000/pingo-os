@@ -1907,6 +1907,14 @@ int main(int argc, char **argv)
 
 		frames++;
 		Uint32 now = SDL_GetTicks();
+		/* jogo do SD2 e o cartão saiu: pausa no menu e avisa */
+		if (frames % 60 == 0 && !strncmp(resume_rom, "/mnt/sd2/", 9) &&
+		    access(resume_rom, F_OK) != 0) {
+			fprintf(stderr, "pingo-retro: SD2 removido com o jogo aberto\n");
+			show_toast(S_SD2_REMOVED);
+			toast_until = SDL_GetTicks() + 600000; /* fica até o cartão voltar */
+			menu_requested = true;
+		}
 		if (now - last_sram >= 5000) { /* SRAM: grava sozinha quando muda */
 			sram_save();
 			last_sram = now;

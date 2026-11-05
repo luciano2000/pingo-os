@@ -521,32 +521,31 @@ static struct node *root_new(void)
 	return node_new("", ROMS_DIR, -1, true);
 }
 
-/* folder: o nome da pasta em Roms/ (com ou sem número na frente) */
-static struct node *console_node(int c, const char *folder)
+/* folder: o nome da pasta em <roms>/ (com ou sem número na frente) */
+static struct node *console_node(int c, const char *roms, const char *folder, int source)
 {
 	char path[1024];
-	snprintf(path, sizeof(path), "%s/%s", ROMS_DIR, folder);
+	snprintf(path, sizeof(path), "%s/%s", roms, folder);
 	struct node *n = node_new(folder, path, c, true);
 	free(n->label);
 	n->label = strdup(consoles[c].name);
+	n->source = source;
 	return n;
 }
 
-struct node *library_scan(void)
+/* Uma pasta por console em <roms> (duas do mesmo console, ex. "NES" e
+ * "01 - NES": fica a numerada, ou a que tem jogos) */
+static void scan_root(const char *roms, int source, struct node *seen[64])
 {
-	struct node *root = root_new();
-	struct node *seen[64] = { 0 };
-	DIR *d = opendir(ROMS_DIR);
+	DIR *d = opendir(roms);
 	struct dirent *e;
 
 	while (d && (e = readdir(d))) {
 		int order, c = library_console_folder(e->d_name, &order);
 		if (c < 0 || c >= 64)
 			continue;
-		struct node *cn = console_node(c, e->d_name);
+		struct node *cn = console_node(c, roms, e->d_name, source);
 		scan_dir(cn, c);
-		/* duas pastas do mesmo console (ex.: "NES" e "01 - NES"): fica a
-		 * numerada, ou a que tem jogos */
 		if (seen[c]) {
 			int o_old;
 			library_console_folder(seen[c]->fname, &o_old);
@@ -561,11 +560,40 @@ struct node *library_scan(void)
 	}
 	if (d)
 		closedir(d);
+}
+
+struct node *library_scan(const int *origin, bool sd2)
+{
+	struct node *root = root_new();
+	struct node *s1[64] = { 0 }, *s2[64] = { 0 };
+	bool want2 = false;
+
+	for (int c = 0; c < n_consoles; c++)
+		want2 |= origin && origin[c] == 2;
+	scan_root(ROMS_DIR, 1, s1);
+	if (want2 && sd2)
+		scan_root(ROMS_DIR_SD2, 2, s2);
+
 	for (int c = 0; c < n_consoles && c < 64; c++) {
-		if (seen[c] && seen[c]->games > 0)
-			node_add(root, seen[c]);
+		struct node *pick = NULL;
+		if (origin && origin[c] == 2) {
+			if (sd2) {
+				pick = s2[c];
+				s2[c] = NULL;
+			} else { /* SD2 fora: o console continua no Início, avisando */
+				pick = console_node(c, ROMS_DIR_SD2, consoles[c].code, 2);
+				pick->missing = true;
+			}
+		} else {
+			pick = s1[c];
+			s1[c] = NULL;
+		}
+		if (pick && (pick->games > 0 || pick->missing))
+			node_add(root, pick);
 		else
-			library_free(seen[c]);
+			library_free(pick);
+		library_free(s1[c]);
+		library_free(s2[c]);
 	}
 	qsort(root->kids, root->nkids, sizeof(*root->kids), console_cmp);
 	return root;
@@ -600,7 +628,8 @@ bool library_equal(const struct node *a, const struct node *b)
 	if (!a || !b)
 		return a == b;
 	if (a->dir != b->dir || a->nkids != b->nkids || a->console != b->console ||
-	    strcmp(a->fname, b->fname))
+	    a->source != b->source || a->missing != b->missing || strcmp(a->fname, b->fname) ||
+	    strcmp(a->path, b->path))
 		return false;
 	for (int i = 0; i < a->nkids; i++)
 		if (!library_equal(a->kids[i], b->kids[i]))
@@ -618,9 +647,12 @@ static void save_node(FILE *f, const struct node *n, int depth)
 {
 	/* .m3u gerado: o caminho fica no cache (não está na pasta do jogo) */
 	bool virt = !n->dir && !strncmp(n->path, M3U_DIR, strlen(M3U_DIR));
-	fprintf(f, "%d\t%c\t%d\t%d\t%s", depth, n->dir ? 'D' : (virt ? 'M' : 'F'), n->console,
-		n->discs, n->fname);
-	if (virt)
+	char type = n->dir ? 'D' : (virt ? 'M' : 'F');
+	if (depth == 1) /* pasta de console: "C" + origem (ou "X": SD2 ausente) + caminho */
+		type = n->missing ? 'X' : 'C';
+	fprintf(f, "%d\t%c\t%d\t%d\t%s", depth, type, n->console,
+		depth == 1 ? n->source : n->discs, n->fname);
+	if (virt || depth == 1)
 		fprintf(f, "\t%s", n->path);
 	fputc('\n', f);
 	for (int i = 0; i < n->nkids; i++)
@@ -634,7 +666,7 @@ bool library_save_cache(const struct node *root, const char *path)
 	FILE *f = fopen(tmp, "w");
 	if (!f)
 		return false;
-	fprintf(f, "pingo-library 4\n");
+	fprintf(f, "pingo-library 5\n");
 	for (int i = 0; i < root->nkids; i++)
 		save_node(f, root->kids[i], 1);
 	if (fflush(f) || fsync(fileno(f)) || fclose(f)) {
@@ -662,7 +694,7 @@ struct node *library_load_cache(const char *path)
 
 	if (!f)
 		return NULL;
-	if (!fgets(line, sizeof(line), f) || strcmp(line, "pingo-library 4\n")) {
+	if (!fgets(line, sizeof(line), f) || strcmp(line, "pingo-library 5\n")) {
 		fclose(f);
 		return NULL;
 	}
@@ -691,8 +723,19 @@ struct node *library_load_cache(const char *path)
 		struct node *parent = stack[depth - 1];
 		struct node *n;
 
-		if (depth == 1) {
-			n = console_node(console, name);
+		if (depth == 1) { /* "pasta\tcaminho"; discs = origem */
+			char *tab = strchr(name, '\t');
+			if (!tab) {
+				ok = false;
+				break;
+			}
+			*tab = 0;
+			n = node_new(name, tab + 1, console, true);
+			free(n->label);
+			n->label = strdup(consoles[console].name);
+			n->source = discs;
+			n->missing = type == 'X';
+			discs = 0;
 		} else if (type == 'M') { /* .m3u gerado: "nome\tcaminho" */
 			char *tab = strchr(name, '\t');
 			if (!tab) {

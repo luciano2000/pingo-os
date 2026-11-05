@@ -139,9 +139,71 @@ do_format() {
 	mount_data
 }
 
+# ---- SD2 (segundo slot): só jogos, montado em /mnt/sd2 ------------------
+# Estado para o launcher em /run/pingo/sd2 ("ok <dispositivo>" ou "none") e
+# /run/pingo/sd2.changed tocado a cada mudança (o launcher refaz a lista).
+SD2=/mnt/sd2
+
+sd2_disk() {
+	local b
+	for b in /sys/block/mmcblk*; do
+		[ -e "$b" ] || continue
+		[ "/dev/$(basename "$b")" = "$DISK" ] && continue   # o cartão do sistema
+		[ -d "$b/device" ] || continue
+		echo "/dev/$(basename "$b")"
+		return 0
+	done
+	return 1
+}
+
+# Partição de jogos do SD2: a ROMS; senão a primeira exFAT/FAT32
+sd2_part() {
+	local disk=$1 p t best=""
+	for p in "$disk" "$disk"p*; do
+		[ -b "$p" ] || continue
+		t=$(blkid -p -o value -s TYPE "$p" 2>/dev/null)
+		case "$t" in exfat|vfat) ;; *) continue ;; esac
+		[ "$(blkid -p -o value -s LABEL "$p" 2>/dev/null)" = "$LABEL" ] && { echo "$p"; return 0; }
+		[ -z "$best" ] && best=$p
+	done
+	[ -n "$best" ] && echo "$best"
+}
+
+sd2_changed() { mkdir -p /run/pingo; touch /run/pingo/sd2.changed; }
+
+sd2_update() {
+	root_disk || return 0
+	local disk part
+	disk=$(sd2_disk)
+	part=${disk:+$(sd2_part "$disk")}
+
+	# cartão tirado (ou trocado): desmonta
+	if mountpoint -q "$SD2"; then
+		cur=$(awk -v m="$SD2" '$2 == m {print $1}' /proc/mounts)
+		if [ -z "$part" ] || [ "$cur" != "$part" ]; then
+			umount "$SD2" 2>/dev/null || umount -l "$SD2"
+			say "SD2 removido"
+			state_sd2=none
+		fi
+	fi
+	if [ -n "$part" ] && ! mountpoint -q "$SD2"; then
+		mkdir -p "$SD2"
+		case "$(blkid -p -o value -s TYPE "$part")" in
+			exfat) fsck.exfat -p "$part" > /dev/null 2>&1
+			       mount -t exfat -o noatime,errors=remount-ro "$part" "$SD2" ;;
+			vfat)  fsck.vfat -a "$part" > /dev/null 2>&1
+			       mount -t vfat -o noatime,utf8,errors=remount-ro "$part" "$SD2" ;;
+		esac && say "SD2 montado ($part)"
+	fi
+	mkdir -p /run/pingo
+	if mountpoint -q "$SD2"; then echo "ok $part" > /run/pingo/sd2; else echo none > /run/pingo/sd2; fi
+	sd2_changed
+}
+
 case "$1" in
-	boot) do_boot ;;
+	boot) do_boot; sd2_update ;;
 	format) do_format ;;
-	stop) sync; umount "$MNT" 2>/dev/null ;;
-	*) echo "uso: $0 boot|format|stop" >&2; exit 2 ;;
+	sd2) sd2_update ;;              # udev: cartão inserido ou tirado do slot 2
+	stop) sync; umount "$SD2" 2>/dev/null; umount "$MNT" 2>/dev/null ;;
+	*) echo "uso: $0 boot|format|sd2|stop" >&2; exit 2 ;;
 esac
