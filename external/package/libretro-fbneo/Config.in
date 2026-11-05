@@ -1,0 +1,9 @@
+config BR2_PACKAGE_LIBRETRO_FBNEO
+	bool "libretro-fbneo"
+	depends on BR2_INSTALL_LIBSTDCPP
+	help
+	  Core libretro de arcade (FinalBurn Neo, licença não comercial).
+	  Instala também a tabela de nomes do romset desta versão
+	  (/usr/share/pingo/arcade/fbneo.tsv), feita a partir do DAT.
+
+	  https://github.com/libretro/FBNeo

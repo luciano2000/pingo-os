@@ -149,6 +149,61 @@ static bool ext_ok(const struct console *c, const char *fname)
 	return false;
 }
 
+/* ---- nomes do arcade (DAT do FBNeo) ---------------------------------- *
+ * /usr/share/pingo/arcade/fbneo.tsv: "zip<TAB>descrição<TAB>bios", em ordem
+ * de nome (gerado no build a partir do DAT desta versão do FBNeo).
+ */
+
+#ifndef ARCADE_NAMES
+#define ARCADE_NAMES "/usr/share/pingo/arcade/fbneo.tsv"
+#endif
+
+static struct arcade_name { char *zip, *desc; bool bios; } *arcade;
+static size_t narcade;
+static bool arcade_loaded;
+
+static void arcade_load(void)
+{
+	FILE *f;
+	char line[1024];
+	size_t cap = 0;
+
+	arcade_loaded = true;
+	if (!(f = fopen(ARCADE_NAMES, "r")))
+		return;
+	while (fgets(line, sizeof(line), f)) {
+		char *t1 = strchr(line, '\t');
+		char *t2 = t1 ? strchr(t1 + 1, '\t') : NULL;
+		if (!t2)
+			continue;
+		*t1 = *t2 = 0;
+		if (narcade == cap) {
+			cap = cap ? cap * 2 : 8192;
+			arcade = realloc(arcade, cap * sizeof(*arcade));
+		}
+		arcade[narcade++] = (struct arcade_name){ strdup(line), strdup(t1 + 1), t2[1] == '1' };
+	}
+	fclose(f);
+}
+
+static int arcade_cmp(const void *key, const void *el)
+{
+	return strcmp(key, ((const struct arcade_name *)el)->zip);
+}
+
+/* NULL se o zip não está no DAT */
+static const struct arcade_name *arcade_find(const char *fname)
+{
+	char key[256];
+	if (!arcade_loaded)
+		arcade_load();
+	snprintf(key, sizeof(key), "%s", fname);
+	char *dot = strrchr(key, '.');
+	if (dot)
+		*dot = 0;
+	return narcade ? bsearch(key, arcade, narcade, sizeof(*arcade), arcade_cmp) : NULL;
+}
+
 /* ---- árvore ---------------------------------------------------------- */
 
 static struct node *node_new(const char *fname, const char *path, int console, bool dir)
@@ -223,7 +278,19 @@ static void scan_dir(struct node *dir, int console)
 			else
 				library_free(sub);
 		} else if (ext_ok(&consoles[console], e->d_name)) {
-			node_add(dir, node_new(e->d_name, path, console, false));
+			struct node *g = node_new(e->d_name, path, console, false);
+			if (!strcmp(consoles[console].code, "ARCADE")) {
+				const struct arcade_name *a = arcade_find(e->d_name);
+				if (a && a->bios) { /* BIOS (neogeo.zip...): fica na pasta, fora da lista */
+					library_free(g);
+					continue;
+				}
+				if (a) {
+					free(g->label);
+					g->label = library_clean_name(a->desc, true);
+				}
+			}
+			node_add(dir, g);
 		}
 	}
 	closedir(d);
@@ -637,6 +704,13 @@ struct node *library_load_cache(const char *path)
 			char p[4096];
 			snprintf(p, sizeof(p), "%s/%s", parent->path, name);
 			n = node_new(name, p, console, type == 'D');
+			if (!n->dir && !strcmp(consoles[console].code, "ARCADE")) {
+				const struct arcade_name *a = arcade_find(name);
+				if (a) {
+					free(n->label);
+					n->label = library_clean_name(a->desc, true);
+				}
+			}
 		}
 		n->discs = discs;
 		/* o total de jogos é refeito ao subir */
