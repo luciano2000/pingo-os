@@ -198,11 +198,11 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 
 - [x] SD2 só com a partição ROMS (o cartão antigo, sem boot e sistema), montado somente leitura
 - [x] Pastas dos consoles no SD2 (sem duplicar as numeradas)
-- [ ] Cartão novo (FAT32 de fábrica) no slot 2: pergunta, prepara, "agora não" lembrado
+- [x] Cartão novo (vazio, de fábrica) no slot 2: pergunta, prepara, "agora não" lembrado
 - [x] Saves, states e remapeamento migrados para o SD1; Recentes voltam
 - [x] Sem escolha, todos os consoles vêm do SD2 (SD1 só com sistema e saves); trocar a origem pelo MENU
-- [ ] Ambos (padrão com dois cartões): listas juntas; SD1/SD2 pelo MENU; cartão sem jogos recusado com aviso
-- [ ] Sem o SD2, console que só tem jogos nele some do Início
+- [x] Ambos (padrão com dois cartões): listas juntas; SD1/SD2 pelo MENU; cartão sem jogos recusado com aviso
+- [x] Sem o SD2, console que só tem jogos nele some do Início
 - [x] Tirar o SD2 com o aparelho ligado: a lista se atualiza
 - [x] Recolocar o SD2: a lista volta sozinha
 - [x] Tirar o SD2 com um jogo dele aberto: pausa e aviso
