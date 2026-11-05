@@ -19,6 +19,8 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 #include <dirent.h>
+#include <execinfo.h>
+#include <signal.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <linux/input.h>
@@ -671,6 +673,8 @@ static bool environment(unsigned cmd, void *data)
 {
 	switch (cmd) {
 	case RETRO_ENVIRONMENT_GET_LOG_INTERFACE:
+		if (!data)
+			return false;
 		((struct retro_log_callback *)data)->log = core_log;
 		return true;
 	case RETRO_ENVIRONMENT_GET_CAN_DUPE:
@@ -696,12 +700,16 @@ static bool environment(unsigned cmd, void *data)
 		*(unsigned *)data = 0; /* opções no formato antigo (SET_VARIABLES) */
 		return true;
 	case RETRO_ENVIRONMENT_SET_VARIABLES:
+		if (!data)
+			return false;
 		vars_define((const struct retro_variable *)data);
 		vars_curate();
 		cfg_load_all(); /* valores salvos por console/jogo */
 		return true;
 	case RETRO_ENVIRONMENT_GET_VARIABLE: {
 		struct retro_variable *v = data;
+		if (!v || !v->key)
+			return false;
 		for (int i = 0; i < nvars; i++)
 			if (!strcmp(vars[i].key, v->key)) {
 				v->value = vars[i].values[vars[i].cur];
@@ -711,8 +719,13 @@ static bool environment(unsigned cmd, void *data)
 		return false;
 	}
 	case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
-		disk = *(const struct retro_disk_control_callback *)data;
-		has_disk = true;
+		/* NULL: o core está dizendo que não tem discos (Genesis Plus GX nos
+		 * cartuchos) */
+		has_disk = data != NULL;
+		if (data)
+			disk = *(const struct retro_disk_control_callback *)data;
+		else
+			memset(&disk, 0, sizeof(disk));
 		return true;
 	case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
 		*(bool *)data = vars_dirty;
@@ -1429,6 +1442,30 @@ static void *unzip_game(const char *path, size_t *size)
 	return buf;
 }
 
+/* ---- diagnóstico de travamentos ------------------------------------- *
+ * SIGSEGV/SIGBUS/SIGABRT: imprime a pilha e os endereços das bibliotecas no
+ * log, para localizar a função no PC (addr2line no .so do build).
+ */
+static void crash_handler(int sig)
+{
+	void *frames[48];
+	int n = backtrace(frames, 48);
+	dprintf(2, "pingo-retro: travou (sinal %d); pilha:\n", sig);
+	backtrace_symbols_fd(frames, n, 2);
+	int fd = open("/proc/self/maps", O_RDONLY);
+	if (fd >= 0) {
+		char buf[4096];
+		ssize_t r;
+		dprintf(2, "pingo-retro: mapas:\n");
+		while ((r = read(fd, buf, sizeof(buf))) > 0)
+			if (write(2, buf, r) < 0)
+				break;
+		close(fd);
+	}
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
+
 /* ---- principal ------------------------------------------------------- */
 
 static void names_from_path(const char *rom, const char *code)
@@ -1464,6 +1501,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "uso: %s <core_libretro.so> <rom> [console] [resume]\n", argv[0]);
 		return 2;
 	}
+	signal(SIGSEGV, crash_handler);
+	signal(SIGBUS, crash_handler);
+	signal(SIGABRT, crash_handler);
 	names_from_path(argv[2], argc > 3 ? argv[3] : NULL);
 	bool resume = argc > 4 && !strcmp(argv[4], "resume");
 	snprintf(resume_core, sizeof(resume_core), "%s", argv[1]);
