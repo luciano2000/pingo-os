@@ -366,9 +366,55 @@ static void origin_save(void)
 	rename(ORIGIN_FILE ".tmp", ORIGIN_FILE);
 }
 
+static char sd2_serial[64];
+static bool sd2_ready;
+
+/* "ok <partição> <série> <preparado>" ou "none" */
 static void sd2_read(void)
 {
-	sd2_present = read_word(SD2_STATE, "ok");
+	FILE *f = fopen(SD2_STATE, "r");
+	char ok[8] = "", part[128] = "", serial[64] = "";
+	int ready = 0;
+	sd2_present = false;
+	sd2_serial[0] = 0;
+	sd2_ready = false;
+	if (!f)
+		return;
+	if (fscanf(f, "%7s %127s %63s %d", ok, part, serial, &ready) >= 1 && !strcmp(ok, "ok")) {
+		sd2_present = true;
+		snprintf(sd2_serial, sizeof(sd2_serial), "%s", serial);
+		sd2_ready = ready == 1;
+	}
+	fclose(f);
+}
+
+/* Cartões em que o usuário respondeu "agora não" (por número de série) */
+#define SD2_IGNORED "/mnt/sd1/Config/sd2-ignorados.txt"
+
+static bool sd2_ignored(void)
+{
+	FILE *f = fopen(SD2_IGNORED, "r");
+	char line[96];
+	bool found = false;
+	if (!f)
+		return false;
+	while (!found && fgets(line, sizeof(line), f)) {
+		line[strcspn(line, "\n")] = 0;
+		found = !strcmp(line, sd2_serial);
+	}
+	fclose(f);
+	return found;
+}
+
+static void sd2_ignore(void)
+{
+	FILE *f = fopen(SD2_IGNORED, "a");
+	if (f) {
+		fprintf(f, "%s\n", sd2_serial);
+		fflush(f);
+		fsync(fileno(f));
+		fclose(f);
+	}
 }
 
 /* ---- varredura em segundo plano -------------------------------------- */
@@ -1124,6 +1170,71 @@ static bool setup_wizard(const char *gb)
 	return true;
 }
 
+/* ---- SD2 novo ---------------------------------------------------------- */
+
+static void sd2_prepare_now(void)
+{
+	message_screen(S_SD2_PREPARING, NULL);
+	int rc = system("/usr/sbin/pingo-storage sd2-prepare");
+	sd2_read();
+	if (rc != 0 || !sd2_ready) {
+		show_toast(S_SD2_FAIL);
+		return;
+	}
+	do
+		setup_screen(S_SD2_READY, S_SD2_READY_TXT, S_CONTINUE, NULL);
+	while (wait_ab() != BTN_EAST);
+	start_scan();
+}
+
+/* Cartão sem Roms/ no slot 2: pergunta uma vez (por cartão) */
+static void sd2_maybe_ask(void)
+{
+	if (!sd2_present || sd2_ready || !sd2_serial[0] || sd2_ignored())
+		return;
+	for (;;) {
+		setup_screen(S_SD2_NEW, S_SD2_NEW_TXT, S_PREPARE, S_NOT_NOW);
+		int b = wait_ab();
+		if (b == BTN_EAST) {
+			sd2_prepare_now();
+			break;
+		}
+		if (b == BTN_SOUTH) {
+			sd2_ignore();
+			break;
+		}
+	}
+	dirty = true;
+}
+
+/* MENU no Início */
+static void home_menu(void)
+{
+	if (!(sd2_present && !sd2_ready)) {
+		show_toast(S_NO_OPTIONS);
+		return;
+	}
+	for (;;) {
+		ui_clear();
+		ui_text(F_BAR_BOLD, S_HOME_OPTIONS, PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 0);
+		int y = PAD_Y + BAR_H + LIST_GAP;
+		ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+		ui_text(F_ITEM_SEL, S_PREPARE_SD2, PAD_X + ROW_PAD, y + ROW_H / 2, COL_SEL_FG, 0, 0);
+		int right = UI_W - PAD_X;
+		right -= draw_hint(right, "B", S_BACK) + 22;
+		draw_hint(right, "A", S_CONFIRM);
+		ui_present();
+		int k = wait_key();
+		if (k == BTN_EAST) {
+			sd2_prepare_now();
+			break;
+		}
+		if (k == BTN_SOUTH || k == BTN_MODE)
+			break;
+	}
+	dirty = true;
+}
+
 /* ---- principal -------------------------------------------------------- */
 
 int main(int argc, char **argv)
@@ -1197,6 +1308,7 @@ int main(int argc, char **argv)
 	draw();
 	dirty = true;
 
+	sd2_maybe_ask();
 	last_input = SDL_GetTicks();
 	while (!quit) {
 		if (dirty && !screen_off)
@@ -1238,10 +1350,12 @@ int main(int argc, char **argv)
 			if (ev.code == BTN_MODE) {
 				/* MENU age ao soltar (MENU+Vol± é brilho). Dentro de um console:
 				 * origem SD1/SD2. No Início ainda não há opções. */
-				if (osd_menu_tapped() && depth > 0 && cur()->dir->console >= 0 &&
-				    cur()->dir != recents) {
+				if (osd_menu_tapped()) {
 					held = -1;
-					console_menu(cur()->dir->console);
+					if (depth == 0)
+						home_menu();
+					else if (cur()->dir->console >= 0 && cur()->dir != recents)
+						console_menu(cur()->dir->console);
 				}
 				continue;
 			}
@@ -1334,6 +1448,7 @@ int main(int argc, char **argv)
 				sd2_read();
 				fprintf(stderr, "pingo-launcher: SD2 %s\n", sd2_present ? "presente" : "ausente");
 				start_scan();
+				sd2_maybe_ask();
 			}
 		}
 	}

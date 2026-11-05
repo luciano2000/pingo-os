@@ -145,8 +145,13 @@ do_format() {
 }
 
 # ---- SD2 (segundo slot): só jogos, montado em /mnt/sd2 ------------------
-# Estado para o launcher em /run/pingo/sd2 ("ok <dispositivo>" ou "none") e
-# /run/pingo/sd2.changed tocado a cada mudança (o launcher refaz a lista).
+# Somente leitura: saves, states e configurações ficam no SD1, então nada
+# precisa ser gravado no SD2 e tirá-lo a qualquer momento é seguro. Só o
+# "preparar" (criar as pastas dos consoles) libera a escrita, por um instante.
+#
+# Estado para o launcher em /run/pingo/sd2:
+#   "ok <partição> <número de série> <1 preparado | 0 sem Roms/>" ou "none"
+# /run/pingo/sd2.changed é tocado a cada mudança (o launcher refaz a lista).
 SD2=/mnt/sd2
 
 sd2_disk() {
@@ -195,19 +200,50 @@ sd2_update() {
 		mkdir -p "$SD2"
 		case "$(blkid -p -o value -s TYPE "$part")" in
 			exfat) fsck.exfat -p "$part" > /dev/null 2>&1
-			       mount -t exfat -o noatime,errors=remount-ro "$part" "$SD2" ;;
+			       mount -t exfat -o ro,noatime "$part" "$SD2" ;;
 			vfat)  fsck.vfat -a "$part" > /dev/null 2>&1
-			       mount -t vfat -o noatime,utf8,errors=remount-ro "$part" "$SD2" ;;
-		esac && say "SD2 montado ($part)"
-		# Mesma estrutura de pastas do SD1, mas só num cartão de jogos (rótulo
-		# ROMS ou que já tem Roms/): um cartão qualquer não é mexido
-		if mountpoint -q "$SD2" && { [ -d "$SD2/Roms" ] ||
-		   [ "$(blkid -p -o value -s LABEL "$part" 2>/dev/null)" = "$LABEL" ]; }; then
-			console_folders "$SD2"
-		fi
+			       mount -t vfat -o ro,noatime,utf8 "$part" "$SD2" ;;
+		esac && say "SD2 montado, somente leitura ($part)"
+		# Cartão já preparado (tem Roms/): cria só as pastas de consoles novos
+		[ -d "$SD2/Roms" ] && sd2_folders
 	fi
+	sd2_state
+	sd2_changed
+}
+
+sd2_state() {
 	mkdir -p /run/pingo
-	if mountpoint -q "$SD2"; then echo "ok $part" > /run/pingo/sd2; else echo none > /run/pingo/sd2; fi
+	if mountpoint -q "$SD2"; then
+		local part serial ready=0
+		part=$(awk -v m="$SD2" '$2 == m {print $1}' /proc/mounts)
+		serial=$(blkid -p -o value -s UUID "$part" 2>/dev/null)
+		[ -d "$SD2/Roms" ] && ready=1
+		echo "ok $part ${serial:-sem-serie} $ready" > /run/pingo/sd2
+	else
+		echo none > /run/pingo/sd2
+	fi
+}
+
+# Cria as pastas que faltam, liberando a escrita só durante isso
+sd2_folders() {
+	local c missing=0
+	for c in $CONSOLES; do
+		ls "$SD2/Roms" 2>/dev/null | grep -qi -E "^([0-9]+[ ._)-]+)?$c\$" || missing=1
+	done
+	[ -d "$SD2/Roms" ] || missing=1
+	[ $missing -eq 0 ] && return 0
+	mount -o remount,rw "$SD2" || return 1
+	console_folders "$SD2"
+	sync
+	mount -o remount,ro "$SD2"
+	say "SD2: pastas dos consoles criadas"
+}
+
+# "Preparar o SD2 para jogos" (launcher): só cria pastas, nunca formata
+sd2_prepare() {
+	mountpoint -q "$SD2" || return 1
+	sd2_folders || return 1
+	sd2_state
 	sd2_changed
 }
 
@@ -215,6 +251,7 @@ case "$1" in
 	boot) do_boot; sd2_update ;;
 	format) do_format ;;
 	sd2) sd2_update ;;              # udev: cartão inserido ou tirado do slot 2
+	sd2-prepare) root_disk; sd2_prepare ;;
 	stop) sync; umount "$SD2" 2>/dev/null; umount "$MNT" 2>/dev/null ;;
 	*) echo "uso: $0 boot|format|sd2|stop" >&2; exit 2 ;;
 esac

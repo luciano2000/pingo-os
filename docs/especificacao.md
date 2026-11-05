@@ -166,6 +166,8 @@ Vale só para aparelhos com dois slots (RG35XX-H, RG40XX). Nos aparelhos com um 
 - Inserir ou remover o SD2 dispara um novo scan. Usar cache das listas (uma por pasta) para o boot e a navegação continuarem rápidos.
 - A estrutura de subpastas de cada console vale igual nos dois cartões.
 - Remover o cartão com um jogo rodando: pausar e avisar.
+- O SD2 é montado somente leitura (nada é gravado nele), então tirá-lo com o aparelho ligado é seguro.
+- Cartão novo no slot 2 (sem `Roms/`): o launcher pergunta se é para usar para jogos e só então cria as pastas, sem formatar. "Agora não" é lembrado por cartão; o MENU do Início tem "Preparar o SD2 para jogos".
 
 Caso de uso típico: um cartão de 128 GB com todos os consoles e arcade (SD1) e outro só com ISOs de PS1 e PC Engine CD (SD2).
 

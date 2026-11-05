@@ -186,7 +186,10 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - Origem por console em `Config/origem.cfg` (`PS=sd2` ou `PS=sd1`). Sem escolha: SD1 se lá houver jogos do console, senão SD2 (sem isso, um SD1 só com saves deixaria o Início vazio). A escolha feita pelo MENU fica fixada. No launcher, MENU dentro de um console abre "Origem: SD1 / SD2"; ao trocar, a pasta do outro cartão é lida na hora e o console reabre.
 - Console com origem SD2 e sem o SD2: continua no Início (contagem "—"); ao abrir, "SD2 não encontrado" com A = usar o SD1. Nunca troca sozinho.
 - SD2 inserido ou tirado: a lista é refeita sozinha. Tirar o SD2 com um jogo dele aberto pausa no menu do jogo, com aviso.
-- O SD2 ganha as pastas dos consoles (mesma regra do SD1, sem duplicar as numeradas) se tiver o rótulo `ROMS` ou já tiver `Roms/`; um cartão qualquer não é mexido. `Saves/`, `States/` e `Config/` não são criadas no SD2.
+- O SD2 é montado **somente leitura**: tudo que é gravado fica no SD1, então tirar o SD2 a qualquer momento é seguro.
+- Cartão sem `Roms/` no slot 2 (novo, de fábrica): o launcher pergunta "Cartão novo no slot 2 — usar para jogos?". A: `pingo-storage sd2-prepare` libera a escrita por um instante, cria `Roms/` e as pastas dos consoles, `sync`, volta a somente leitura. Nunca formata. B: não pergunta mais sobre aquele cartão (número de série em `Config/sd2-ignorados.txt`); dá para preparar depois pelo MENU do Início.
+- Cartão já preparado: se faltar a pasta de um console novo (depois de uma atualização), ela é criada sozinha do mesmo jeito.
+- Cartões de até 32 GB vêm em FAT32 (arquivos até 4 GB): não atrapalha nenhum console do Pingo.
 - Saves, save states, configurações e BIOS ficam sempre no SD1.
 - Recentes guardam o caminho relativo à pasta do console: valem na origem que estiver ativa.
 
@@ -194,6 +197,8 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 
 - [ ] SD2 só com a partição ROMS (o cartão antigo, sem boot e sistema)
 - [ ] Pastas dos consoles criadas no SD2 (sem duplicar as numeradas)
+- [ ] Cartão novo (FAT32 de fábrica) no slot 2: pergunta, prepara, "agora não" lembrado
+- [ ] Tirar o SD2 com o console ligado (somente leitura)
 - [ ] Trocar a origem de um console para o SD2 e jogar
 - [ ] Tirar o SD2 no Início e dentro de um console: "SD2 não encontrado" e voltar ao SD1
 - [ ] Recolocar o SD2: a lista volta sozinha
