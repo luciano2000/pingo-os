@@ -195,11 +195,11 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 
 ### Checklist
 
-- [ ] SD2 só com a partição ROMS (o cartão antigo, sem boot e sistema)
-- [ ] Pastas dos consoles criadas no SD2 (sem duplicar as numeradas)
+- [x] SD2 só com a partição ROMS (o cartão antigo, sem boot e sistema), montado somente leitura
+- [x] Pastas dos consoles no SD2 (sem duplicar as numeradas)
 - [ ] Cartão novo (FAT32 de fábrica) no slot 2: pergunta, prepara, "agora não" lembrado
-- [ ] Tirar o SD2 com o console ligado (somente leitura)
-- [ ] Trocar a origem de um console para o SD2 e jogar
-- [ ] Tirar o SD2 no Início e dentro de um console: "SD2 não encontrado" e voltar ao SD1
-- [ ] Recolocar o SD2: a lista volta sozinha
-- [ ] Tirar o SD2 com um jogo dele aberto: pausa e aviso
+- [x] Saves, states e remapeamento migrados para o SD1; Recentes voltam
+- [x] Sem escolha, todos os consoles vêm do SD2 (SD1 só com sistema e saves); trocar a origem pelo MENU; origem vazia mantém o console no Início
+- [x] Tirar o SD2 com o aparelho ligado: a lista se atualiza
+- [x] Recolocar o SD2: a lista volta sozinha
+- [x] Tirar o SD2 com um jogo dele aberto: pausa e aviso
