@@ -8,6 +8,8 @@
 #define PINGO_STRINGS_H
 
 #define S_RECENTS        "Recentes"
+#define S_RANDOM         "Aleatório"
+#define S_RANDOM_HINT    "aleatório"
 #define S_OPEN           "abrir"
 #define S_PLAY           "jogar"
 #define S_BACK           "voltar"

@@ -553,14 +553,20 @@ static int open_input(const char *want)
 	return -1;
 }
 
-/* Layout libretro: B embaixo, A à direita (igual aos botões do aparelho) */
+/* Layout libretro (Nintendo): B embaixo, A à direita, Y à esquerda, X em
+ * cima, como impresso no aparelho. No device tree do H700 os códigos de X e
+ * Y estão trocados em relação à posição: o botão da esquerda (Y) envia
+ * BTN_NORTH e o de cima (X) envia BTN_WEST. */
+#define PAD_Y_LEFT BTN_NORTH
+#define PAD_X_TOP  BTN_WEST
+
 static int map_key(int code)
 {
 	switch (code) {
 	case BTN_SOUTH:      return RETRO_DEVICE_ID_JOYPAD_B;
 	case BTN_EAST:       return RETRO_DEVICE_ID_JOYPAD_A;
-	case BTN_WEST:       return RETRO_DEVICE_ID_JOYPAD_Y;
-	case BTN_NORTH:      return RETRO_DEVICE_ID_JOYPAD_X;
+	case PAD_Y_LEFT:     return RETRO_DEVICE_ID_JOYPAD_Y;
+	case PAD_X_TOP:      return RETRO_DEVICE_ID_JOYPAD_X;
 	case BTN_SELECT:     return RETRO_DEVICE_ID_JOYPAD_SELECT;
 	case BTN_START:      return RETRO_DEVICE_ID_JOYPAD_START;
 	case BTN_DPAD_UP:    return RETRO_DEVICE_ID_JOYPAD_UP;
@@ -609,8 +615,8 @@ static const char *button_name(int code)
 	switch (code) {
 	case BTN_SOUTH:      return "B";
 	case BTN_EAST:       return "A";
-	case BTN_WEST:       return "Y";
-	case BTN_NORTH:      return "X";
+	case PAD_Y_LEFT:     return "Y";
+	case PAD_X_TOP:      return "X";
 	case BTN_TL:         return "L1";
 	case BTN_TR:         return "R1";
 	case BTN_TL2:        return "L2";

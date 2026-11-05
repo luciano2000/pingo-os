@@ -51,6 +51,8 @@ static int depth;            /* stack[depth] é a tela atual */
 static struct node *lib;     /* árvore da biblioteca (dona dos nós) */
 static struct node *recents; /* "Recentes" (dono dos nós dele) */
 static struct node home;     /* Início: aponta para recents e lib->kids */
+static struct node random_item; /* "Aleatório" no Início */
+#define RANDOM_PATH "pingo:aleatorio"
 static bool dirty = true;
 static bool have_roms;
 
@@ -162,10 +164,18 @@ static void home_build(void)
 	home.console = -1;
 	home.path = (char *)"pingo:inicio";
 	home.label = (char *)"";
-	int n = (lib ? lib->nkids : 0) + 1;
+	int n = (lib ? lib->nkids : 0) + 2;
 	home.kids = calloc(n, sizeof(*home.kids));
 	if (recents && recents->nkids > 0)
 		home.kids[home.nkids++] = recents;
+	if (lib && lib->games > 0) {
+		random_item = (struct node){ 0 };
+		random_item.fname = random_item.path = (char *)RANDOM_PATH;
+		random_item.label = (char *)S_RANDOM;
+		random_item.console = -1;
+		random_item.games = lib->games;
+		home.kids[home.nkids++] = &random_item;
+	}
 	for (int i = 0; lib && i < lib->nkids; i++)
 		home.kids[home.nkids++] = lib->kids[i];
 }
@@ -474,7 +484,9 @@ static void draw(void)
 			right -= draw_hint(right, "B", S_BACK) + 22;
 			struct node *s = selected();
 			if (s)
-				draw_hint(right, "A", s->dir ? S_OPEN : S_PLAY);
+				right -= draw_hint(right, "A", s->dir ? S_OPEN : S_PLAY) + 22;
+			if (l->dir != recents && l->dir->games > 1)
+				draw_hint(right, "X", S_RANDOM_HINT);
 		}
 	}
 
@@ -582,11 +594,45 @@ static void jump_letter(int dir)
 	dirty = true;
 }
 
+/* Sorteia um jogo dentro de dir (e das subpastas); cada jogo tem a mesma chance */
+static struct node *random_game(struct node *dir)
+{
+	if (!dir || dir->games <= 0)
+		return NULL;
+	int k = rand() % dir->games;
+	for (;;) {
+		if (!dir->dir)
+			return dir;
+		struct node *next = NULL;
+		for (int i = 0; i < dir->nkids; i++) {
+			if (k < dir->kids[i]->games) {
+				next = dir->kids[i];
+				break;
+			}
+			k -= dir->kids[i]->games;
+		}
+		if (!next)
+			return NULL;
+		dir = next;
+	}
+}
+
+static bool open_random(struct node *dir)
+{
+	struct node *g = random_game(dir);
+	if (!g)
+		return false;
+	fprintf(stderr, "pingo-launcher: aleatório: %s\n", g->path);
+	return launch(g);
+}
+
 static bool open_selected(void)
 {
 	struct node *it = selected();
 	if (!it)
 		return false;
+	if (it == &random_item)
+		return open_random(lib);
 	if (it->dir) {
 		if (depth + 1 >= (int)(sizeof(stack) / sizeof(stack[0])))
 			return false;
@@ -664,6 +710,10 @@ static bool press(int code)
 	case BTN_TR:         jump_letter(1); break;
 	case BTN_EAST:       return open_selected(); /* A */
 	case BTN_SOUTH:      go_back(); break;       /* B */
+	case BTN_WEST: /* X (em cima; no device tree do H700 o X é BTN_WEST): aleatório da pasta */
+		if (depth > 0 && cur()->dir != recents)
+			return open_random(cur()->dir);
+		break;
 	}
 	return false;
 }
@@ -890,6 +940,7 @@ int main(int argc, char **argv)
 
 	if (!ui_init())
 		return 1;
+	srand((unsigned)time(NULL) ^ (unsigned)getpid());
 	fds[DEV_PAD].fd = open_by_name("H700 Gamepad");
 	fds[DEV_POWER].fd = open_by_name("axp20x-pek");
 	fds[DEV_VOLUME].fd = open_by_name("gpio-keys-volume");
