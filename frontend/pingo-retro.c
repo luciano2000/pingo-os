@@ -1196,6 +1196,17 @@ static bool environment(unsigned cmd, void *data)
 		else
 			memset(&disk, 0, sizeof(disk));
 		return true;
+	/* Sem estas duas respostas, o FBNeo acha que é partida em rede (netplay)
+	 * na primeira vez que o save state é consultado e desliga os recordes
+	 * (hiscore.dat). Aqui é sempre: vídeo e som ligados, save state normal. */
+	case RETRO_ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE:
+		if (data)
+			*(int *)data = 1 | 2;
+		return true;
+	case RETRO_ENVIRONMENT_GET_SAVESTATE_CONTEXT:
+		if (data)
+			*(int *)data = RETRO_SAVESTATE_CONTEXT_NORMAL;
+		return true;
 	case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
 		*(bool *)data = vars_dirty;
 		vars_dirty = false;
@@ -2174,6 +2185,12 @@ static void *unzip_game(const char *path, size_t *size)
  * SIGSEGV/SIGBUS/SIGABRT: imprime a pilha e os endereços das bibliotecas no
  * log, para localizar a função no PC (addr2line no .so do build).
  */
+static void term_handler(int sig)
+{
+	(void)sig;
+	quit_requested = true;
+}
+
 static void crash_handler(int sig)
 {
 	void *frames[48];
@@ -2229,6 +2246,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "uso: %s <core_libretro.so> <rom> [console] [resume]\n", argv[0]);
 		return 2;
 	}
+	/* desligamento pelo sistema: sai como pelo menu (SRAM, recordes) */
+	signal(SIGTERM, term_handler);
+	signal(SIGINT, term_handler);
 	signal(SIGSEGV, crash_handler);
 	signal(SIGBUS, crash_handler);
 	signal(SIGABRT, crash_handler);
