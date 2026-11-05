@@ -69,6 +69,7 @@ static struct {
 	bool (*load_game)(const struct retro_game_info *);
 	void (*unload_game)(void);
 	size_t (*serialize_size)(void);
+	void (*reset)(void);
 	bool (*serialize)(void *, size_t);
 	bool (*unserialize)(const void *, size_t);
 	void *(*get_memory_data)(unsigned);
@@ -105,6 +106,7 @@ static bool core_open(const char *path)
 	LOAD_SYM(load_game, "retro_load_game");
 	LOAD_SYM(unload_game, "retro_unload_game");
 	LOAD_SYM(serialize_size, "retro_serialize_size");
+	LOAD_SYM(reset, "retro_reset");
 	LOAD_SYM(serialize, "retro_serialize");
 	LOAD_SYM(unserialize, "retro_unserialize");
 	LOAD_SYM(get_memory_data, "retro_get_memory_data");
@@ -212,7 +214,7 @@ static int default_bind(int f);
 enum { SCALE_FIT, SCALE_INT };
 static int scale_mode = SCALE_FIT;
 
-#define MAX_VARS 96
+#define MAX_VARS 192
 static struct var {
 	char *key, *desc;
 	char *values[32];
@@ -239,6 +241,15 @@ static void vars_curate(void)
 	snprintf(path, sizeof(path), "%s/%s.opts", dir && *dir ? dir : CORE_OPTS_DIR, core_name);
 	FILE *f = fopen(path, "r");
 	nshown = 0;
+	for (int i = 0; i < nvars; i++) {
+		free(vars[i].label);
+		vars[i].label = NULL;
+		for (int k = 0; k < vars[i].nvalues; k++) {
+			free(vars[i].vlabel[k]);
+			vars[i].vlabel[k] = NULL;
+			vars[i].vhide[k] = false;
+		}
+	}
 	if (!f)
 		return;
 	while (fgets(line, sizeof(line), f) && nshown < MAX_VARS) {
@@ -370,6 +381,68 @@ static void var_set_value(const char *key, const char *value)
 				}
 }
 
+/* ---- dip switches do arcade (FBNeo) ------------------------------------ *
+ * Cada placa tem os seus: o FBNeo os manda como opções do core
+ * ("fbneo-dipswitch-<jogo>-<nome>", descrição "[Dipswitch] Nome"). Ficam
+ * num submenu próprio, com os nomes mais comuns em português. A BIOS do
+ * Neo Geo fica de fora: ela é a opção "Neo Geo: versão".
+ */
+#define DIP_PREFIX "fbneo-dipswitch-"
+static int dips[MAX_VARS], ndips;
+
+static void dips_build(void)
+{
+	ndips = 0;
+	for (int i = 0; i < nvars; i++)
+		if (!strncmp(vars[i].key, DIP_PREFIX, strlen(DIP_PREFIX)) &&
+		    strcmp(vars[i].desc, "[Dipswitch] BIOS"))
+			dips[ndips++] = i;
+	if (ndips)
+		fprintf(stderr, "pingo-retro: %d dip switches\n", ndips);
+}
+
+static const char *const dip_words[][2] = {
+	/* nomes */
+	{ "Difficulty", "Dificuldade" }, { "Game Difficulty", "Dificuldade" },
+	{ "Lives", "Vidas" }, { "Player Lives", "Vidas" }, { "Bonus Life", "Vida extra" },
+	{ "Extend", "Vida extra" }, { "Demo Sounds", "Som na demonstração" },
+	{ "Demo Sound", "Som na demonstração" }, { "Flip Screen", "Inverter a tela" },
+	{ "Free Play", "Jogo grátis" }, { "Cabinet", "Gabinete" }, { "Coinage", "Fichas" },
+	{ "Coin A", "Fichas (A)" }, { "Coin B", "Fichas (B)" }, { "Coin Slots", "Entradas de ficha" },
+	{ "Service Mode", "Modo de serviço" }, { "Allow Continue", "Permitir continuar" },
+	{ "Continue", "Continuar" }, { "Continues", "Continuações" }, { "Language", "Idioma" },
+	{ "Region", "Região" }, { "Time", "Tempo" }, { "Timer", "Tempo" },
+	{ "Timer Speed", "Velocidade do tempo" }, { "Game Time", "Tempo de jogo" },
+	{ "Round Time", "Tempo do round" }, { "Blood", "Sangue" }, { "Violence", "Violência" },
+	{ "Players", "Jogadores" }, { "Max Players", "Jogadores" },
+	{ "Rounds", "Rounds" }, { "Stage Select", "Escolher fase" },
+	/* valores */
+	{ "Off", "Desligado" }, { "On", "Ligado" }, { "Yes", "Sim" }, { "No", "Não" },
+	{ "Very Easy", "Muito fácil" }, { "Easiest", "Muito fácil" }, { "Easy", "Fácil" },
+	{ "Normal", "Normal" }, { "Medium", "Médio" }, { "Hard", "Difícil" },
+	{ "Harder", "Mais difícil" }, { "Very Hard", "Muito difícil" },
+	{ "Hardest", "Muito difícil" }, { "Upright", "Em pé" }, { "Cocktail", "Mesa (cocktail)" },
+	{ "English", "Inglês" }, { "Japanese", "Japonês" }, { "Japan", "Japão" },
+	{ "World", "Mundo" }, { "Europe", "Europa" }, { "USA", "EUA" }, { "Asia", "Ásia" },
+	{ "None", "Nenhum" }, { "Infinite", "Infinito" },
+};
+
+static const char *dip_text(const char *en)
+{
+	for (size_t i = 0; i < sizeof(dip_words) / sizeof(*dip_words); i++)
+		if (!strcasecmp(dip_words[i][0], en))
+			return dip_words[i][1];
+	return en;
+}
+
+static const char *dip_label(const struct var *v)
+{
+	const char *d = v->desc;
+	if (!strncmp(d, "[Dipswitch] ", 12))
+		d += 12;
+	return dip_text(d);
+}
+
 static void cfg_path(char *out, size_t n, bool per_game)
 {
 	if (per_game)
@@ -432,6 +505,13 @@ static bool cfg_save(bool per_game)
 		len += (size_t)snprintf(buf + len, sizeof(buf) - len, "%s=%s\n", v->key,
 					v->values[v->cur]);
 	}
+	/* dip switches: todos (são do jogo; no arquivo do console não atrapalham
+	 * os outros jogos, porque a chave tem o nome do jogo) */
+	for (int k = 0; k < ndips && len < sizeof(buf); k++) {
+		struct var *v = &vars[dips[k]];
+		len += (size_t)snprintf(buf + len, sizeof(buf) - len, "%s=%s\n", v->key,
+					v->values[v->cur]);
+	}
 	if (len >= sizeof(buf))
 		len = sizeof(buf) - 1;
 	return write_file(p, buf, len);
@@ -442,8 +522,13 @@ static void vars_define(const struct retro_variable *v)
 {
 	for (; v && v->key && nvars < MAX_VARS; v++) {
 		struct var *x = &vars[nvars];
-		const char *semi = strchr(v->value, ';');
+		const char *semi = v->value ? strchr(v->value, ';') : NULL;
 		if (!semi)
+			continue;
+		bool dup = false;
+		for (int i = 0; i < nvars && !dup; i++)
+			dup = !strcmp(vars[i].key, v->key);
+		if (dup)
 			continue;
 		x->key = strdup(v->key);
 		x->desc = strndup(v->value, semi - v->value);
@@ -1074,6 +1159,7 @@ static bool environment(unsigned cmd, void *data)
 			return false;
 		vars_define((const struct retro_variable *)data);
 		vars_curate();
+		dips_build();
 		cfg_load_all(); /* valores salvos por console/jogo */
 		screen_apply();
 		return true;
@@ -1531,8 +1617,8 @@ static void draw_menu(int sel)
 }
 
 /* opções: escala, botões, opções do core e as duas formas de salvar */
-enum { OPT_SCALE, OPT_SCREEN, OPT_GRID, OPT_GHOST, OPT_BUTTONS, OPT_VAR, OPT_SAVE_GAME,
-       OPT_SAVE_CONSOLE };
+enum { OPT_SCALE, OPT_SCREEN, OPT_GRID, OPT_GHOST, OPT_BUTTONS, OPT_DIPS, OPT_VAR,
+       OPT_SAVE_GAME, OPT_SAVE_CONSOLE };
 static int opt_kind[MAX_VARS + 8], opt_arg[MAX_VARS + 8], opt_n;
 
 static void options_build(void)
@@ -1545,6 +1631,8 @@ static void options_build(void)
 		opt_kind[opt_n++] = OPT_GHOST;
 	}
 	opt_kind[opt_n++] = OPT_BUTTONS;
+	if (ndips)
+		opt_kind[opt_n++] = OPT_DIPS;
 	for (int k = 0; k < nshown; k++) {
 		opt_kind[opt_n] = OPT_VAR;
 		opt_arg[opt_n++] = k;
@@ -1594,6 +1682,9 @@ static void draw_options(int sel, int top_item)
 		case OPT_BUTTONS:
 			label = S_O_BUTTONS;
 			break;
+		case OPT_DIPS:
+			label = S_O_DIPS;
+			break;
 		case OPT_VAR: {
 			struct var *v = &vars[shown[opt_arg[i]]];
 			label = v->label;
@@ -1607,7 +1698,7 @@ static void draw_options(int sel, int top_item)
 			label = S_O_SAVE_CONSOLE;
 		}
 		draw_list_row(r, i == sel, label, value);
-		if (i == sel && opt_kind[i] == OPT_BUTTONS)
+		if (i == sel && (opt_kind[i] == OPT_BUTTONS || opt_kind[i] == OPT_DIPS))
 			ui_icon_chevron(UI_W - PAD_X - ROW_PAD - 16,
 					PAD_Y + BAR_H + LIST_GAP + r * (ROW_H + ROW_GAP) + ROW_H / 2,
 					COL_SEL_FG);
@@ -1616,12 +1707,23 @@ static void draw_options(int sel, int top_item)
 	draw_toast_or(NULL);
 	int right = UI_W - PAD_X;
 	right -= draw_hint(right, "B", S_BACK) + 22;
-	if (opt_kind[sel] != OPT_BUTTONS && opt_kind[sel] < OPT_SAVE_GAME)
+	if (opt_kind[sel] != OPT_BUTTONS && opt_kind[sel] != OPT_DIPS &&
+	    opt_kind[sel] < OPT_SAVE_GAME)
 		draw_hint(right, "◀ ▶", S_HINT_CHANGE);
 	else
 		draw_hint(right, "A", S_CONFIRM);
 	osd_draw(renderer, screen_w, screen_h);
 	SDL_RenderPresent(renderer);
+}
+
+static void var_step(struct var *v, int d)
+{
+	int k = v->cur;
+	do /* pula os valores fora da lista curada */
+		k = (k + d + v->nvalues) % v->nvalues;
+	while (v->vhide[k] && k != v->cur);
+	v->cur = k;
+	vars_dirty = true;
 }
 
 static void option_change(int i, int d)
@@ -1640,13 +1742,7 @@ static void option_change(int i, int d)
 	} else if (opt_kind[i] == OPT_GHOST) {
 		ghost_on = !ghost_on;
 	} else if (opt_kind[i] == OPT_VAR) {
-		struct var *v = &vars[shown[opt_arg[i]]];
-		int k = v->cur;
-		do /* pula os valores fora da lista curada */
-			k = (k + d + v->nvalues) % v->nvalues;
-		while (v->vhide[k] && k != v->cur);
-		v->cur = k;
-		vars_dirty = true;
+		var_step(&vars[shown[opt_arg[i]]], d);
 	}
 }
 
@@ -1763,6 +1859,69 @@ static void run_buttons(void)
 	}
 }
 
+static void dips_note(void)
+{
+	ui_text(F_BAR, S_DIPS_NOTE, PAD_X, UI_H - PAD_Y - BAR_H / 2, COL_DIM, 0, 330);
+}
+
+static void draw_dips(int sel, int top_item)
+{
+	draw_dimmed_game();
+	draw_bar(S_O_DIPS);
+	for (int r = 0; r < ROWS && top_item + r <= ndips; r++) {
+		int i = top_item + r;
+		if (i == ndips) { /* última linha: reiniciar */
+			draw_list_row(r, i == sel, S_RESET_GAME, NULL);
+			continue;
+		}
+		const struct var *v = &vars[dips[i]];
+		draw_list_row(r, i == sel, dip_label(v), dip_text(v->values[v->cur]));
+	}
+	draw_toast_or(dips_note);
+	int right = UI_W - PAD_X;
+	right -= draw_hint(right, "B", S_BACK) + 22;
+	if (sel < ndips)
+		draw_hint(right, "◀ ▶", S_HINT_CHANGE);
+	else
+		draw_hint(right, "A", S_CONFIRM);
+	osd_draw(renderer, screen_w, screen_h);
+	SDL_RenderPresent(renderer);
+}
+
+/* Dip switches: mudam na hora (o FBNeo lê a cada mudança); salvar é pelas
+ * duas opções de salvar do menu anterior */
+static void run_dips(void)
+{
+	int sel = 0, top = 0;
+	for (;;) {
+		poll_devices();
+		if (quit_requested)
+			return;
+		int n = ndips + 1;
+		if (was_pressed(BTN_DPAD_UP))
+			sel = (sel - 1 + n) % n;
+		if (was_pressed(BTN_DPAD_DOWN))
+			sel = (sel + 1) % n;
+		if (sel < ndips && was_pressed(BTN_DPAD_LEFT))
+			var_step(&vars[dips[sel]], -1);
+		if (sel < ndips && (was_pressed(BTN_DPAD_RIGHT) || was_pressed(BTN_EAST)))
+			var_step(&vars[dips[sel]], 1);
+		if (sel == ndips && was_pressed(BTN_EAST)) {
+			core.reset();
+			show_toast(S_GAME_RESET);
+		}
+		if (was_pressed(BTN_SOUTH) || menu_requested) {
+			menu_requested = false;
+			return;
+		}
+		if (sel < top)
+			top = sel;
+		if (sel >= top + ROWS)
+			top = sel - ROWS + 1;
+		draw_dips(sel, top);
+	}
+}
+
 /* devolve false para sair do jogo */
 static bool run_options(void)
 {
@@ -1782,10 +1941,12 @@ static bool run_options(void)
 			option_change(sel, 1);
 		if (was_pressed(BTN_EAST)) {
 			int k = opt_kind[sel];
-			if (k != OPT_BUTTONS && k < OPT_SAVE_GAME)
+			if (k != OPT_BUTTONS && k != OPT_DIPS && k < OPT_SAVE_GAME)
 				option_change(sel, 1);
 			else if (k == OPT_BUTTONS)
 				run_buttons();
+			else if (k == OPT_DIPS)
+				run_dips();
 			else if (cfg_save(k == OPT_SAVE_GAME))
 				show_toast(k == OPT_SAVE_GAME ? S_O_SAVED_GAME : S_O_SAVED_CONS);
 			else
