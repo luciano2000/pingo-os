@@ -186,12 +186,14 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - Origem por console em `Config/origem.cfg` (`PS=sd2` ou `PS=sd1`). Sem escolha: SD1 se lá houver jogos do console, senão SD2 (sem isso, um SD1 só com saves deixaria o Início vazio). A escolha feita pelo MENU fica fixada. No launcher, MENU dentro de um console abre "Origem: SD1 / SD2"; ao trocar, a pasta do outro cartão é lida na hora e o console reabre.
 - Console com origem SD2 e sem o SD2: continua no Início (contagem "—"); ao abrir, "SD2 não encontrado" com A = usar o SD1. Nunca troca sozinho.
 - SD2 inserido ou tirado: a lista é refeita sozinha. Tirar o SD2 com um jogo dele aberto pausa no menu do jogo, com aviso.
+- O SD2 ganha as pastas dos consoles (mesma regra do SD1, sem duplicar as numeradas) se tiver o rótulo `ROMS` ou já tiver `Roms/`; um cartão qualquer não é mexido. `Saves/`, `States/` e `Config/` não são criadas no SD2.
 - Saves, save states, configurações e BIOS ficam sempre no SD1.
 - Recentes guardam o caminho relativo à pasta do console: valem na origem que estiver ativa.
 
 ### Checklist
 
 - [ ] SD2 só com a partição ROMS (o cartão antigo, sem boot e sistema)
+- [ ] Pastas dos consoles criadas no SD2 (sem duplicar as numeradas)
 - [ ] Trocar a origem de um console para o SD2 e jogar
 - [ ] Tirar o SD2 no Início e dentro de um console: "SD2 não encontrado" e voltar ao SD1
 - [ ] Recolocar o SD2: a lista volta sozinha
