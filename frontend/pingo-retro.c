@@ -1919,9 +1919,8 @@ static void run_dips(void)
 				show_toast(S_DIPS_NOCHANGE);
 			} else if (cfg_save(true)) {
 				core.reset();
-				for (int k = 0; k < ndips; k++)
-					dip_start[k] = vars[dips[k]].cur;
-				show_toast(S_DIPS_APPLIED);
+				show_toast(S_DIPS_APPLIED); /* aparece nas Opções */
+				return;
 			} else {
 				show_toast(S_SAVE_FAILED);
 			}
