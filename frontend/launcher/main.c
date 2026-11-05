@@ -337,7 +337,7 @@ static void origin_load(void)
 	FILE *f = fopen(ORIGIN_FILE, "r");
 	char line[128];
 	for (int c = 0; c < 64; c++)
-		origin[c] = 1;
+		origin[c] = 0; /* não escolhida */
 	if (!f)
 		return;
 	while (fgets(line, sizeof(line), f)) {
@@ -347,7 +347,7 @@ static void origin_load(void)
 		*eq = 0;
 		int c = console_by_code(line);
 		if (c >= 0 && c < 64)
-			origin[c] = !strncmp(eq + 1, "sd2", 3) ? 2 : 1;
+			origin[c] = !strncmp(eq + 1, "sd2", 3) ? 2 : (!strncmp(eq + 1, "sd1", 3) ? 1 : 0);
 	}
 	fclose(f);
 }
@@ -358,8 +358,8 @@ static void origin_save(void)
 	if (!f)
 		return;
 	for (int c = 0; c < n_consoles && c < 64; c++)
-		if (origin[c] == 2)
-			fprintf(f, "%s=sd2\n", consoles[c].code);
+		if (origin[c])
+			fprintf(f, "%s=%s\n", consoles[c].code, origin[c] == 2 ? "sd2" : "sd1");
 	fflush(f);
 	fsync(fileno(f));
 	fclose(f);
@@ -776,7 +776,8 @@ static void change_origin(int c, int to)
 /* MENU dentro de um console: "Origem: SD1 / SD2" */
 static void console_menu(int c)
 {
-	int to = origin[c];
+	int cur_src = cur()->dir && cur()->dir->source ? cur()->dir->source : 1;
+	int to = origin[c] ? origin[c] : cur_src;
 	for (;;) {
 		ui_clear();
 		int bar_y = PAD_Y + BAR_H / 2;
@@ -801,7 +802,8 @@ static void console_menu(int c)
 		else if (k == BTN_SOUTH || k == BTN_MODE)
 			break;
 	}
-	change_origin(c, to);
+	if (to != cur_src || origin[c])
+		change_origin(c, to); /* a escolha fica fixada */
 	dirty = true;
 }
 

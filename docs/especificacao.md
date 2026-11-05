@@ -158,7 +158,7 @@ Vale só para aparelhos com dois slots (RG35XX-H, RG40XX). Nos aparelhos com um 
 
 - **A origem é escolhida por console**, no MENU da lista de jogos: item **"Origem: SD1 / SD2"**.
 - Ao mudar a origem, o launcher faz na hora o scan da pasta correspondente no outro cartão.
-- A escolha é **salva por console** em `/Config` no SD1 e vale depois de reiniciar. O padrão de fábrica é SD1.
+- A escolha é **salva por console** em `/Config` no SD1 e vale depois de reiniciar. Sem escolha, o console usa o SD1 se lá houver jogos dele, senão o SD2 (um SD1 só com o sistema e os saves funciona sem configurar nada).
 - **Não há indicação de SD2 na tela inicial nem na lista de jogos.** A informação fica só no MENU da lista.
 - Se o SD2 não estiver presente e algum console apontar para ele: mostrar "SD2 não encontrado" e oferecer voltar para o SD1. **Nunca trocar sozinho.**
 - **Saves e save states ficam sempre no SD1**, qualquer que seja a origem do jogo.

@@ -45,7 +45,8 @@ struct node {
 };
 
 /* Raiz: um filho por console que tem jogos, na ordem do Início.
- * origin[c] = 1 (SD1) ou 2 (SD2) para cada console; sd2: o SD2 está montado.
+ * origin[c] = 1 (SD1), 2 (SD2) ou 0 (não escolhida: SD1 se lá tiver jogos do
+ * console, senão SD2); sd2: o SD2 está montado.
  * Console com origem SD2 e sem SD2 aparece com missing = true. */
 struct node *library_scan(const int *origin, bool sd2);
 struct node *library_load_cache(const char *path);

@@ -568,15 +568,21 @@ struct node *library_scan(const int *origin, bool sd2)
 	struct node *s1[64] = { 0 }, *s2[64] = { 0 };
 	bool want2 = false;
 
+	/* origem 0 (não escolhida): SD1 se lá tiver jogos do console, senão SD2 */
 	for (int c = 0; c < n_consoles; c++)
-		want2 |= origin && origin[c] == 2;
+		want2 |= !origin || origin[c] != 1;
 	scan_root(ROMS_DIR, 1, s1);
 	if (want2 && sd2)
 		scan_root(ROMS_DIR_SD2, 2, s2);
 
 	for (int c = 0; c < n_consoles && c < 64; c++) {
 		struct node *pick = NULL;
-		if (origin && origin[c] == 2) {
+		int o = origin ? origin[c] : 0;
+		if (o == 0)
+			o = (s1[c] && s1[c]->games > 0) || !sd2 ? 1 : 2;
+		if (o == 2 && origin && origin[c] == 0 && !sd2)
+			o = 1;
+		if (o == 2) {
 			if (sd2) {
 				pick = s2[c];
 				s2[c] = NULL;

@@ -183,7 +183,7 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 ## Fatia 7: SD1/SD2
 
 - `pingo-storage sd2`: acha o cartão do slot 2 (o `mmcblk` que não é o do sistema), escolhe a partição `ROMS` (ou a primeira exFAT/FAT32), roda `fsck` e monta em `/mnt/sd2`. No boot e a cada inserção/remoção (regra do udev `80-pingo-sd2.rules`, em segundo plano). Estado em `/run/pingo/sd2`; `/run/pingo/sd2.changed` avisa o launcher.
-- Origem por console em `Config/origem.cfg` (`PS=sd2`); padrão SD1. No launcher, MENU dentro de um console abre "Origem: SD1 / SD2"; ao trocar, a pasta do outro cartão é lida na hora e o console reabre.
+- Origem por console em `Config/origem.cfg` (`PS=sd2` ou `PS=sd1`). Sem escolha: SD1 se lá houver jogos do console, senão SD2 (sem isso, um SD1 só com saves deixaria o Início vazio). A escolha feita pelo MENU fica fixada. No launcher, MENU dentro de um console abre "Origem: SD1 / SD2"; ao trocar, a pasta do outro cartão é lida na hora e o console reabre.
 - Console com origem SD2 e sem o SD2: continua no Início (contagem "—"); ao abrir, "SD2 não encontrado" com A = usar o SD1. Nunca troca sozinho.
 - SD2 inserido ou tirado: a lista é refeita sozinha. Tirar o SD2 com um jogo dele aberto pausa no menu do jogo, com aviso.
 - Saves, save states, configurações e BIOS ficam sempre no SD1.
