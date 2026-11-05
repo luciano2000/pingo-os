@@ -301,6 +301,7 @@ Exemplos em tela 640x480 (4:3):
 | SNES / Mega Drive / PS1 (4:3) | variável | tela cheia | depende da resolução do jogo |
 
 - **Arcade:** usar a proporção de cada jogo informada pelo FBNeo. Jogos verticais (shmups) aparecem em pé, com bordas laterais.
+- **Futuro: "Tela em pé" para jogos verticais** (opção por jogo/console, desligada por padrão). Gira a imagem 90° no sentido anti-horário para jogar com o aparelho em pé, ocupando a tela toda, sempre com a proporção original. O controle gira junto: o analógico direito vira o direcional e os botões de ação ficam no mesmo lugar físico (o remapeamento acompanha). Referência: o modo TATE do RetroArch e a opção `fbneo-vertical-mode`.
 - **PS1:** respeitar a proporção 4:3 da TV mesmo quando a resolução interna do jogo muda (ex.: 256, 320, 512 ou 640 de largura).
 - Quando a proporção dos pixels não for quadrada (Mega Drive, SNES, PS1), corrigir para a proporção da TV original, sem distorcer.
 
