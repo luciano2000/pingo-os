@@ -201,6 +201,13 @@ static void clean_label(const char *base, char *out, size_t n)
  * Padrão -> Config/<console>/console.cfg -> Config/<console>/<jogo>.cfg
  */
 
+/* Remapeamento: bind[f] = botão do aparelho (código evdev) que aciona a
+ * função f do core (RETRO_DEVICE_ID_JOYPAD_*). Padrão: o layout libretro. */
+static int bind[16];
+static int button_by_name(const char *name);
+static const char *button_name(int code);
+static int default_bind(int f);
+
 enum { SCALE_FIT, SCALE_INT };
 static int scale_mode = SCALE_FIT;
 
@@ -260,6 +267,12 @@ static void var_set_value(const char *key, const char *value)
 		scale_mode = !strcmp(value, "inteira") ? SCALE_INT : SCALE_FIT;
 		return;
 	}
+	if (!strncmp(key, "pingo.bind.", 11)) {
+		int f = atoi(key + 11), code = button_by_name(value);
+		if (f >= 0 && f < 16 && code >= 0)
+			bind[f] = code;
+		return;
+	}
 	for (int i = 0; i < nvars; i++)
 		if (!strcmp(vars[i].key, key))
 			for (int k = 0; k < vars[i].nvalues; k++)
@@ -314,6 +327,12 @@ static bool cfg_save(bool per_game)
 	char buf[16384];
 	size_t len = (size_t)snprintf(buf, sizeof(buf), "pingo.scale=%s\n",
 				      scale_mode == SCALE_INT ? "inteira" : "ajustada");
+	/* botões: só os que mudaram do padrão */
+	for (int f = 0; f < 16 && len < sizeof(buf); f++) {
+		if (bind[f] != default_bind(f) && bind[f] >= 0)
+			len += (size_t)snprintf(buf + len, sizeof(buf) - len, "pingo.bind.%d=%s\n", f,
+						button_name(bind[f]));
+	}
 	/* só as opções do menu: as ocultas seguem o padrão do core */
 	for (int k = 0; k < nshown && len < sizeof(buf); k++) {
 		struct var *v = &vars[shown[k]];
@@ -498,6 +517,10 @@ static void audio_pause(bool pause)
 
 static int pad_fd = -1, vol_fd = -1, power_fd = -1;
 static bool pad_state[16];
+
+
+/* Nomes das funções vindos do core (SET_INPUT_DESCRIPTORS), porta 0 */
+static char *desc_name[16];
 static bool quit_requested, power_off_requested, suspend_requested, menu_requested;
 static bool power_down;
 static Uint32 power_down_at;
@@ -554,6 +577,64 @@ static int map_key(int code)
 	}
 }
 
+static const int physical_buttons[] = {
+	BTN_SOUTH, BTN_EAST, BTN_WEST, BTN_NORTH, BTN_TL, BTN_TR, BTN_TL2, BTN_TR2,
+	BTN_SELECT, BTN_START, BTN_THUMBL, BTN_THUMBR,
+	BTN_DPAD_UP, BTN_DPAD_DOWN, BTN_DPAD_LEFT, BTN_DPAD_RIGHT,
+};
+#define N_PHYSICAL (int)(sizeof(physical_buttons) / sizeof(physical_buttons[0]))
+
+static int default_bind(int f)
+{
+	for (int i = 0; i < N_PHYSICAL; i++)
+		if (map_key(physical_buttons[i]) == f)
+			return physical_buttons[i];
+	return -1;
+}
+
+static void binds_default(void)
+{
+	for (int f = 0; f < 16; f++)
+		bind[f] = -1;
+	for (int i = 0; i < N_PHYSICAL; i++) {
+		int f = map_key(physical_buttons[i]);
+		if (f >= 0)
+			bind[f] = physical_buttons[i];
+	}
+}
+
+/* Nome do botão do aparelho, como está impresso nele */
+static const char *button_name(int code)
+{
+	switch (code) {
+	case BTN_SOUTH:      return "B";
+	case BTN_EAST:       return "A";
+	case BTN_WEST:       return "Y";
+	case BTN_NORTH:      return "X";
+	case BTN_TL:         return "L1";
+	case BTN_TR:         return "R1";
+	case BTN_TL2:        return "L2";
+	case BTN_TR2:        return "R2";
+	case BTN_SELECT:     return "Select";
+	case BTN_START:      return "Start";
+	case BTN_THUMBL:     return "L3";
+	case BTN_THUMBR:     return "R3";
+	case BTN_DPAD_UP:    return "↑";
+	case BTN_DPAD_DOWN:  return "↓";
+	case BTN_DPAD_LEFT:  return "←";
+	case BTN_DPAD_RIGHT: return "→";
+	default:             return "—";
+	}
+}
+
+static int button_by_name(const char *name)
+{
+	for (int i = 0; i < N_PHYSICAL; i++)
+		if (!strcmp(button_name(physical_buttons[i]), name))
+			return physical_buttons[i];
+	return -1;
+}
+
 /* Lê todos os dispositivos (uma vez por quadro, no jogo e no menu) */
 static void poll_devices(void)
 {
@@ -594,9 +675,10 @@ static void poll_devices(void)
 		}
 		if (ev.value == 1 && npressed < 16)
 			pressed[npressed++] = ev.code;
-		int id = map_key(ev.code);
-		if (id >= 0)
-			pad_state[id] = ev.value != 0;
+		/* um botão pode acionar uma função (remapeamento) */
+		for (int f = 0; f < 16; f++)
+			if (bind[f] == (int)ev.code)
+				pad_state[f] = ev.value != 0;
 	}
 }
 
@@ -717,6 +799,18 @@ static bool environment(unsigned cmd, void *data)
 			}
 		v->value = NULL;
 		return false;
+	}
+	case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS: {
+		const struct retro_input_descriptor *d = data;
+		for (int f = 0; f < 16; f++) {
+			free(desc_name[f]);
+			desc_name[f] = NULL;
+		}
+		for (; d && d->description; d++)
+			if (d->port == 0 && d->device == RETRO_DEVICE_JOYPAD && d->id < 16 &&
+			    !desc_name[d->id])
+				desc_name[d->id] = strdup(d->description);
+		return true;
 	}
 	case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
 		/* NULL: o core está dizendo que não tem discos (Genesis Plus GX nos
@@ -1147,10 +1241,34 @@ static void draw_menu(int sel)
 	SDL_RenderPresent(renderer);
 }
 
-/* opções: escala, opções do core e as duas formas de salvar */
-static int options_count(void)
+/* opções: escala, botões, opções do core e as duas formas de salvar */
+enum { OPT_SCALE, OPT_BUTTONS, OPT_VAR, OPT_SAVE_GAME, OPT_SAVE_CONSOLE };
+static int opt_kind[MAX_VARS + 4], opt_arg[MAX_VARS + 4], opt_n;
+
+static void options_build(void)
 {
-	return 1 + nshown + 2;
+	opt_n = 0;
+	opt_kind[opt_n++] = OPT_SCALE;
+	opt_kind[opt_n++] = OPT_BUTTONS;
+	for (int k = 0; k < nshown; k++) {
+		opt_kind[opt_n] = OPT_VAR;
+		opt_arg[opt_n++] = k;
+	}
+	opt_kind[opt_n++] = OPT_SAVE_GAME;
+	opt_kind[opt_n++] = OPT_SAVE_CONSOLE;
+}
+
+static void draw_list_row(int r, bool s, const char *label, const char *value)
+{
+	int y = PAD_Y + BAR_H + LIST_GAP + r * (ROW_H + ROW_GAP);
+	if (s)
+		ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+	int vw = 0;
+	if (value)
+		vw = ui_text(F_COUNT, value, UI_W - PAD_X - ROW_PAD, y + ROW_H / 2,
+			     s ? COL_SEL_FG : COL_DIM, 1, 200) + 16;
+	ui_text(s ? F_ITEM_SEL : F_ITEM, label, PAD_X + ROW_PAD, y + ROW_H / 2,
+		s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
 }
 
 static void draw_options(int sel, int top_item)
@@ -1158,36 +1276,40 @@ static void draw_options(int sel, int top_item)
 	draw_dimmed_game();
 	draw_bar(S_M_OPTIONS);
 
-	int n = options_count();
-	int top = PAD_Y + BAR_H + LIST_GAP;
-	for (int r = 0; r < ROWS && top_item + r < n; r++) {
-		int i = top_item + r, y = top + r * (ROW_H + ROW_GAP);
-		bool s = i == sel;
+	for (int r = 0; r < ROWS && top_item + r < opt_n; r++) {
+		int i = top_item + r;
 		const char *label, *value = NULL;
-		if (i == 0) {
+		switch (opt_kind[i]) {
+		case OPT_SCALE:
 			label = S_O_SCALE;
 			value = scale_mode == SCALE_INT ? S_O_SCALE_INT : S_O_SCALE_FIT;
-		} else if (i <= nshown) {
-			struct var *v = &vars[shown[i - 1]];
+			break;
+		case OPT_BUTTONS:
+			label = S_O_BUTTONS;
+			break;
+		case OPT_VAR: {
+			struct var *v = &vars[shown[opt_arg[i]]];
 			label = v->label;
 			value = v->values[v->cur];
-		} else {
-			label = i == nshown + 1 ? S_O_SAVE_GAME : S_O_SAVE_CONSOLE;
+			break;
 		}
-		if (s)
-			ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
-		int vw = 0;
-		if (value)
-			vw = ui_text(F_COUNT, value, UI_W - PAD_X - ROW_PAD, y + ROW_H / 2,
-				     s ? COL_SEL_FG : COL_DIM, 1, 200) + 16;
-		ui_text(s ? F_ITEM_SEL : F_ITEM, label, PAD_X + ROW_PAD, y + ROW_H / 2,
-			s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
+		case OPT_SAVE_GAME:
+			label = S_O_SAVE_GAME;
+			break;
+		default:
+			label = S_O_SAVE_CONSOLE;
+		}
+		draw_list_row(r, i == sel, label, value);
+		if (i == sel && opt_kind[i] == OPT_BUTTONS)
+			ui_icon_chevron(UI_W - PAD_X - ROW_PAD - 16,
+					PAD_Y + BAR_H + LIST_GAP + r * (ROW_H + ROW_GAP) + ROW_H / 2,
+					COL_SEL_FG);
 	}
 
 	draw_toast_or(NULL);
 	int right = UI_W - PAD_X;
 	right -= draw_hint(right, "B", S_BACK) + 22;
-	if (sel <= nshown)
+	if (opt_kind[sel] == OPT_SCALE || opt_kind[sel] == OPT_VAR)
 		draw_hint(right, "◀ ▶", S_HINT_CHANGE);
 	else
 		draw_hint(right, "A", S_CONFIRM);
@@ -1197,10 +1319,10 @@ static void draw_options(int sel, int top_item)
 
 static void option_change(int i, int d)
 {
-	if (i == 0) {
+	if (opt_kind[i] == OPT_SCALE) {
 		scale_mode = scale_mode == SCALE_INT ? SCALE_FIT : SCALE_INT;
-	} else if (i <= nshown) {
-		struct var *v = &vars[shown[i - 1]];
+	} else if (opt_kind[i] == OPT_VAR) {
+		struct var *v = &vars[shown[opt_arg[i]]];
 		v->cur = (v->cur + d + v->nvalues) % v->nvalues;
 		vars_dirty = true;
 	}
@@ -1214,28 +1336,136 @@ static bool was_pressed(int code)
 	return false;
 }
 
+/* Funções que aparecem na tela de botões: as que o core nomeou (menos o
+ * direcional); sem nomes, os botões do layout padrão */
+static int bfunc[16], nbfunc;
+
+static void buttons_build(void)
+{
+	static const int order[] = {
+		RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_X,
+		RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_R,
+		RETRO_DEVICE_ID_JOYPAD_L2, RETRO_DEVICE_ID_JOYPAD_R2, RETRO_DEVICE_ID_JOYPAD_L3,
+		RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START,
+	};
+	bool named = false;
+	for (int f = 0; f < 16; f++)
+		named |= desc_name[f] != NULL;
+	nbfunc = 0;
+	for (unsigned i = 0; i < sizeof(order) / sizeof(order[0]); i++)
+		if (!named || desc_name[order[i]])
+			bfunc[nbfunc++] = order[i];
+}
+
+static const char *func_name(int f)
+{
+	static const char *def[16] = { "B", "Y", "Select", "Start", "↑", "↓", "←", "→",
+				       "A", "X", "L1", "R1", "L2", "R2", "L3", "R3" };
+	return desc_name[f] ? desc_name[f] : def[f];
+}
+
+static void draw_buttons(int sel, int top_item, bool waiting)
+{
+	draw_dimmed_game();
+	draw_bar(S_O_BUTTONS);
+	int n = nbfunc + 1;
+	for (int r = 0; r < ROWS && top_item + r < n; r++) {
+		int i = top_item + r;
+		if (i < nbfunc) {
+			int f = bfunc[i];
+			const char *v = (waiting && i == sel) ? S_PRESS_BUTTON : button_name(bind[f]);
+			draw_list_row(r, i == sel, func_name(f), v);
+		} else {
+			draw_list_row(r, i == sel, S_O_BUTTONS_RESET, NULL);
+		}
+	}
+	draw_toast_or(NULL);
+	int right = UI_W - PAD_X;
+	if (!waiting) {
+		right -= draw_hint(right, "B", S_BACK) + 22;
+		draw_hint(right, "A", sel < nbfunc ? S_HINT_CHANGE : S_CONFIRM);
+	}
+	osd_draw(renderer, screen_w, screen_h);
+	SDL_RenderPresent(renderer);
+}
+
+/* A numa função: espera o botão do aparelho; se ele já era de outra
+ * função, as duas trocam (nenhuma fica sem botão) */
+static void run_buttons(void)
+{
+	int sel = 0, top = 0;
+	bool waiting = false;
+	buttons_build();
+	for (;;) {
+		poll_devices();
+		if (quit_requested)
+			return;
+		int n = nbfunc + 1;
+		if (waiting) {
+			for (int k = 0; k < npressed; k++) {
+				int code = pressed[k];
+				if (!strcmp(button_name(code), "—")) /* não é botão do controle */
+					continue;
+				int f = bfunc[sel], old = bind[f];
+				for (int g = 0; g < 16; g++)
+					if (g != f && bind[g] == code)
+						bind[g] = old;
+				bind[f] = code;
+				waiting = false;
+				break;
+			}
+			memset(pad_state, 0, sizeof(pad_state));
+		} else {
+			if (was_pressed(BTN_DPAD_UP))
+				sel = (sel - 1 + n) % n;
+			if (was_pressed(BTN_DPAD_DOWN))
+				sel = (sel + 1) % n;
+			if (was_pressed(BTN_EAST)) {
+				if (sel < nbfunc) {
+					waiting = true;
+					npressed = 0;
+				} else {
+					binds_default();
+					show_toast(S_O_BUTTONS_RESTORED);
+				}
+			} else if (was_pressed(BTN_SOUTH) || menu_requested) {
+				menu_requested = false;
+				return;
+			}
+		}
+		if (sel < top)
+			top = sel;
+		if (sel >= top + ROWS)
+			top = sel - ROWS + 1;
+		draw_buttons(sel, top, waiting);
+	}
+}
+
 /* devolve false para sair do jogo */
 static bool run_options(void)
 {
 	int sel = 0, top = 0;
+	options_build();
 	for (;;) {
 		poll_devices();
 		if (quit_requested)
 			return false;
-		int n = options_count();
 		if (was_pressed(BTN_DPAD_UP))
-			sel = (sel - 1 + n) % n;
+			sel = (sel - 1 + opt_n) % opt_n;
 		if (was_pressed(BTN_DPAD_DOWN))
-			sel = (sel + 1) % n;
+			sel = (sel + 1) % opt_n;
 		if (was_pressed(BTN_DPAD_LEFT))
 			option_change(sel, -1);
 		if (was_pressed(BTN_DPAD_RIGHT))
 			option_change(sel, 1);
 		if (was_pressed(BTN_EAST)) {
-			if (sel <= nshown)
+			int k = opt_kind[sel];
+			if (k == OPT_SCALE || k == OPT_VAR)
 				option_change(sel, 1);
-			else if (cfg_save(sel == nshown + 1))
-				show_toast(sel == nshown + 1 ? S_O_SAVED_GAME : S_O_SAVED_CONS);
+			else if (k == OPT_BUTTONS)
+				run_buttons();
+			else if (cfg_save(k == OPT_SAVE_GAME))
+				show_toast(k == OPT_SAVE_GAME ? S_O_SAVED_GAME : S_O_SAVED_CONS);
 			else
 				show_toast(S_SAVE_FAILED);
 		}
@@ -1511,7 +1741,8 @@ int main(int argc, char **argv)
 	snprintf(system_dir, sizeof(system_dir), "%s/Bios", DATA_ROOT);
 	snprintf(save_dir, sizeof(save_dir), "%s/Saves/%s", DATA_ROOT, console_code);
 	mkdir_p(save_dir);
-	cfg_load_all(); /* escala (as opções do core chegam no SET_VARIABLES) */
+	binds_default();
+	cfg_load_all(); /* escala e botões (as opções do core chegam no SET_VARIABLES) */
 
 	{ /* ".../gambatte_libretro.so" -> "gambatte" */
 		const char *b = strrchr(argv[1], '/');

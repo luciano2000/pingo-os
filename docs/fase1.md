@@ -122,7 +122,7 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] Menu do jogo, salvar/carregar nos 4 slots com prévia
 - [x] Escala Ajustada/Inteira e opções do Gambatte (só as úteis)
 - [x] `.zip` de Game Boy
-- [ ] Remapeamento de botões nas Opções (fica para depois dos cores, fatia 5)
+- [x] Remapeamento de botões (Opções → Botões): nomes das funções vindos do core (FBNeo: "Weak Punch"...), A + botão do aparelho, troca quando o botão já estava em uso, restaurar padrão; salvo por jogo ou por console (`pingo.bind.<função>=<botão>`, só o que muda do padrão). Falta testar no aparelho nas Opções (fica para depois dos cores, fatia 5)
 
 ## Fatia 4: energia
 
@@ -178,4 +178,4 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] PS1 com vários discos: `.m3u` como um item ("N discos"), agrupamento automático de "(Disc N)" sem `.m3u`, troca de disco no menu e "Disco N" na barra; abertura da BIOS ligada
 - [ ] Listas curadas de opções dos cores novos (por enquanto só a Escala)
 - [ ] Filtros de tela (seção 8.1)
-- [ ] Remapeamento de botões
+- [x] Remapeamento de botões (Opções → Botões): nomes das funções vindos do core (FBNeo: "Weak Punch"...), A + botão do aparelho, troca quando o botão já estava em uso, restaurar padrão; salvo por jogo ou por console (`pingo.bind.<função>=<botão>`, só o que muda do padrão). Falta testar no aparelho

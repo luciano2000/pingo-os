@@ -72,5 +72,9 @@
 #define S_O_SAVED_GAME   "Opções salvas para este jogo"
 #define S_O_SAVED_CONS   "Opções salvas para o console"
 #define S_HINT_CHANGE    "mudar"
+#define S_O_BUTTONS      "Botões"
+#define S_O_BUTTONS_RESET "Restaurar padrão"
+#define S_O_BUTTONS_RESTORED "Botões no padrão"
+#define S_PRESS_BUTTON   "Aperte o botão…"
 
 #endif
