@@ -1871,7 +1871,7 @@ static void draw_dips(int sel, int top_item)
 	for (int r = 0; r < ROWS && top_item + r <= ndips; r++) {
 		int i = top_item + r;
 		if (i == ndips) { /* última linha: reiniciar */
-			draw_list_row(r, i == sel, S_RESET_GAME, NULL);
+			draw_list_row(r, i == sel, S_DIPS_APPLY, NULL);
 			continue;
 		}
 		const struct var *v = &vars[dips[i]];
@@ -1888,11 +1888,14 @@ static void draw_dips(int sel, int top_item)
 	SDL_RenderPresent(renderer);
 }
 
-/* Dip switches: mudam na hora (o FBNeo lê a cada mudança); salvar é pelas
- * duas opções de salvar do menu anterior */
+/* Dip switches: mudam na hora (o FBNeo lê a cada mudança); "Aplicar
+ * mudanças" salva para este jogo e reinicia a placa */
 static void run_dips(void)
 {
 	int sel = 0, top = 0;
+	int dip_start[MAX_VARS];
+	for (int k = 0; k < ndips; k++)
+		dip_start[k] = vars[dips[k]].cur;
 	for (;;) {
 		poll_devices();
 		if (quit_requested)
@@ -1907,8 +1910,21 @@ static void run_dips(void)
 		if (sel < ndips && (was_pressed(BTN_DPAD_RIGHT) || was_pressed(BTN_EAST)))
 			var_step(&vars[dips[sel]], 1);
 		if (sel == ndips && was_pressed(BTN_EAST)) {
-			core.reset();
-			show_toast(S_GAME_RESET);
+			/* salva para este jogo e reinicia a placa (alguns dips só são
+			 * lidos no boot); assim sair depois não perde nada */
+			bool changed = false;
+			for (int k = 0; k < ndips; k++)
+				changed |= vars[dips[k]].cur != dip_start[k];
+			if (!changed) {
+				show_toast(S_DIPS_NOCHANGE);
+			} else if (cfg_save(true)) {
+				core.reset();
+				for (int k = 0; k < ndips; k++)
+					dip_start[k] = vars[dips[k]].cur;
+				show_toast(S_DIPS_APPLIED);
+			} else {
+				show_toast(S_SAVE_FAILED);
+			}
 		}
 		if (was_pressed(BTN_SOUTH) || menu_requested) {
 			menu_requested = false;
