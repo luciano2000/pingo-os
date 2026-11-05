@@ -35,4 +35,11 @@ No Sega CD, cada região de jogo precisa da BIOS da mesma região.
 
 Game Boy, Game Boy Color, NES, Super Nintendo, Virtual Boy, Master System, Game Gear, Mega Drive, 32X, PC Engine (HuCard), Neo Geo Pocket, WonderSwan e Atari 2600.
 
-Arcade (FBNeo): os jogos de Neo Geo precisam do `neogeo.zip` (fica na pasta `Roms/ARCADE`, junto com os jogos). Detalhes na fatia do arcade.
+## Arcade (FBNeo)
+
+- Romset: **FinalBurn Neo 1.0.0.03 (Arcade)**, de preferência **non-merged** (cada `.zip` completo e independente). Split/merged também funcionam, com o `.zip` pai junto.
+- Romsets de **MAME** não servem: os nomes coincidem, mas o conteúdo dos `.zip` muitas vezes não.
+- Para conferir ou reconstruir a coleção (RomVault, ClrMamePro), use o DAT exato desta versão: [FinalBurn Neo (ClrMame Pro XML, Arcade only).dat](https://github.com/libretro/FBNeo/blob/72af9e23b766b6ad6d2a30042fc8d83eadd25b61/dats/FinalBurn%20Neo%20(ClrMame%20Pro%20XML,%20Arcade%20only).dat).
+- BIOS de arcade ficam **na mesma pasta dos jogos** (`Roms/ARCADE`) e não aparecem na lista: `neogeo.zip` (Neo Geo), `pgm.zip` (PGM), `skns.zip`, `decocass.zip` etc.
+- O launcher mostra o nome do jogo vindo do DAT ("Street Fighter II: The World Warrior" em vez de `sf2.zip`).
+- Quando o FBNeo for atualizado no Pingo OS, a versão do romset muda junto; ela fica registrada aqui.
