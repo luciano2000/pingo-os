@@ -42,4 +42,7 @@ Game Boy, Game Boy Color, NES, Super Nintendo, Virtual Boy, Master System, Game 
 - Para conferir ou reconstruir a coleção (RomVault, ClrMamePro), use o DAT exato desta versão: [FinalBurn Neo (ClrMame Pro XML, Arcade only).dat](https://github.com/libretro/FBNeo/blob/72af9e23b766b6ad6d2a30042fc8d83eadd25b61/dats/FinalBurn%20Neo%20(ClrMame%20Pro%20XML,%20Arcade%20only).dat).
 - BIOS de arcade ficam **na mesma pasta dos jogos** (`Roms/ARCADE`) e não aparecem na lista: `neogeo.zip` (Neo Geo), `pgm.zip` (PGM), `skns.zip`, `decocass.zip` etc.
 - O launcher mostra o nome do jogo vindo do DAT ("Street Fighter II: The World Warrior" em vez de `sf2.zip`).
+- **Samples** (sons gravados de jogos antigos, como Donkey Kong, Galaga, Space Invaders): em `Bios/fbneo/samples/`, um `.zip` por jogo, com o nome do jogo e sem descompactar (`Bios/fbneo/samples/dkong.zip`). Sem eles o jogo roda, só faltam alguns sons.
+- **Recordes** (opcional): `Bios/fbneo/hiscore.dat` faz o FBNeo guardar a tabela de recordes de cada jogo.
+- O FBNeo cria `Bios/fbneo/` e `Bios/fbneo/samples/` sozinho na primeira vez que roda.
 - Quando o FBNeo for atualizado no Pingo OS, a versão do romset muda junto; ela fica registrada aqui.
