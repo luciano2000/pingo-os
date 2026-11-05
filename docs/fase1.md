@@ -177,7 +177,13 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] Ordem dos consoles por número na pasta (`01 - NES`), como no MinUI
 - [x] PS1 com vários discos: `.m3u` como um item ("N discos"), agrupamento automático de "(Disc N)" sem `.m3u`, troca de disco no menu e "Disco N" na barra; abertura da BIOS ligada
 - [ ] Listas curadas de opções dos cores novos (por enquanto só a Escala)
-- [ ] Filtros de tela (seção 8.1)
+- [ ] Filtros de tela (seção 8.1): implementados, falta testar no aparelho com jogos de GB, GBC e GBA
+  - Opções → **Tela** (GB: Original/DMG; GBC: Original/GBC; GBA: Original/GBA/SP 101), **Grade LCD** e **Rastro da tela**; gravados com as outras opções (`pingo.tela`, `pingo.grade`, `pingo.rastro`). Padrão: GB em DMG, o resto Original, grade e rastro desligados.
+  - GB e GBC: a cor vem do Gambatte (`gambatte_gb_colorization`/`gambatte_gb_internal_palette`, `gambatte_gbc_color_correction`), forçada por baixo; essas opções saíram da lista curada do Gambatte.
+  - GBA: tabela de 32768 cores (RGB 5-5-5) calculada com as matrizes de `gba-color` e `sp101-color` (slang-shaders, Pokefan531/hunterk, domínio público), aplicada na CPU a cada quadro. O "GBA" usa `darken_screen` 0,5 (tela sem luz). A correção e a mistura do próprio mGBA ficam desligadas.
+  - Rastro: média 50 % com o quadro anterior, na CPU, para os três (o `gambatte_mix_frames` fica desligado).
+  - Grade LCD: textura multiplicada sobre a imagem, linha escura na borda de cada pixel (mais clara em 2x). Só na escala Inteira: ligar a grade muda a escala para Inteira; voltar para Ajustada desliga a grade.
+  - Na CPU e não em shader GLES (como a seção 8.1 sugeria): nessas resoluções (até 240x160) o custo é desprezível e o desenho continua todo no `SDL_Renderer`, junto com o menu.
 - [x] Remapeamento de botões (Opções → Botões): nomes das funções vindos do core (FBNeo: "Weak Punch"...), A + botão do aparelho, troca quando o botão já estava em uso, restaurar padrão; salvo por jogo ou por console (`pingo.bind.<função>=<botão>`, só o que muda do padrão). Falta testar no aparelho
 
 ## Fatia 7: SD1/SD2

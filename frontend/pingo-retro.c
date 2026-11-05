@@ -24,6 +24,7 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <linux/input.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -261,10 +262,49 @@ static void vars_curate(void)
 	fclose(f);
 }
 
+/* ---- filtros de tela (GB, GBC, GBA) ----------------------------------- *
+ * O usuário escolhe um nome; nunca vê parâmetros. A cor do GB e do GBC vem
+ * do próprio Gambatte (custo zero); a do GBA é uma tabela de 32768 cores
+ * aplicada a cada quadro (240x160: nada para a CPU). O rastro (mistura com
+ * o quadro anterior) e a grade LCD valem para os três.
+ */
+static const struct screen_console {
+	const char *code;
+	const char *names[3];
+	int n, def;
+} screen_consoles[] = {
+	{ "GB",  { "Original", "DMG" },           2, 1 },
+	{ "GBC", { "Original", "GBC" },           2, 0 },
+	{ "GBA", { "Original", "GBA", "SP 101" }, 3, 0 },
+};
+static const struct screen_console *scr; /* NULL: console sem filtros */
+static int screen_preset;
+static bool grid_on, ghost_on;
+
+static void screen_init(void)
+{
+	scr = NULL;
+	for (size_t i = 0; i < sizeof(screen_consoles) / sizeof(*screen_consoles); i++)
+		if (!strcmp(screen_consoles[i].code, console_code))
+			scr = &screen_consoles[i];
+	screen_preset = scr ? scr->def : 0;
+	grid_on = ghost_on = false;
+}
+
 static void var_set_value(const char *key, const char *value)
 {
 	if (!strcmp(key, "pingo.scale")) {
 		scale_mode = !strcmp(value, "inteira") ? SCALE_INT : SCALE_FIT;
+		return;
+	}
+	if (!strcmp(key, "pingo.tela")) {
+		for (int i = 0; scr && i < scr->n; i++)
+			if (!strcmp(scr->names[i], value))
+				screen_preset = i;
+		return;
+	}
+	if (!strcmp(key, "pingo.grade") || !strcmp(key, "pingo.rastro")) {
+		*(key[6] == 'g' ? &grid_on : &ghost_on) = !strcmp(value, "sim");
 		return;
 	}
 	if (!strncmp(key, "pingo.bind.", 11)) {
@@ -327,6 +367,11 @@ static bool cfg_save(bool per_game)
 	char buf[16384];
 	size_t len = (size_t)snprintf(buf, sizeof(buf), "pingo.scale=%s\n",
 				      scale_mode == SCALE_INT ? "inteira" : "ajustada");
+	if (scr)
+		len += (size_t)snprintf(buf + len, sizeof(buf) - len,
+					"pingo.tela=%s\npingo.grade=%s\npingo.rastro=%s\n",
+					scr->names[screen_preset], grid_on ? "sim" : "nao",
+					ghost_on ? "sim" : "nao");
 	/* botões: só os que mudaram do padrão */
 	for (int f = 0; f < 16 && len < sizeof(buf); f++) {
 		if (bind[f] != default_bind(f) && bind[f] >= 0)
@@ -368,6 +413,46 @@ static void vars_define(const struct retro_variable *v)
 	}
 }
 
+/* Muda uma opção do core por baixo (as do filtro de tela, que não
+ * aparecem no menu) */
+static void var_force(const char *key, const char *value)
+{
+	for (int i = 0; i < nvars; i++)
+		if (!strcmp(vars[i].key, key))
+			for (int k = 0; k < vars[i].nvalues; k++)
+				if (!strcmp(vars[i].values[k], value) && vars[i].cur != k) {
+					vars[i].cur = k;
+					vars_dirty = true;
+				}
+}
+
+/* tabela de cor: índice RGB 5-5-5 -> cor final no formato da textura */
+static uint32_t *color_lut;
+static bool lut_on;
+static void lut_build(void);
+
+static void screen_apply(void)
+{
+	if (!scr)
+		return;
+	const char *name = scr->names[screen_preset];
+	if (!strcmp(scr->code, "GB")) {
+		bool dmg = !strcmp(name, "DMG");
+		var_force("gambatte_gb_colorization", dmg ? "internal" : "disabled");
+		if (dmg)
+			var_force("gambatte_gb_internal_palette", "GB - DMG");
+	} else if (!strcmp(scr->code, "GBC")) {
+		var_force("gambatte_gbc_color_correction",
+			  !strcmp(name, "GBC") ? "GBC only" : "disabled");
+		var_force("gambatte_gbc_color_correction_mode", "accurate");
+	} else {
+		var_force("mgba_color_correction", "OFF");
+		var_force("mgba_interframe_blending", "OFF");
+	}
+	var_force("gambatte_mix_frames", "disabled"); /* o rastro é nosso */
+	lut_build();
+}
+
 /* interface de troca de disco do core (jogos de vários discos) */
 static struct retro_disk_control_callback disk;
 static bool has_disk;
@@ -386,10 +471,117 @@ static float aspect;
 static void *frame_buf;
 static int frame_w, frame_h, frame_pitch;
 
+/* Matrizes de cor de Pokefan531 e hunterk (gba-color e sp101-color dos
+ * libretro slang-shaders, perfil sRGB; domínio público). Linha = cor de
+ * saída, coluna = contribuição de R, G, B da entrada. */
+static const float gba_matrix[3][3] = {
+	{ 0.905f, 0.195f, -0.10f }, { 0.10f, 0.65f, 0.25f }, { 0.1575f, 0.1425f, 0.70f } };
+static const float sp101_matrix[3][3] = {
+	{ 0.96f, 0.11f, -0.07f }, { 0.0325f, 0.89f, 0.0775f }, { 0.001f, -0.03f, 1.029f } };
+
+static void lut_build(void)
+{
+	const float (*m)[3] = NULL;
+	float lum = 1, darken = 0;
+	if (scr && !strcmp(scr->code, "GBA") && screen_preset == 1) {
+		m = gba_matrix; lum = 0.91f; darken = 0.5f; /* tela sem luz: mais escura */
+	} else if (scr && !strcmp(scr->code, "GBA") && screen_preset == 2) {
+		m = sp101_matrix; lum = 0.935f;
+	}
+	lut_on = m != NULL;
+	if (!lut_on)
+		return;
+	if (!color_lut && !(color_lut = malloc(32768 * sizeof(*color_lut)))) {
+		lut_on = false;
+		return;
+	}
+	const float g = 2.2f, out_g = darken / (g * g) + 1 / g;
+	for (int i = 0; i < 32768; i++) {
+		float in[3] = { powf(((i >> 10) & 31) / 31.0f, g), powf(((i >> 5) & 31) / 31.0f, g),
+				powf((i & 31) / 31.0f, g) };
+		int o[3];
+		for (int c = 0; c < 3; c++) {
+			float v = (m[c][0] * in[0] + m[c][1] * in[1] + m[c][2] * in[2]) * lum;
+			v = v < 0 ? 0 : (v > 1 ? 1 : v);
+			o[c] = (int)(powf(v, out_g) * 255 + 0.5f);
+		}
+		if (tex_format == SDL_PIXELFORMAT_RGB565)
+			color_lut[i] = (o[0] >> 3) << 11 | (o[1] >> 2) << 5 | o[2] >> 3;
+		else if (tex_format == SDL_PIXELFORMAT_RGB555)
+			color_lut[i] = (o[0] >> 3) << 10 | (o[1] >> 3) << 5 | o[2] >> 3;
+		else
+			color_lut[i] = (uint32_t)o[0] << 16 | o[1] << 8 | o[2];
+	}
+}
+
+/* quadro filtrado e o quadro anterior (para o rastro) */
+static void *flt_buf, *prev_buf;
+static int flt_w, flt_h;
+static bool prev_valid;
+
+static const void *screen_filter(const void *data, unsigned w, unsigned h, size_t *pitch)
+{
+	if (!scr || (!lut_on && !ghost_on))
+		return data;
+	if ((int)w != flt_w || (int)h != flt_h || !flt_buf) {
+		free(flt_buf);
+		free(prev_buf);
+		flt_buf = malloc((size_t)w * h * 4);
+		prev_buf = malloc((size_t)w * h * 4);
+		flt_w = w;
+		flt_h = h;
+		prev_valid = false;
+		if (!flt_buf || !prev_buf)
+			return data;
+	}
+	if (!ghost_on)
+		prev_valid = false;
+	if (tex_bpp == 2) {
+		bool is565 = tex_format == SDL_PIXELFORMAT_RGB565;
+		uint16_t mask = is565 ? 0xF7DE : 0x7BDE; /* tira o bit baixo de cada cor */
+		for (unsigned y = 0; y < h; y++) {
+			const uint16_t *src = (const uint16_t *)((const char *)data + y * *pitch);
+			uint16_t *dst = (uint16_t *)flt_buf + y * w, *prev = (uint16_t *)prev_buf + y * w;
+			for (unsigned x = 0; x < w; x++) {
+				uint16_t c = src[x];
+				if (lut_on)
+					c = color_lut[is565 ? (c >> 1 & 0x7C00) | (c >> 1 & 0x3E0) | (c & 31)
+							    : (c & 0x7FFF)];
+				if (ghost_on) {
+					uint16_t p = prev_valid ? prev[x] : c;
+					prev[x] = c;
+					c = (uint16_t)(((c ^ p) & mask) >> 1) + (c & p);
+				}
+				dst[x] = c;
+			}
+		}
+	} else {
+		for (unsigned y = 0; y < h; y++) {
+			const uint32_t *src = (const uint32_t *)((const char *)data + y * *pitch);
+			uint32_t *dst = (uint32_t *)flt_buf + y * w, *prev = (uint32_t *)prev_buf + y * w;
+			for (unsigned x = 0; x < w; x++) {
+				uint32_t c = src[x] & 0xFFFFFF;
+				if (lut_on)
+					c = color_lut[(c >> 9 & 0x7C00) | (c >> 6 & 0x3E0) | (c >> 3 & 31)];
+				if (ghost_on) {
+					uint32_t p = prev_valid ? prev[x] : c;
+					prev[x] = c;
+					c = (((c ^ p) & 0xFEFEFE) >> 1) + (c & p);
+				}
+				dst[x] = c;
+			}
+		}
+	}
+	prev_valid = ghost_on;
+	*pitch = (size_t)w * tex_bpp;
+	return flt_buf;
+}
+
 static void video_refresh(const void *data, unsigned width, unsigned height, size_t pitch)
 {
 	if (!data) /* quadro duplicado (GET_CAN_DUPE) */
 		return;
+	data = screen_filter(data, width, height, &pitch);
 	if (!texture || (int)width != tex_w || (int)height != tex_h) {
 		if (texture)
 			SDL_DestroyTexture(texture);
@@ -438,6 +630,45 @@ static SDL_Rect game_rect(void)
 	return r;
 }
 
+/* Grade LCD: textura do tamanho da imagem, branca com as bordas de cada
+ * pixel do jogo mais escuras, multiplicada por cima (só na escala Inteira) */
+static SDL_Texture *grid_tex;
+static int grid_w, grid_h, grid_s;
+
+static void draw_grid(const SDL_Rect *dst)
+{
+	int s = tex_h > 0 ? dst->h / tex_h : 0;
+	if (s < 2 || dst->w != tex_w * s)
+		return;
+	if (!grid_tex || grid_w != dst->w || grid_h != dst->h || grid_s != s) {
+		if (grid_tex)
+			SDL_DestroyTexture(grid_tex);
+		grid_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+					     SDL_TEXTUREACCESS_STATIC, dst->w, dst->h);
+		uint32_t *px = grid_tex ? malloc((size_t)dst->w * dst->h * 4) : NULL;
+		if (!px) {
+			if (grid_tex)
+				SDL_DestroyTexture(grid_tex);
+			grid_tex = NULL;
+			return;
+		}
+		/* em 2x a linha ocupa metade do pixel: mais clara */
+		uint32_t line = s >= 3 ? 0xB0 : 0xD8;
+		for (int y = 0; y < dst->h; y++)
+			for (int x = 0; x < dst->w; x++) {
+				uint32_t v = (x % s == s - 1 || y % s == s - 1) ? line : 0xFF;
+				px[y * dst->w + x] = 0xFF000000 | v << 16 | v << 8 | v;
+			}
+		SDL_UpdateTexture(grid_tex, NULL, px, dst->w * 4);
+		free(px);
+		SDL_SetTextureBlendMode(grid_tex, SDL_BLENDMODE_MOD);
+		grid_w = dst->w;
+		grid_h = dst->h;
+		grid_s = s;
+	}
+	SDL_RenderCopy(renderer, grid_tex, NULL, dst);
+}
+
 static void draw_game(void)
 {
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -445,6 +676,8 @@ static void draw_game(void)
 	if (texture) {
 		SDL_Rect dst = game_rect();
 		SDL_RenderCopy(renderer, texture, NULL, &dst);
+		if (scr && grid_on && scale_mode == SCALE_INT)
+			draw_grid(&dst);
 	}
 }
 
@@ -776,6 +1009,7 @@ static bool environment(unsigned cmd, void *data)
 		case RETRO_PIXEL_FORMAT_0RGB1555: tex_format = SDL_PIXELFORMAT_RGB555; tex_bpp = 2; break;
 		default: return false;
 		}
+		lut_build(); /* a tabela de cor sai no formato da textura */
 		return true;
 	}
 	case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
@@ -793,6 +1027,7 @@ static bool environment(unsigned cmd, void *data)
 		vars_define((const struct retro_variable *)data);
 		vars_curate();
 		cfg_load_all(); /* valores salvos por console/jogo */
+		screen_apply();
 		return true;
 	case RETRO_ENVIRONMENT_GET_VARIABLE: {
 		struct retro_variable *v = data;
@@ -1248,13 +1483,19 @@ static void draw_menu(int sel)
 }
 
 /* opções: escala, botões, opções do core e as duas formas de salvar */
-enum { OPT_SCALE, OPT_BUTTONS, OPT_VAR, OPT_SAVE_GAME, OPT_SAVE_CONSOLE };
-static int opt_kind[MAX_VARS + 4], opt_arg[MAX_VARS + 4], opt_n;
+enum { OPT_SCALE, OPT_SCREEN, OPT_GRID, OPT_GHOST, OPT_BUTTONS, OPT_VAR, OPT_SAVE_GAME,
+       OPT_SAVE_CONSOLE };
+static int opt_kind[MAX_VARS + 8], opt_arg[MAX_VARS + 8], opt_n;
 
 static void options_build(void)
 {
 	opt_n = 0;
 	opt_kind[opt_n++] = OPT_SCALE;
+	if (scr) {
+		opt_kind[opt_n++] = OPT_SCREEN;
+		opt_kind[opt_n++] = OPT_GRID;
+		opt_kind[opt_n++] = OPT_GHOST;
+	}
 	opt_kind[opt_n++] = OPT_BUTTONS;
 	for (int k = 0; k < nshown; k++) {
 		opt_kind[opt_n] = OPT_VAR;
@@ -1290,6 +1531,18 @@ static void draw_options(int sel, int top_item)
 			label = S_O_SCALE;
 			value = scale_mode == SCALE_INT ? S_O_SCALE_INT : S_O_SCALE_FIT;
 			break;
+		case OPT_SCREEN:
+			label = S_O_SCREEN;
+			value = scr->names[screen_preset];
+			break;
+		case OPT_GRID:
+			label = S_O_GRID;
+			value = grid_on ? S_O_ON_F : S_O_OFF_F;
+			break;
+		case OPT_GHOST:
+			label = S_O_GHOST;
+			value = ghost_on ? S_O_ON : S_O_OFF;
+			break;
 		case OPT_BUTTONS:
 			label = S_O_BUTTONS;
 			break;
@@ -1315,7 +1568,7 @@ static void draw_options(int sel, int top_item)
 	draw_toast_or(NULL);
 	int right = UI_W - PAD_X;
 	right -= draw_hint(right, "B", S_BACK) + 22;
-	if (opt_kind[sel] == OPT_SCALE || opt_kind[sel] == OPT_VAR)
+	if (opt_kind[sel] != OPT_BUTTONS && opt_kind[sel] < OPT_SAVE_GAME)
 		draw_hint(right, "◀ ▶", S_HINT_CHANGE);
 	else
 		draw_hint(right, "A", S_CONFIRM);
@@ -1327,6 +1580,17 @@ static void option_change(int i, int d)
 {
 	if (opt_kind[i] == OPT_SCALE) {
 		scale_mode = scale_mode == SCALE_INT ? SCALE_FIT : SCALE_INT;
+		if (scale_mode == SCALE_FIT)
+			grid_on = false; /* a grade só fica certa na escala inteira */
+	} else if (opt_kind[i] == OPT_SCREEN) {
+		screen_preset = (screen_preset + d + scr->n) % scr->n;
+		screen_apply();
+	} else if (opt_kind[i] == OPT_GRID) {
+		grid_on = !grid_on;
+		if (grid_on)
+			scale_mode = SCALE_INT;
+	} else if (opt_kind[i] == OPT_GHOST) {
+		ghost_on = !ghost_on;
 	} else if (opt_kind[i] == OPT_VAR) {
 		struct var *v = &vars[shown[opt_arg[i]]];
 		v->cur = (v->cur + d + v->nvalues) % v->nvalues;
@@ -1466,7 +1730,7 @@ static bool run_options(void)
 			option_change(sel, 1);
 		if (was_pressed(BTN_EAST)) {
 			int k = opt_kind[sel];
-			if (k == OPT_SCALE || k == OPT_VAR)
+			if (k != OPT_BUTTONS && k < OPT_SAVE_GAME)
 				option_change(sel, 1);
 			else if (k == OPT_BUTTONS)
 				run_buttons();
@@ -1748,6 +2012,7 @@ int main(int argc, char **argv)
 	snprintf(save_dir, sizeof(save_dir), "%s/Saves/%s", DATA_ROOT, console_code);
 	mkdir_p(save_dir);
 	binds_default();
+	screen_init();
 	cfg_load_all(); /* escala e botões (as opções do core chegam no SET_VARIABLES) */
 
 	{ /* ".../gambatte_libretro.so" -> "gambatte" */

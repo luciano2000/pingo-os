@@ -278,9 +278,9 @@ Camada opcional, independente da cor:
 - **Interframe blending / ghosting** no GB e no GBA. Vários jogos dependem do "rastro" da tela original para simular transparência (piscar de sprites).
 
 Regras:
-- Implementar como shaders GLES no próprio frontend. No Mali-G31, a 640x480, o custo é desprezível.
+- Implementado no próprio frontend: a cor do GB e do GBC pelo Gambatte, a do GBA, o rastro e a grade no `pingo-retro` (tabela de cor e mistura na CPU; a grade é uma textura por cima). Nessas resoluções o custo é desprezível; shaders GLES ficam para filtros de consoles de tela grande, se um dia forem pedidos.
 - Usar como base os shaders do repositório `libretro/glsl-shaders`, conferindo a licença de cada um.
-- A escolha é salva **por console**. Por jogo, só se for pedido no futuro.
+- A escolha é salva junto com as outras opções: "Salvar para o console" (o normal) ou "para este jogo".
 - Padrão de fábrica: GB → DMG; GBC e GBA → Original.
 - Escala: opção "Inteira / Ajustada" ao lado dos filtros (ver 8.2).
 
