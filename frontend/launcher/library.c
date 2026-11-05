@@ -594,7 +594,17 @@ struct node *library_scan(const int *origin, bool sd2)
 			pick = s1[c];
 			s1[c] = NULL;
 		}
-		if (pick && (pick->games > 0 || pick->missing))
+		/* Origem escolhida pelo usuário, sem jogos desse console nela, mas com
+		 * jogos no outro cartão: o console fica no Início (vazio), para dar
+		 * para trocar a origem de volta pelo MENU */
+		struct node *other = o == 2 ? s1[c] : s2[c];
+		if (origin && origin[c] && !(pick && pick->missing) && (!pick || pick->games == 0) &&
+		    other && other->games > 0) {
+			library_free(pick);
+			pick = console_node(c, o == 2 ? ROMS_DIR_SD2 : ROMS_DIR, other->fname, o);
+		}
+		if (pick && (pick->games > 0 || pick->missing || (origin && origin[c] && other &&
+								     other->games > 0)))
 			node_add(root, pick);
 		else
 			library_free(pick);

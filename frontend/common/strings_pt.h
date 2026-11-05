@@ -39,6 +39,7 @@
 #define S_DISCS_N        "%d discos"
 #define S_EMPTY_TITLE    "Nenhum jogo encontrado"
 #define S_EMPTY_HINT     "Copie os jogos para a pasta Roms do cartão"
+#define S_EMPTY_ORIGIN   "MENU para trocar a origem (SD1/SD2)"
 #define S_NO_CARD        "Cartão sem a partição ROMS"
 #define S_NO_CORE        "Este console ainda não tem emulador"
 #define S_MISSING_GAME   "Jogo não encontrado"

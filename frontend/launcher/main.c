@@ -571,8 +571,8 @@ static void draw(void)
 		ui_text(F_TITLE, have_roms ? S_EMPTY_TITLE : S_NO_CARD, UI_W / 2, UI_H / 2 - 16,
 			COL_TEXT, 2, UI_W - 2 * PAD_X);
 		if (have_roms)
-			ui_text(F_BAR, S_EMPTY_HINT, UI_W / 2, UI_H / 2 + 18, COL_DIM, 2,
-				UI_W - 2 * PAD_X);
+			ui_text(F_BAR, (!at_home && l->dir->console >= 0) ? S_EMPTY_ORIGIN : S_EMPTY_HINT,
+				UI_W / 2, UI_H / 2 + 18, COL_DIM, 2, UI_W - 2 * PAD_X);
 	}
 	for (int row = 0; row < ROWS && l->top + row < n; row++) {
 		int i = l->top + row;
