@@ -198,14 +198,15 @@ sd2_update() {
 	fi
 	if [ -n "$part" ] && ! mountpoint -q "$SD2"; then
 		mkdir -p "$SD2"
+		# Sem fsck: montado só para leitura, um cartão "sujo" não faz mal, e
+		# num cartão grande em FAT32 o fsck levava quase um minuto no boot
 		case "$(blkid -p -o value -s TYPE "$part")" in
-			exfat) fsck.exfat -p "$part" > /dev/null 2>&1
-			       mount -t exfat -o ro,noatime "$part" "$SD2" ;;
-			vfat)  fsck.vfat -a "$part" > /dev/null 2>&1
-			       mount -t vfat -o ro,noatime,utf8 "$part" "$SD2" ;;
+			exfat) mount -t exfat -o ro,noatime "$part" "$SD2" ;;
+			vfat)  mount -t vfat -o ro,noatime,utf8 "$part" "$SD2" ;;
 		esac && say "SD2 montado, somente leitura ($part)"
-		# Cartão já preparado (tem Roms/): cria só as pastas de consoles novos
-		[ -d "$SD2/Roms" ] && sd2_folders
+		# Cartão preparado pelo Pingo: cria só as pastas de consoles novos.
+		# Cartão de outro sistema (MinUI etc.), mesmo com Roms/: não mexe
+		sd2_is_pingo && sd2_folders
 	fi
 	sd2_state
 	sd2_changed
@@ -224,6 +225,12 @@ sd2_state() {
 	fi
 }
 
+# Cartão do Pingo: marcado no "preparar" (Roms/.pingo) ou com o rótulo ROMS
+sd2_is_pingo() {
+	[ -f "$SD2/Roms/.pingo" ] && return 0
+	[ "$(blkid -p -o value -s LABEL "$(awk -v m="$SD2" '$2 == m {print $1}' /proc/mounts)" 2>/dev/null)" = "$LABEL" ]
+}
+
 # Cria as pastas que faltam, liberando a escrita só durante isso
 sd2_folders() {
 	local c missing=0
@@ -234,6 +241,7 @@ sd2_folders() {
 	[ $missing -eq 0 ] && return 0
 	mount -o remount,rw "$SD2" || return 1
 	console_folders "$SD2"
+	: > "$SD2/Roms/.pingo" # marca: cartão preparado pelo Pingo
 	sync
 	mount -o remount,ro "$SD2"
 	say "SD2: pastas dos consoles criadas"
@@ -248,7 +256,7 @@ sd2_prepare() {
 }
 
 case "$1" in
-	boot) do_boot; sd2_update ;;
+	boot) do_boot; sd2_update & ;; # o SD2 não segura o boot
 	format) do_format ;;
 	sd2) sd2_update ;;              # udev: cartão inserido ou tirado do slot 2
 	sd2-prepare) root_disk; sd2_prepare ;;

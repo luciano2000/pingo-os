@@ -498,6 +498,35 @@ int library_console_folder(const char *name, int *order)
 	for (int c = 0; c < n_consoles; c++)
 		if (!strcasecmp(p, consoles[c].code))
 			return c;
+	/* Cartão do MinUI e parecidos: "Game Boy (GB)", "SNES (SFC)" */
+	const char *open = strrchr(p, '('), *close = open ? strchr(open, ')') : NULL;
+	if (open && close && close[1] == 0 && close > open + 1) {
+		static const struct { const char *tag, *code; } tags[] = {
+			{ "GB", "GB" }, { "SGB", "GB" }, { "GBC", "GBC" }, { "GBA", "GBA" },
+			{ "MGBA", "GBA" }, { "FC", "NES" }, { "NES", "NES" }, { "FDS", "FDS" },
+			{ "SFC", "SNES" }, { "SUPA", "SNES" }, { "SNES", "SNES" }, { "VB", "VB" },
+			{ "PKM", "POKEMINI" }, { "POKE", "POKEMINI" }, { "SMS", "MS" }, { "MS", "MS" },
+			{ "GG", "GG" }, { "MD", "MD" }, { "GEN", "MD" }, { "SEGACD", "SEGACD" },
+			{ "THIRTYTWOX", "32X" }, { "32X", "32X" }, { "PCE", "PCE" },
+			{ "PCECD", "PCECD" }, { "NGP", "NGP" }, { "NGPC", "NGP" }, { "WS", "WS" },
+			{ "WSC", "WS" }, { "MSX", "MSX" }, { "ATARI", "A2600" }, { "A2600", "A2600" },
+			{ "SEVENTYEIGHTHUNDRED", "A7800" }, { "A7800", "A7800" }, { "LYNX", "LYNX" },
+			{ "PS", "PS" }, { "PSX", "PS" }, { "FBN", "ARCADE" }, { "FBNEO", "ARCADE" },
+			{ "ARCADE", "ARCADE" }, { "CPS1", "ARCADE" }, { "CPS2", "ARCADE" },
+			{ "CPS3", "ARCADE" }, { "NEOGEO", "NEOGEO" },
+		};
+		char tag[32];
+		size_t n = (size_t)(close - open - 1);
+		if (n < sizeof(tag)) {
+			memcpy(tag, open + 1, n);
+			tag[n] = 0;
+			for (size_t t = 0; t < sizeof(tags) / sizeof(*tags); t++)
+				if (!strcasecmp(tag, tags[t].tag))
+					for (int c = 0; c < n_consoles; c++)
+						if (!strcmp(consoles[c].code, tags[t].code))
+							return c;
+		}
+	}
 	*order = -1;
 	return -1;
 }
@@ -534,33 +563,73 @@ static struct node *console_node(int c, const char *roms, const char *folder, in
 	return n;
 }
 
-/* Uma pasta por console em <roms> (duas do mesmo console, ex. "NES" e
- * "01 - NES": fica a numerada, ou a que tem jogos) */
+static int count_games(struct node *n);
+
+/* Pastas de console em <roms>. Duas do mesmo console, ex. "NES" e
+ * "01 - NES": fica a numerada, ou a que tem jogos. Várias com jogos (no
+ * MinUI, "Megadrive (MD)" e "Megadrive JAP (MD)"): viram subpastas do
+ * console, com o nome da pasta sem a sigla. */
+#define MAX_SAME 12
 static void scan_root(const char *roms, int source, struct node *seen[64])
 {
 	DIR *d = opendir(roms);
 	struct dirent *e;
+	struct node *cand[64][MAX_SAME];
+	int ncand[64] = { 0 };
 
 	while (d && (e = readdir(d))) {
 		int order, c = library_console_folder(e->d_name, &order);
-		if (c < 0 || c >= 64)
+		if (c < 0 || c >= 64 || ncand[c] >= MAX_SAME)
 			continue;
 		struct node *cn = console_node(c, roms, e->d_name, source);
 		scan_dir(cn, c);
-		if (seen[c]) {
-			int o_old;
-			library_console_folder(seen[c]->fname, &o_old);
-			bool better = (order >= 0 && o_old < 0) || (seen[c]->games == 0 && cn->games > 0);
-			if (!better) {
-				library_free(cn);
-				continue;
-			}
-			library_free(seen[c]);
-		}
-		seen[c] = cn;
+		cand[c][ncand[c]++] = cn;
 	}
 	if (d)
 		closedir(d);
+
+	for (int c = 0; c < 64; c++) {
+		if (!ncand[c])
+			continue;
+		int with_games = 0, best = 0;
+		for (int i = 0; i < ncand[c]; i++) {
+			int oi, ob;
+			with_games += cand[c][i]->games > 0;
+			library_console_folder(cand[c][i]->fname, &oi);
+			library_console_folder(cand[c][best]->fname, &ob);
+			bool better = (cand[c][i]->games > 0 && cand[c][best]->games == 0) ||
+				      ((cand[c][i]->games > 0) == (cand[c][best]->games > 0) &&
+				       oi >= 0 && ob < 0);
+			if (better)
+				best = i;
+		}
+		if (with_games <= 1) {
+			seen[c] = cand[c][best];
+			for (int i = 0; i < ncand[c]; i++)
+				if (i != best)
+					library_free(cand[c][i]);
+			continue;
+		}
+		/* várias pastas com jogos: uma subpasta para cada */
+		struct node *w = node_new(cand[c][best]->fname, roms, c, true);
+		free(w->label);
+		w->label = strdup(consoles[c].name);
+		w->source = source;
+		for (int i = 0; i < ncand[c]; i++) {
+			struct node *k = cand[c][i];
+			if (k->games == 0) {
+				library_free(k);
+				continue;
+			}
+			free(k->label);
+			k->label = library_clean_name(k->fname, true);
+			k->source = 0; /* só a pasta do console guarda a origem */
+			node_add(w, k);
+		}
+		qsort(w->kids, w->nkids, sizeof(*w->kids), kid_cmp);
+		count_games(w);
+		seen[c] = w;
+	}
 }
 
 /* Junta src em dst (pastas de mesmo nome se fundem; arquivo de mesmo nome

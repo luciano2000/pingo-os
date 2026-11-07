@@ -199,7 +199,9 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - SD2 inserido ou tirado: a lista é refeita sozinha. Tirar o SD2 com um jogo dele aberto pausa no menu do jogo, com aviso.
 - O SD2 é montado **somente leitura**: tudo que é gravado fica no SD1, então tirar o SD2 a qualquer momento é seguro.
 - Cartão sem `Roms/` no slot 2 (novo, de fábrica): o launcher pergunta "Cartão novo no slot 2 — usar para jogos?". A: `pingo-storage sd2-prepare` libera a escrita por um instante, cria `Roms/` e as pastas dos consoles, `sync`, volta a somente leitura. Nunca formata. B: não pergunta mais sobre aquele cartão (número de série em `Config/sd2-ignorados.txt`); dá para preparar depois pelo MENU do Início.
-- Cartão já preparado: se faltar a pasta de um console novo (depois de uma atualização), ela é criada sozinha do mesmo jeito.
+- Cartão já preparado (rótulo `ROMS` ou marca `Roms/.pingo`, gravada no "preparar"): se faltar a pasta de um console novo (depois de uma atualização), ela é criada sozinha do mesmo jeito. Cartão de outro sistema (MinUI etc.), mesmo com `Roms/`, nunca é alterado.
+- Sem `fsck` no SD2 (montado só para leitura) e montagem em segundo plano no boot: um cartão FAT32 grande levava quase um minuto no logo.
+- **Cartões do MinUI** são lidos como estão: pastas "Nome (SIGLA)" ("Game Boy (GB)", "SNES (SFC)", "Megadrive (MD)", "Arcade (FBN)"...) valem pela sigla. Várias pastas com jogos do mesmo console ("Megadrive (MD)" e "Megadrive JAP (MD)") viram subpastas dele, com o nome sem a sigla. Pastas de siglas que o Pingo não roda (N64, DC, PICO-8...) são ignoradas.
 - Cartões de até 32 GB vêm em FAT32 (arquivos até 4 GB): não atrapalha nenhum console do Pingo.
 - Saves, save states, configurações e BIOS ficam sempre no SD1.
 - Recentes guardam o caminho relativo à pasta do console e procuram o jogo nas pastas do console nos dois cartões.
