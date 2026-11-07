@@ -1,0 +1,3 @@
+# SSH só pelo cabo USB (usb0, 192.168.7.2): a senha do root é conhecida
+# ("pingo"), então nunca pode ficar aberto no Wi-Fi
+DROPBEAR_ARGS="-p 192.168.7.2:22"
