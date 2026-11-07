@@ -357,19 +357,29 @@ int ui_icon_wifi(int x, int y_center, Uint32 rgb)
 	return 18;
 }
 
+/* Cor da carga: verde (60 % ou mais), amarelo (40 a 59), laranja (20 a 39)
+ * e vermelho (abaixo de 20) */
+static Uint32 battery_color(int percent)
+{
+	return percent >= 60 ? 0x3DBE5A : percent >= 40 ? 0xF2C230 : percent >= 20 ? 0xF08A24
+									  : 0xE5483B;
+}
+
 int ui_icon_battery(int x, int y_center, int percent, bool charging, Uint32 rgb)
 {
 	int y = y_center - 7;
-	draw_tex(battery_tex, x, y, 26, 14, rgb);
 	if (percent < 0)
 		percent = 0;
 	if (percent > 100)
 		percent = 100;
+	Uint32 fill = battery_color(percent);
+	/* carregando: o contorno também fica na cor da carga */
+	draw_tex(battery_tex, x, y, 26, 14, charging ? fill : rgb);
 	/* área interna do mockup: x 3,5 a 19,5; y 3,5 a 10,5 */
 	int fw = (16 * percent + 50) / 100;
 	if (fw < 2 && percent > 0)
 		fw = 2;
-	ui_rect(x + 4, y + 4, fw, 6, charging ? COL_TEXT : rgb);
+	ui_rect(x + 4, y + 4, fw, 6, fill);
 	return 26;
 }
 
