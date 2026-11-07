@@ -44,5 +44,10 @@ case "$1" in
     [ -f "$RUN/udhcpc.pid" ] && kill "$(cat "$RUN/udhcpc.pid")"
     [ -f "$RUN/wpa.pid" ] && kill "$(cat "$RUN/wpa.pid")"
     ;;
+  restart)
+    "$0" stop
+    sleep 1
+    "$0" start
+    ;;
 esac
 exit 0
