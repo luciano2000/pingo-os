@@ -1326,28 +1326,501 @@ static void sd2_maybe_ask(void)
 }
 
 /* MENU no Início */
-static void home_menu(void)
+/* ---- Wi-Fi ------------------------------------------------------------ *
+ * A tela conversa com o /usr/sbin/pingo-wifi (wpa_supplicant por baixo).
+ * A senha vai pela entrada padrão do script, nunca pela linha de comando, e
+ * só a chave derivada dela é gravada.
+ */
+static const char *wifi_cmd(void)
 {
-	if (!(sd2_present && !sd2_ready)) {
-		show_toast(S_NO_OPTIONS);
+	const char *e = getenv("PINGO_WIFI"); /* para testar sem regravar o sistema */
+	return e && *e ? e : "/usr/sbin/pingo-wifi";
+}
+
+/* Roda o pingo-wifi; devolve o código de saída (-1: não rodou) */
+static int wifi_run(const char *a1, const char *a2, const char *input, char *out, size_t outn)
+{
+	int in_p[2], out_p[2];
+	if (pipe(in_p) < 0)
+		return -1;
+	if (pipe(out_p) < 0) {
+		close(in_p[0]);
+		close(in_p[1]);
+		return -1;
+	}
+	pid_t pid = fork();
+	if (pid == 0) {
+		dup2(in_p[0], 0);
+		dup2(out_p[1], 1);
+		close(in_p[1]);
+		close(out_p[0]);
+		const char *cmd = wifi_cmd();
+		execl(cmd, cmd, a1, a2, (char *)NULL);
+		_exit(127);
+	}
+	close(in_p[0]);
+	close(out_p[1]);
+	if (pid < 0) {
+		close(in_p[1]);
+		close(out_p[0]);
+		return -1;
+	}
+	if (input) {
+		ssize_t w = write(in_p[1], input, strlen(input));
+		w += write(in_p[1], "\n", 1);
+		(void)w;
+	}
+	close(in_p[1]);
+	size_t len = 0;
+	ssize_t r;
+	char tmp[512];
+	while ((r = read(out_p[0], tmp, sizeof(tmp))) > 0)
+		if (out && len + 1 < outn) {
+			size_t n = SDL_min((size_t)r, outn - 1 - len);
+			memcpy(out + len, tmp, n);
+			len += n;
+		}
+	if (out && outn)
+		out[len] = 0;
+	close(out_p[0]);
+	int st;
+	if (waitpid(pid, &st, 0) < 0)
+		return -1;
+	return WIFEXITED(st) ? WEXITSTATUS(st) : -1;
+}
+
+#define WIFI_MAX_NETS 40
+static struct wifi_net {
+	char ssid[64];
+	int signal; /* dBm */
+	bool open, wep, saved;
+} wifi_nets[WIFI_MAX_NETS];
+static int wifi_nnets;
+static bool wifi_on;
+static char wifi_ssid[64], wifi_ip[32];
+
+static void wifi_status_read(void)
+{
+	char out[512];
+	wifi_on = false;
+	wifi_ssid[0] = wifi_ip[0] = 0;
+	if (wifi_run("status", NULL, NULL, out, sizeof(out)) < 0)
+		return;
+	for (char *l = strtok(out, "\n"); l; l = strtok(NULL, "\n")) {
+		if (!strcmp(l, "estado ligado"))
+			wifi_on = true;
+		else if (!strncmp(l, "rede ", 5))
+			snprintf(wifi_ssid, sizeof(wifi_ssid), "%s", l + 5);
+		else if (!strncmp(l, "ip ", 3))
+			snprintf(wifi_ip, sizeof(wifi_ip), "%s", l + 3);
+	}
+}
+
+static void wifi_scan(void)
+{
+	static char out[8192];
+	wifi_nnets = 0;
+	if (!wifi_on || wifi_run("scan", NULL, NULL, out, sizeof(out)) != 0)
+		return;
+	char *save = NULL;
+	for (char *l = strtok_r(out, "\n", &save); l && wifi_nnets < WIFI_MAX_NETS;
+	     l = strtok_r(NULL, "\n", &save)) {
+		/* sinal<tab>tipo<tab>salva<tab>nome */
+		char *f[4] = { l, NULL, NULL, NULL };
+		for (int i = 1; i < 4; i++) {
+			char *t = strchr(f[i - 1], '\t');
+			if (!t)
+				break;
+			*t = 0;
+			f[i] = t + 1;
+		}
+		if (!f[3] || !*f[3])
+			continue;
+		struct wifi_net *n = &wifi_nets[wifi_nnets++];
+		snprintf(n->ssid, sizeof(n->ssid), "%s", f[3]);
+		n->signal = atoi(f[0]);
+		n->open = !strcmp(f[1], "aberta");
+		n->wep = !strcmp(f[1], "wep");
+		n->saved = !strcmp(f[2], "1");
+	}
+}
+
+/* Sinal em 4 barrinhas, como no ícone da barra */
+static void draw_signal(int right, int y_center, int dbm, Uint32 rgb)
+{
+	int bars = dbm >= -55 ? 4 : dbm >= -65 ? 3 : dbm >= -75 ? 2 : 1;
+	for (int i = 0; i < 4; i++) {
+		int h = 5 + i * 4, x = right - (4 - i) * 6;
+		Uint32 c = i < bars ? rgb : 0x4A4A4A;
+		ui_rect(x, y_center + 8 - h, 4, h, c);
+	}
+}
+
+/* ---- teclado na tela ---- */
+static const char *const kb_pages[3][4] = {
+	{ "1234567890", "qwertyuiop", "asdfghjkl-", "zxcvbnm_.@" },
+	{ "1234567890", "QWERTYUIOP", "ASDFGHJKL-", "ZXCVBNM_.@" },
+	{ "!@#$%^&*()", "-_=+[]{}\\|", ";:'\",.<>/?", "`~" },
+};
+enum { KB_SHIFT, KB_SYMS, KB_SPACE, KB_DEL, KB_OK, KB_NSPECIAL };
+static const int kb_special_w[KB_NSPECIAL] = { 84, 84, 228, 84, 96 };
+
+#define KB_X     PAD_X
+#define KB_KW    54
+#define KB_KH    42
+#define KB_GAP   6
+#define KB_Y     160
+
+static int kb_row_len(int page, int r)
+{
+	return r < 4 ? (int)strlen(kb_pages[page][r]) : KB_NSPECIAL;
+}
+
+static void kb_draw(const char *title, const char *text, int page, int r, int c, const char *err)
+{
+	ui_clear();
+	ui_text(F_BAR_BOLD, title, PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, UI_W - 2 * PAD_X);
+	/* campo */
+	int fy = PAD_Y + BAR_H + LIST_GAP;
+	ui_round_rect(PAD_X, fy, UI_W - 2 * PAD_X, 52, 12, 0x2A2A2A);
+	char shown[160];
+	size_t n = strlen(text);
+	/* mostra o fim do texto quando não cabe */
+	const char *start = text;
+	while (ui_text_width(F_ITEM, start) > UI_W - 2 * PAD_X - 40 && *start)
+		start++;
+	snprintf(shown, sizeof(shown), "%s|", start);
+	ui_text(F_ITEM, n ? shown : "|", PAD_X + ROW_PAD, fy + 26, COL_TEXT, 0, 0);
+	if (err)
+		ui_text(F_BAR, err, PAD_X, fy + 52 + 22, COL_DIM, 0, UI_W - 2 * PAD_X);
+	/* teclas */
+	for (int rr = 0; rr < 5; rr++) {
+		int y = KB_Y + rr * (KB_KH + KB_GAP), x = KB_X;
+		for (int cc = 0; cc < kb_row_len(page, rr); cc++) {
+			int w = rr < 4 ? KB_KW : kb_special_w[cc];
+			bool sel = rr == r && cc == c;
+			Uint32 bg = sel ? COL_SEL_BG : 0x2A2A2A, fg = sel ? COL_SEL_FG : COL_TEXT;
+			ui_round_rect(x, y, w, KB_KH, 10, bg);
+			char label[16];
+			if (rr < 4) {
+				label[0] = kb_pages[page][rr][cc];
+				label[1] = 0;
+				ui_text(F_ITEM, label, x + w / 2, y + KB_KH / 2, fg, 2, 0);
+			} else {
+				const char *names[] = { page == 1 ? S_KB_LOWER : S_KB_UPPER,
+							page == 2 ? S_KB_LETTERS : S_KB_SYMBOLS, S_KB_SPACE,
+							S_KB_DELETE, S_KB_OK };
+				ui_text(F_BAR_BOLD, names[cc], x + w / 2, y + KB_KH / 2, fg, 2, w - 8);
+			}
+			x += w + KB_GAP;
+		}
+	}
+	int right = UI_W - PAD_X;
+	right -= draw_hint(right, "START", S_KB_OK) + 22;
+	right -= draw_hint(right, "B", S_KB_DELETE) + 22;
+	right -= draw_hint(right, "Y", S_KB_UPPER) + 22;
+	draw_hint(right, "MENU", S_CANCEL);
+	osd_draw(ui_renderer(), UI_W, UI_H);
+	ui_present();
+}
+
+/* coluna equivalente ao trocar entre a fileira das teclas especiais e as outras */
+static int kb_map_col(int page, int from_r, int c, int to_r)
+{
+	int x = KB_X;
+	if (from_r == 4) {
+		for (int i = 0; i < c; i++)
+			x += kb_special_w[i] + KB_GAP;
+		x += kb_special_w[c] / 2;
+	} else {
+		x += c * (KB_KW + KB_GAP) + KB_KW / 2;
+	}
+	int best = 0, bx = KB_X;
+	for (int i = 0; i < kb_row_len(page, to_r); i++) {
+		int w = to_r < 4 ? KB_KW : kb_special_w[i];
+		if (x >= bx)
+			best = i;
+		bx += w + KB_GAP;
+	}
+	return best;
+}
+
+/* Teclado: devolve true com o texto em buf (OK), false se cancelou */
+static bool keyboard(const char *title, char *buf, size_t max, int min_len, const char *min_msg)
+{
+	int page = 0, r = 1, c = 0;
+	const char *err = NULL;
+	for (;;) {
+		kb_draw(title, buf, page, r, c, err);
+		int k = wait_key();
+		size_t n = strlen(buf);
+		bool type = false, ok = false;
+		switch (k) {
+		case BTN_DPAD_UP:
+			if (r > 0) {
+				int nr = r - 1;
+				c = (r == 4) ? kb_map_col(page, r, c, nr) : SDL_min(c, kb_row_len(page, nr) - 1);
+				r = nr;
+			}
+			break;
+		case BTN_DPAD_DOWN:
+			if (r < 4) {
+				int nr = r + 1;
+				c = (nr == 4) ? kb_map_col(page, r, c, nr) : SDL_min(c, kb_row_len(page, nr) - 1);
+				r = nr;
+			}
+			break;
+		case BTN_DPAD_LEFT:
+			c = (c - 1 + kb_row_len(page, r)) % kb_row_len(page, r);
+			break;
+		case BTN_DPAD_RIGHT:
+			c = (c + 1) % kb_row_len(page, r);
+			break;
+		case BTN_EAST: /* A: a tecla selecionada */
+			type = true;
+			break;
+		case BTN_SOUTH: /* B: apagar */
+			if (n)
+				buf[n - 1] = 0;
+			break;
+		case BTN_NORTH: /* Y: maiúsculas */
+			page = page == 1 ? 0 : 1;
+			break;
+		case BTN_WEST: /* X: espaço */
+			if (n + 1 < max) {
+				buf[n] = ' ';
+				buf[n + 1] = 0;
+			}
+			break;
+		case BTN_SELECT:
+			page = page == 2 ? 0 : 2;
+			break;
+		case BTN_START:
+			ok = true;
+			break;
+		case BTN_MODE:
+			return false;
+		}
+		if (type && r < 4) {
+			if (n + 1 < max) {
+				buf[n] = kb_pages[page][r][c];
+				buf[n + 1] = 0;
+			}
+		} else if (type) {
+			switch (c) {
+			case KB_SHIFT: page = page == 1 ? 0 : 1; break;
+			case KB_SYMS: page = page == 2 ? 0 : 2; break;
+			case KB_SPACE:
+				if (n + 1 < max) {
+					buf[n] = ' ';
+					buf[n + 1] = 0;
+				}
+				break;
+			case KB_DEL:
+				if (n)
+					buf[n - 1] = 0;
+				break;
+			case KB_OK: ok = true; break;
+			}
+		}
+		/* trocar de página pode encurtar a fileira */
+		if (c >= kb_row_len(page, r))
+			c = kb_row_len(page, r) - 1;
+		err = NULL;
+		if (ok) {
+			if ((int)strlen(buf) >= min_len)
+				return true;
+			err = min_msg;
+		}
+	}
+}
+
+static void wifi_busy(const char *title, const char *hint)
+{
+	message_screen(title, hint);
+}
+
+static void wifi_refresh(bool rescan)
+{
+	wifi_busy(rescan ? S_WIFI_SCANNING : S_WIFI_UPDATING, NULL);
+	wifi_status_read();
+	if (rescan)
+		wifi_scan();
+	status_update();
+}
+
+static void wifi_connect(const struct wifi_net *n)
+{
+	char pass[72] = "", title[128], hint[128];
+	if (!strcmp(n->ssid, wifi_ssid) && wifi_ip[0]) {
+		show_toast(S_WIFI_ALREADY);
 		return;
 	}
+	if (n->wep) {
+		show_toast(S_WIFI_WEP);
+		return;
+	}
+	if (!n->open && !n->saved) {
+		snprintf(title, sizeof(title), S_WIFI_PASSWORD_FOR, n->ssid);
+		if (!keyboard(title, pass, 64, 8, S_WIFI_PASS_SHORT))
+			return;
+	}
+	snprintf(hint, sizeof(hint), "%s", n->ssid);
+	wifi_busy(S_WIFI_CONNECTING, hint);
+	int rc = wifi_run("connect", n->ssid, pass, NULL, 0);
+	memset(pass, 0, sizeof(pass));
+	wifi_status_read();
+	for (int i = 0; i < wifi_nnets; i++) /* atualiza "salva" sem procurar de novo */
+		if (!strcmp(wifi_nets[i].ssid, n->ssid))
+			wifi_nets[i].saved |= rc == 0; /* só pede senha de rede não salva */
+	status_update();
+	char msg[160];
+	if (rc == 0)
+		snprintf(msg, sizeof(msg), S_WIFI_CONNECTED_TO, n->ssid);
+	else
+		snprintf(msg, sizeof(msg), "%s", rc == 3 ? S_WIFI_PASS_BAD : S_WIFI_FAILED);
+	show_toast(msg);
+}
+
+static void wifi_screen(void)
+{
+	int sel = 0, top = 0;
+	wifi_refresh(true);
 	for (;;) {
+		int n = 1 + wifi_nnets; /* 0: liga/desliga; depois as redes */
+		if (sel >= n)
+			sel = n - 1;
+		const int net_rows = 6;
+		if (sel > 0 && sel - 1 < top)
+			top = sel - 1;
+		if (sel > 0 && sel - 1 >= top + net_rows)
+			top = sel - net_rows;
+
+		ui_clear();
+		ui_text(F_BAR_BOLD, S_WIFI, PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 0);
+		draw_status_right();
+		int y = PAD_Y + BAR_H + LIST_GAP;
+		bool s0 = sel == 0;
+		if (s0)
+			ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+		ui_text(s0 ? F_ITEM_SEL : F_ITEM, S_WIFI, PAD_X + ROW_PAD, y + ROW_H / 2,
+			s0 ? COL_SEL_FG : COL_TEXT, 0, 0);
+		ui_text(F_COUNT, wifi_on ? S_O_ON : S_O_OFF, UI_W - PAD_X - ROW_PAD, y + ROW_H / 2,
+			s0 ? COL_SEL_FG : COL_DIM, 1, 0);
+		y += ROW_H + 12;
+		char info[160];
+		if (!wifi_on)
+			snprintf(info, sizeof(info), "%s", S_WIFI_OFF_INFO);
+		else if (wifi_ssid[0])
+			snprintf(info, sizeof(info), S_WIFI_CONNECTED_INFO, wifi_ssid,
+				 wifi_ip[0] ? wifi_ip : "…");
+		else
+			snprintf(info, sizeof(info), "%s", wifi_nnets ? S_WIFI_NOT_CONNECTED : S_WIFI_NONE);
+		ui_text(F_BAR, info, PAD_X + ROW_PAD, y + 8, COL_DIM, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD);
+		y += 30;
+		for (int r = 0; r < net_rows && top + r < wifi_nnets; r++) {
+			const struct wifi_net *w = &wifi_nets[top + r];
+			bool s = sel == top + r + 1;
+			int ry = y + r * (ROW_H + ROW_GAP);
+			if (s)
+				ui_round_rect(PAD_X, ry, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+			Uint32 fg = s ? COL_SEL_FG : COL_TEXT, dim = s ? COL_SEL_FG : COL_DIM;
+			int right = UI_W - PAD_X - ROW_PAD;
+			draw_signal(right, ry + ROW_H / 2, w->signal, dim);
+			right -= 24 + 12;
+			const char *tag = !strcmp(w->ssid, wifi_ssid) ? S_WIFI_TAG_CONNECTED
+					: w->saved ? S_WIFI_TAG_SAVED : w->open ? S_WIFI_TAG_OPEN : NULL;
+			if (tag)
+				right -= ui_text(F_SMALL, tag, right, ry + ROW_H / 2, dim, 1, 0) + 12;
+			ui_text(s ? F_ITEM_SEL : F_ITEM, w->ssid, PAD_X + ROW_PAD, ry + ROW_H / 2, fg, 0,
+				right - PAD_X - 2 * ROW_PAD);
+		}
+		/* rodapé */
+		int right = UI_W - PAD_X;
+		if (toast[0] && SDL_GetTicks() < toast_until) {
+			ui_text(F_BAR, toast, PAD_X, UI_H - PAD_Y - BAR_H / 2, COL_TEXT, 0, UI_W - 2 * PAD_X);
+		} else {
+			toast[0] = 0;
+			right -= draw_hint(right, "B", S_BACK) + 22;
+			right -= draw_hint(right, "A", sel == 0 ? S_HINT_CHANGE : S_WIFI_CONNECT) + 22;
+			if (wifi_on)
+				right -= draw_hint(right, "X", S_WIFI_SEARCH) + 22;
+			if (sel > 0 && wifi_nets[sel - 1].saved)
+				draw_hint(right, "Y", S_WIFI_FORGET);
+		}
+		osd_draw(ui_renderer(), UI_W, UI_H);
+		ui_present();
+
+		int k = wait_key();
+		if (k == BTN_SOUTH || k == BTN_MODE)
+			break;
+		if (k == BTN_DPAD_UP)
+			sel = (sel - 1 + n) % n;
+		else if (k == BTN_DPAD_DOWN)
+			sel = (sel + 1) % n;
+		else if (k == BTN_WEST && wifi_on)
+			wifi_refresh(true);
+		else if (k == BTN_EAST || (sel == 0 && (k == BTN_DPAD_LEFT || k == BTN_DPAD_RIGHT))) {
+			if (sel == 0) {
+				wifi_busy(wifi_on ? S_WIFI_TURNING_OFF : S_WIFI_TURNING_ON, NULL);
+				wifi_run(wifi_on ? "off" : "on", NULL, NULL, NULL, 0);
+				if (!wifi_on)
+					sleep(3); /* dá tempo de associar à rede salva */
+				wifi_refresh(true);
+			} else {
+				wifi_connect(&wifi_nets[sel - 1]);
+			}
+		} else if (k == BTN_NORTH && sel > 0 && wifi_nets[sel - 1].saved) {
+			struct wifi_net *w = &wifi_nets[sel - 1];
+			wifi_run("forget", w->ssid, NULL, NULL, 0);
+			w->saved = false;
+			wifi_status_read();
+			status_update();
+			show_toast(S_WIFI_FORGOTTEN);
+		}
+	}
+	dirty = true;
+}
+
+/* MENU no Início: Wi-Fi e, com um cartão novo no slot 2, prepará-lo */
+static void home_menu(void)
+{
+	int sel = 0;
+	for (;;) {
+		bool sd2_item = sd2_present && !sd2_ready;
+		int n = sd2_item ? 2 : 1;
+		if (sel >= n)
+			sel = n - 1;
 		ui_clear();
 		ui_text(F_BAR_BOLD, S_HOME_OPTIONS, PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 0);
-		int y = PAD_Y + BAR_H + LIST_GAP;
-		ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
-		ui_text(F_ITEM_SEL, S_PREPARE_SD2, PAD_X + ROW_PAD, y + ROW_H / 2, COL_SEL_FG, 0, 0);
+		for (int i = 0; i < n; i++) {
+			int y = PAD_Y + BAR_H + LIST_GAP + i * (ROW_H + ROW_GAP);
+			bool s = i == sel;
+			if (s)
+				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+			ui_text(s ? F_ITEM_SEL : F_ITEM, i == 0 ? S_WIFI : S_PREPARE_SD2, PAD_X + ROW_PAD,
+				y + ROW_H / 2, s ? COL_SEL_FG : COL_TEXT, 0, 0);
+			if (i == 0 && s)
+				ui_icon_chevron(UI_W - PAD_X - ROW_PAD - 16, y + ROW_H / 2, COL_SEL_FG);
+		}
 		int right = UI_W - PAD_X;
 		right -= draw_hint(right, "B", S_BACK) + 22;
 		draw_hint(right, "A", S_CONFIRM);
+		osd_draw(ui_renderer(), UI_W, UI_H);
 		ui_present();
 		int k = wait_key();
-		if (k == BTN_EAST) {
-			sd2_prepare_now();
-			break;
-		}
-		if (k == BTN_SOUTH || k == BTN_MODE)
+		if (k == BTN_DPAD_UP)
+			sel = (sel - 1 + n) % n;
+		else if (k == BTN_DPAD_DOWN)
+			sel = (sel + 1) % n;
+		else if (k == BTN_EAST) {
+			if (sel == 0) {
+				wifi_screen();
+			} else {
+				sd2_prepare_now();
+				break;
+			}
+		} else if (k == BTN_SOUTH || k == BTN_MODE)
 			break;
 	}
 	dirty = true;

@@ -44,7 +44,7 @@ Importado por `scripts/sync-rocknix.sh` no commit registrado em `external/board/
 ## Como testar no aparelho
 
 1. Grave a imagem no cartão.
-2. Para testar o Wi-Fi: no PC, abra `pingo-wifi.txt` na partição `PINGOBOOT` e preencha `SSID=` e `SENHA=`.
+2. Para testar o Wi-Fi: no PC, abra `pingo-wifi.txt` na partição `PINGOBOOT` e preencha `SSID=` e `SENHA=`. (Fase 2: substituído pela tela de Wi-Fi; o arquivo, se existir, é importado e apagado.)
 3. Ligue o aparelho. Deve aparecer o log do kernel na tela e, no fim, o login.
 4. Pela rede: `ssh root@pingo` (ou o IP), senha `pingo`.
 5. Rode `pingo-hwtest` e anote o resultado de cada item.

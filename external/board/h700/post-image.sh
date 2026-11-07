@@ -11,7 +11,7 @@ rm -rf "$BINARIES_DIR/extlinux" "$BINARIES_DIR/dtbs"
 mkdir -p "$BINARIES_DIR/extlinux" "$BINARIES_DIR/dtbs"
 cp "$BOARD_DIR/extlinux.conf" "$BINARIES_DIR/extlinux/extlinux.conf"
 cp "$BINARIES_DIR"/*.dtb "$BINARIES_DIR/dtbs/"
-cp "$H700_DIR/pingo-wifi.txt" "$BINARIES_DIR/pingo-wifi.txt"
+rm -f "$BINARIES_DIR/pingo-wifi.txt" # Wi-Fi agora pela tela do launcher
 
 support/scripts/genimage.sh -c "$H700_DIR/genimage.cfg"
 

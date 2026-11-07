@@ -326,7 +326,7 @@ Exemplos em tela 640x480 (4:3):
 - O relógio de hardware (RTC) guarda a hora com o aparelho desligado.
 
 ## 9. Wi-Fi (usos previstos)
-- Conectar a redes pelo menu de configurações: lista das redes com o sinal, senha num teclado na tela. **Obrigatório na versão final.** Continua com o `wpa_supplicant` (sem NetworkManager/D-Bus), conversando pelo socket de controle; redes salvas no cartão. O `pingo-wifi.txt` na partição de boot continua valendo para configurar pelo PC.
+- Conectar a redes pelo menu de configurações: lista das redes com o sinal, senha num teclado na tela. **Obrigatório na versão final.** Continua com o `wpa_supplicant` (sem NetworkManager/D-Bus), conversando pelo socket de controle; redes salvas no cartão. Senha nunca gravada: só a chave derivada (psk de 64 dígitos), em `.system/wifi/` no SD1. Um `pingo-wifi.txt` posto na partição de boot pelo PC (`SSID=`/`SENHA=`) é importado no boot do mesmo jeito e apagado em seguida.
 - **RetroAchievements** (principal uso do Wi-Fi): biblioteca oficial `rcheevos` (MIT) dentro do `pingo-retro`. Login pelo teclado na tela ou por arquivo no cartão; guarda só o token, nunca a senha. Aviso "Conquista desbloqueada" no jogo, item **Conquistas** no menu do jogo, modo hardcore opcional (bloqueia save states e fast-forward, regra do RetroAchievements). Sem rede na hora, as conquistas ficam pendentes e são enviadas quando a conexão voltar.
 - Netplay: fora do escopo (protocolo complexo, pouco uso em portátil).
 - Futuro: sincronizar saves (ex.: Syncthing) e baixar ports pelo PortMaster.

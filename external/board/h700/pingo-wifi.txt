@@ -1,4 +1,0 @@
-# Pingo OS - Wi-Fi (provisório, Fase 0)
-# Preencha no PC e o aparelho conecta no boot. Linhas com # são ignoradas.
-SSID=
-SENHA=
