@@ -273,6 +273,8 @@ Presets simples por console, escolhidos em **Menu do jogo → Opções → Tela*
 | Game Boy Color | **Original**, **GBC** (cores lavadas da tela real) | Correção de cor do gambatte ou shader de cor GBC |
 | Game Boy Advance | **Original**, **GBA** (tela sem luz, escura/lavada), **SP 101** (backlit, cores vivas) | Correção de cor do mGBA ou shaders de cor (`gba-color`, `sp101-color`) |
 
+Para **todos os consoles**: **Scanlines** (desligadas por padrão), linhas 25 % mais escuras entre as linhas do jogo, simulando a TV de tubo.
+
 Camada opcional, independente da cor:
 - **Grade LCD** (efeito de pixel da tela original). Só faz sentido com escala inteira: GB e GBC em 3x (480x432) ficam ótimos; o GBA em 2x (480x320) fica pequeno, e em tela cheia a escala não é inteira e a grade fica irregular.
 - **Interframe blending / ghosting** no GB e no GBA. Vários jogos dependem do "rastro" da tela original para simular transparência (piscar de sprites).

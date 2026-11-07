@@ -323,6 +323,7 @@ static const struct screen_console {
 static const struct screen_console *scr; /* NULL: console sem filtros */
 static int screen_preset;
 static bool grid_on, ghost_on;
+static bool scanlines_on; /* todos os consoles */
 
 static void screen_init(void)
 {
@@ -360,6 +361,10 @@ static void var_set_value(const char *key, const char *value)
 		for (int i = 0; scr && i < scr->n; i++)
 			if (!strcmp(scr->names[i], value))
 				screen_preset = i;
+		return;
+	}
+	if (!strcmp(key, "pingo.scanlines")) {
+		scanlines_on = !strcmp(value, "sim");
 		return;
 	}
 	if (!strcmp(key, "pingo.grade") || !strcmp(key, "pingo.rastro")) {
@@ -488,6 +493,8 @@ static bool cfg_save(bool per_game)
 	char buf[16384];
 	size_t len = (size_t)snprintf(buf, sizeof(buf), "pingo.scale=%s\n",
 				      scale_mode == SCALE_INT ? "inteira" : "ajustada");
+	len += (size_t)snprintf(buf + len, sizeof(buf) - len, "pingo.scanlines=%s\n",
+				scanlines_on ? "sim" : "nao");
 	if (scr)
 		len += (size_t)snprintf(buf + len, sizeof(buf) - len,
 					"pingo.tela=%s\npingo.grade=%s\npingo.rastro=%s\n",
@@ -825,6 +832,41 @@ static void draw_grid(const SDL_Rect *dst)
 	SDL_RenderCopy(renderer, grid_tex, NULL, dst);
 }
 
+/* Scanlines: escurece 25 % da metade de baixo de cada linha do jogo. A
+ * textura tem 4 linhas por linha do jogo e é esticada com filtro linear:
+ * na escala Inteira as linhas saem exatas; na Ajustada, suaves e
+ * regulares. Gira junto com a imagem (jogos verticais). */
+static SDL_Texture *scan_tex;
+static int scan_h;
+
+static void draw_scanlines(const SDL_Rect *dst)
+{
+	if (!scan_tex || scan_h != tex_h) {
+		if (scan_tex)
+			SDL_DestroyTexture(scan_tex);
+		scan_tex = NULL;
+		scan_h = tex_h;
+		int h = tex_h * 4;
+		uint32_t *px = malloc((size_t)h * 4);
+		if (!px)
+			return;
+		for (int y = 0; y < h; y++) {
+			uint32_t v = (y & 3) >= 2 ? 0xBF : 0xFF; /* 75 %: 25 % mais escuro */
+			px[y] = 0xFF000000 | v << 16 | v << 8 | v;
+		}
+		scan_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+					     SDL_TEXTUREACCESS_STATIC, 1, h);
+		if (scan_tex) {
+			SDL_UpdateTexture(scan_tex, NULL, px, 4);
+			SDL_SetTextureBlendMode(scan_tex, SDL_BLENDMODE_MOD);
+			SDL_SetTextureScaleMode(scan_tex, SDL_ScaleModeLinear);
+		}
+		free(px);
+	}
+	if (scan_tex)
+		blit_rotated(scan_tex, dst);
+}
+
 static void draw_game(void)
 {
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -834,6 +876,8 @@ static void draw_game(void)
 		blit_rotated(texture, &dst);
 		if (scr && grid_on && scale_mode == SCALE_INT && !rotation)
 			draw_grid(&dst);
+		if (scanlines_on && tex_h > 0)
+			draw_scanlines(&dst);
 	}
 }
 
@@ -1661,7 +1705,7 @@ static void draw_menu(int sel)
 }
 
 /* opções: escala, botões, opções do core e as duas formas de salvar */
-enum { OPT_SCALE, OPT_SCREEN, OPT_GRID, OPT_GHOST, OPT_BUTTONS, OPT_DIPS, OPT_VAR,
+enum { OPT_SCALE, OPT_SCANLINES, OPT_SCREEN, OPT_GRID, OPT_GHOST, OPT_BUTTONS, OPT_DIPS, OPT_VAR,
        OPT_SAVE_GAME, OPT_SAVE_CONSOLE };
 static int opt_kind[MAX_VARS + 8], opt_arg[MAX_VARS + 8], opt_n;
 
@@ -1669,6 +1713,7 @@ static void options_build(void)
 {
 	opt_n = 0;
 	opt_kind[opt_n++] = OPT_SCALE;
+	opt_kind[opt_n++] = OPT_SCANLINES;
 	if (scr) {
 		opt_kind[opt_n++] = OPT_SCREEN;
 		opt_kind[opt_n++] = OPT_GRID;
@@ -1710,6 +1755,10 @@ static void draw_options(int sel, int top_item)
 		case OPT_SCALE:
 			label = S_O_SCALE;
 			value = scale_mode == SCALE_INT ? S_O_SCALE_INT : S_O_SCALE_FIT;
+			break;
+		case OPT_SCANLINES:
+			label = S_O_SCANLINES;
+			value = scanlines_on ? S_O_ON_FP : S_O_OFF_FP;
 			break;
 		case OPT_SCREEN:
 			label = S_O_SCREEN;
@@ -1776,6 +1825,8 @@ static void option_change(int i, int d)
 		scale_mode = scale_mode == SCALE_INT ? SCALE_FIT : SCALE_INT;
 		if (scale_mode == SCALE_FIT)
 			grid_on = false; /* a grade só fica certa na escala inteira */
+	} else if (opt_kind[i] == OPT_SCANLINES) {
+		scanlines_on = !scanlines_on;
 	} else if (opt_kind[i] == OPT_SCREEN) {
 		screen_preset = (screen_preset + d + scr->n) % scr->n;
 		screen_apply();
