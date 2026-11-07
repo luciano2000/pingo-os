@@ -13,4 +13,5 @@
 ### Checklist
 
 - [x] Backend no aparelho: importa o `pingo-wifi.txt` e apaga, conecta, lista redes, desliga/liga, senha errada volta para a rede salva
-- [ ] Tela: ligar/desligar, procurar, conectar numa rede nova com o teclado, esquecer
+- [x] Tela: ligar/desligar (corrigido o travamento ao religar), estado e lista de redes
+- [ ] Conectar numa rede nova com o teclado na tela; esquecer uma rede salva
