@@ -7,13 +7,22 @@ mountpoint -q /mnt/sd1 && export XDG_CACHE_HOME=/mnt/sd1/.system/cache
 mkdir -p /run/pingo
 rm -f /run/pingo/next /run/pingo/launcher.state /run/pingo/booted
 
+# Fuso escolhido em Data e hora (o relógio do sistema fica em UTC)
+load_tz() {
+	local z
+	z=$(head -n1 /mnt/sd1/Config/fuso.txt 2>/dev/null | tr -d '\r')
+	[ -n "$z" ] && [ -e "/usr/share/zoneinfo/$z" ] && export TZ=":$z"
+}
+
 while true; do
+	load_tz
 	/usr/bin/pingo-launcher
 	rc=$?
 	if [ -f /run/pingo/next ]; then
 		mode=""
 		{ read -r core; read -r rom; read -r console; read -r mode; } < /run/pingo/next
 		rm -f /run/pingo/next
+		load_tz # pode ter mudado no launcher
 		echo "== $(date '+%F %T') $rom"
 		/usr/bin/pingo-retro "$core" "$rom" "$console" $mode
 		if [ $? -eq 3 ]; then # power segurado no jogo

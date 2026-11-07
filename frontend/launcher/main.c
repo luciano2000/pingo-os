@@ -1791,13 +1791,285 @@ static void wifi_screen(void)
 	dirty = true;
 }
 
-/* MENU no Início: Wi-Fi e, com um cartão novo no slot 2, prepará-lo */
+/* ---- data, hora e fuso ------------------------------------------------ *
+ * O relógio do sistema e o RTC ficam em UTC; o fuso escolhido vai em
+ * Config/fuso.txt (nome da base de fusos, que já sabe o horário de verão) e
+ * o pingo-shell o passa adiante (TZ) para o launcher e os jogos. Com
+ * Config/hora-manual, o pingo-wifi não acerta mais o relógio pela internet.
+ */
+#define TZ_FILE     "/mnt/sd1/Config/fuso.txt"
+#define MANUAL_FILE "/mnt/sd1/Config/hora-manual"
+
+static const struct { const char *zone, *name; } zones[] = {
+	{ "America/Sao_Paulo", "Brasília" },
+	{ "America/Manaus", "Manaus, Cuiabá" },
+	{ "America/Rio_Branco", "Acre" },
+	{ "America/Noronha", "Fernando de Noronha" },
+	{ "America/Argentina/Buenos_Aires", "Buenos Aires" },
+	{ "America/Santiago", "Santiago" },
+	{ "America/Bogota", "Bogotá, Lima" },
+	{ "America/Mexico_City", "Cidade do México" },
+	{ "America/New_York", "Nova York, Miami" },
+	{ "America/Chicago", "Chicago" },
+	{ "America/Denver", "Denver" },
+	{ "America/Los_Angeles", "Los Angeles" },
+	{ "Europe/Lisbon", "Lisboa" },
+	{ "Europe/London", "Londres" },
+	{ "Europe/Paris", "Madri, Paris, Roma" },
+	{ "Africa/Luanda", "Luanda" },
+	{ "Africa/Maputo", "Maputo" },
+	{ "Asia/Tokyo", "Tóquio" },
+	{ "UTC", "UTC" },
+};
+#define NZONES ((int)(sizeof(zones) / sizeof(*zones)))
+
+static int zone_index(void)
+{
+	char buf[96] = "";
+	FILE *f = fopen(TZ_FILE, "r");
+	if (f) {
+		if (!fgets(buf, sizeof(buf), f))
+			buf[0] = 0;
+		fclose(f);
+	}
+	buf[strcspn(buf, "\r\n")] = 0;
+	for (int i = 0; i < NZONES; i++)
+		if (!strcmp(buf, zones[i].zone))
+			return i;
+	return 0; /* sem escolha: Brasília (o /etc/localtime da imagem) */
+}
+
+static void zone_apply(int i)
+{
+	char tz[112];
+	snprintf(tz, sizeof(tz), ":%s", zones[i].zone);
+	setenv("TZ", tz, 1);
+	tzset();
+}
+
+static void zone_save(int i)
+{
+	FILE *f = fopen(TZ_FILE ".tmp", "w");
+	if (!f)
+		return;
+	fprintf(f, "%s\n", zones[i].zone);
+	fflush(f);
+	fsync(fileno(f));
+	fclose(f);
+	rename(TZ_FILE ".tmp", TZ_FILE);
+}
+
+/* "Brasília (UTC−3)": a diferença sai da base de fusos, já com o horário de verão */
+static void zone_label(int i, char *out, size_t n)
+{
+	zone_apply(i);
+	time_t t = time(NULL);
+	struct tm tm;
+	localtime_r(&t, &tm);
+	long off = tm.tm_gmtoff / 60;
+	char o[24];
+	if (off == 0)
+		snprintf(o, sizeof(o), "UTC");
+	else if (off % 60)
+		snprintf(o, sizeof(o), "UTC%s%ld:%02ld", off < 0 ? "−" : "+", labs(off) / 60, labs(off) % 60);
+	else
+		snprintf(o, sizeof(o), "UTC%s%ld", off < 0 ? "−" : "+", labs(off) / 60);
+	if (!strcmp(zones[i].zone, "UTC"))
+		snprintf(out, n, "UTC");
+	else
+		snprintf(out, n, "%s (%s)", zones[i].name, o);
+}
+
+static bool manual_time(void)
+{
+	struct stat st;
+	return stat(MANUAL_FILE, &st) == 0;
+}
+
+static int days_in(int month, int year)
+{
+	static const int d[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+	if (month == 2 && ((year % 4 == 0 && year % 100) || year % 400 == 0))
+		return 29;
+	return d[month - 1];
+}
+
+/* Edita dia/mês/ano ou hora/minuto: ◀ ▶ escolhem o campo, ▲ ▼ mudam */
+static bool time_edit(bool date, struct tm *tm)
+{
+	int f = 0, nf = date ? 3 : 2;
+	struct tm t = *tm;
+	for (;;) {
+		int v[3] = { date ? t.tm_mday : t.tm_hour, date ? t.tm_mon + 1 : t.tm_min,
+			     t.tm_year + 1900 };
+		ui_clear();
+		ui_text(F_BAR_BOLD, date ? S_DT_DATE : S_DT_TIME, PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 0);
+		int w = date ? 130 : 110, total = nf * w + (nf - 1) * 30;
+		int x = (UI_W - total) / 2, y = UI_H / 2 - 40;
+		for (int i = 0; i < nf; i++) {
+			char b[8];
+			snprintf(b, sizeof(b), i == 2 ? "%04d" : "%02d", v[i]);
+			bool s = i == f;
+			ui_round_rect(x, y, w, 80, 16, s ? COL_SEL_BG : 0x2A2A2A);
+			ui_text(F_BIG, b, x + w / 2, y + 40, s ? COL_SEL_FG : COL_TEXT, 2, 0);
+			if (i < nf - 1)
+				ui_text(F_BIG, date ? "/" : ":", x + w + 15, y + 40, COL_DIM, 2, 0);
+			x += w + 30;
+		}
+		int right = UI_W - PAD_X;
+		right -= draw_hint(right, "B", S_CANCEL) + 22;
+		right -= draw_hint(right, "A", S_CONFIRM) + 22;
+		draw_hint(right, "▲ ▼", S_HINT_CHANGE);
+		osd_draw(ui_renderer(), UI_W, UI_H);
+		ui_present();
+		int k = wait_key(), d = 0;
+		if (k == BTN_DPAD_LEFT)
+			f = (f - 1 + nf) % nf;
+		else if (k == BTN_DPAD_RIGHT)
+			f = (f + 1) % nf;
+		else if (k == BTN_DPAD_UP)
+			d = 1;
+		else if (k == BTN_DPAD_DOWN)
+			d = -1;
+		else if (k == BTN_EAST) {
+			*tm = t;
+			return true;
+		} else if (k == BTN_SOUTH || k == BTN_MODE)
+			return false;
+		if (!d)
+			continue;
+		if (date) {
+			if (f == 0)
+				t.tm_mday = (t.tm_mday - 1 + d + days_in(t.tm_mon + 1, t.tm_year + 1900)) %
+						    days_in(t.tm_mon + 1, t.tm_year + 1900) + 1;
+			else if (f == 1)
+				t.tm_mon = (t.tm_mon + d + 12) % 12;
+			else
+				t.tm_year = SDL_clamp(t.tm_year + d, 2024 - 1900, 2099 - 1900);
+			int dim = days_in(t.tm_mon + 1, t.tm_year + 1900);
+			if (t.tm_mday > dim)
+				t.tm_mday = dim;
+		} else if (f == 0) {
+			t.tm_hour = (t.tm_hour + d + 24) % 24;
+		} else {
+			t.tm_min = (t.tm_min + d + 60) % 60;
+		}
+	}
+}
+
+/* Grava a hora local escolhida no relógio do sistema e no RTC (em UTC) */
+static void time_set(struct tm *tm)
+{
+	tm->tm_sec = 0;
+	tm->tm_isdst = -1;
+	time_t t = mktime(tm);
+	if (t == (time_t)-1)
+		return;
+	struct timespec ts = { t, 0 };
+	if (clock_settime(CLOCK_REALTIME, &ts) == 0 && system("hwclock -w -u") != 0)
+		fprintf(stderr, "pingo-launcher: hwclock falhou\n");
+	status_update();
+}
+
+static void datetime_screen(void)
+{
+	int sel = 0, zi = zone_index();
+	zone_apply(zi);
+	for (;;) {
+		bool manual = manual_time();
+		int n = manual ? 4 : 2; /* fuso, pela internet, [data, hora] */
+		if (sel >= n)
+			sel = n - 1;
+		time_t now = time(NULL);
+		struct tm tm;
+		localtime_r(&now, &tm);
+		char zl[96], dbuf[32], tbuf[16], head[96];
+		zone_label(zi, zl, sizeof(zl));
+		zone_apply(zi);
+		strftime(dbuf, sizeof(dbuf), "%d/%m/%Y", &tm);
+		strftime(tbuf, sizeof(tbuf), "%H:%M", &tm);
+		snprintf(head, sizeof(head), "%s  %s", dbuf, tbuf);
+
+		ui_clear();
+		ui_text(F_BAR_BOLD, S_DT_TITLE, PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 0);
+		draw_status_right();
+		int y = PAD_Y + BAR_H + LIST_GAP;
+		ui_text(F_BIG, head, PAD_X + ROW_PAD, y + 20, COL_TEXT, 0, 0);
+		y += 56;
+		const char *labels[4] = { S_DT_ZONE, S_DT_NTP, S_DT_DATE, S_DT_TIME };
+		const char *values[4] = { zl, manual ? S_O_OFF : S_O_ON, dbuf, tbuf };
+		for (int i = 0; i < n; i++) {
+			int ry = y + i * (ROW_H + ROW_GAP);
+			bool s = i == sel;
+			if (s)
+				ui_round_rect(PAD_X, ry, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+			int vw = ui_text(F_COUNT, values[i], UI_W - PAD_X - ROW_PAD, ry + ROW_H / 2,
+					 s ? COL_SEL_FG : COL_DIM, 1, 330);
+			ui_text(s ? F_ITEM_SEL : F_ITEM, labels[i], PAD_X + ROW_PAD, ry + ROW_H / 2,
+				s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw - 16);
+		}
+		if (!manual)
+			ui_text(F_BAR, S_DT_NTP_INFO, PAD_X + ROW_PAD, y + n * (ROW_H + ROW_GAP) + 16,
+				COL_DIM, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD);
+		int right = UI_W - PAD_X;
+		if (toast[0] && SDL_GetTicks() < toast_until) {
+			ui_text(F_BAR, toast, PAD_X, UI_H - PAD_Y - BAR_H / 2, COL_TEXT, 0, UI_W - 2 * PAD_X);
+		} else {
+			toast[0] = 0;
+			right -= draw_hint(right, "B", S_BACK) + 22;
+			draw_hint(right, sel < 2 ? "◀ ▶" : "A", sel < 2 ? S_HINT_CHANGE : S_DT_ADJUST);
+		}
+		osd_draw(ui_renderer(), UI_W, UI_H);
+		ui_present();
+
+		int k = wait_key();
+		int d = k == BTN_DPAD_LEFT ? -1 : (k == BTN_DPAD_RIGHT || (k == BTN_EAST && sel < 2)) ? 1 : 0;
+		if (k == BTN_SOUTH || k == BTN_MODE)
+			break;
+		if (k == BTN_DPAD_UP)
+			sel = (sel - 1 + n) % n;
+		else if (k == BTN_DPAD_DOWN)
+			sel = (sel + 1) % n;
+		else if (sel == 0 && d) {
+			zi = (zi + d + NZONES) % NZONES;
+			zone_apply(zi);
+			zone_save(zi);
+			status_update();
+		} else if (sel == 1 && d) {
+			if (manual) {
+				unlink(MANUAL_FILE);
+				/* volta a acertar pela internet, agora se houver conexão */
+				if (system("(ntpd -n -q -p pool.ntp.org && hwclock -w -u) >/dev/null 2>&1 &") != 0)
+					fprintf(stderr, "pingo-launcher: ntpd não rodou\n");
+				show_toast(S_DT_NTP_ON);
+			} else {
+				FILE *f = fopen(MANUAL_FILE, "w");
+				if (f)
+					fclose(f);
+			}
+		} else if (sel >= 2 && k == BTN_EAST) {
+			struct tm t = tm;
+			if (time_edit(sel == 2, &t)) {
+				if (sel == 3) { /* hora: mantém a data atual */
+					t.tm_mday = tm.tm_mday;
+					t.tm_mon = tm.tm_mon;
+					t.tm_year = tm.tm_year;
+				}
+				time_set(&t);
+				show_toast(S_DT_SAVED);
+			}
+		}
+	}
+	dirty = true;
+}
+
+/* MENU no Início: Wi-Fi, data e hora e, com um cartão novo no slot 2, prepará-lo */
 static void home_menu(void)
 {
 	int sel = 0;
 	for (;;) {
 		bool sd2_item = sd2_present && !sd2_ready;
-		int n = sd2_item ? 2 : 1;
+		int n = sd2_item ? 3 : 2;
 		if (sel >= n)
 			sel = n - 1;
 		ui_clear();
@@ -1807,9 +2079,10 @@ static void home_menu(void)
 			bool s = i == sel;
 			if (s)
 				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
-			ui_text(s ? F_ITEM_SEL : F_ITEM, i == 0 ? S_WIFI : S_PREPARE_SD2, PAD_X + ROW_PAD,
+			const char *items[3] = { S_WIFI, S_DT_TITLE, S_PREPARE_SD2 };
+			ui_text(s ? F_ITEM_SEL : F_ITEM, items[i], PAD_X + ROW_PAD,
 				y + ROW_H / 2, s ? COL_SEL_FG : COL_TEXT, 0, 0);
-			if (i == 0 && s)
+			if (i < 2 && s)
 				ui_icon_chevron(UI_W - PAD_X - ROW_PAD - 16, y + ROW_H / 2, COL_SEL_FG);
 		}
 		int right = UI_W - PAD_X;
@@ -1825,6 +2098,8 @@ static void home_menu(void)
 		else if (k == BTN_EAST) {
 			if (sel == 0) {
 				wifi_screen();
+			} else if (sel == 1) {
+				datetime_screen();
 			} else {
 				sd2_prepare_now();
 				break;
@@ -1840,6 +2115,8 @@ static void home_menu(void)
 int main(int argc, char **argv)
 {
 	th = th_dark;
+	if (!getenv("TZ")) /* o pingo-shell já passa; sem ele, lê o arquivo */
+		zone_apply(zone_index());
 	struct stat st;
 
 	/* Mensagem de tela cheia até receber SIGTERM (usado no boot) */

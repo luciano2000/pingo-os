@@ -15,3 +15,16 @@
 - [x] Backend no aparelho: importa o `pingo-wifi.txt` e apaga, conecta, lista redes, desliga/liga, senha errada volta para a rede salva
 - [x] Tela: ligar/desligar (corrigido o travamento ao religar), estado e lista de redes
 - [x] Conectar numa rede nova (roteador do celular) com o teclado na tela
+
+## Data, hora e fuso
+
+- **Tela:** MENU no Início → **Data e hora**: data e hora atuais em destaque, **Fuso horário** (◀ ▶, 19 fusos com nome em português e a diferença do UTC calculada na hora, já com horário de verão), **Acertar pela internet** (padrão ligado).
+- Com o acerto pela internet desligado aparecem **Data** e **Hora**: A abre o editor (◀ ▶ escolhem o campo, ▲ ▼ mudam, A grava, B cancela). A hora vai para o relógio do sistema (`clock_settime`) e para o RTC (`hwclock -w -u`), que segue contando com o aparelho desligado.
+- O relógio do sistema e o RTC ficam em UTC. O fuso é um nome da base de fusos (glibc + tzdata) gravado em `Config/fuso.txt`; o `pingo-shell` exporta `TZ` antes de abrir o launcher e cada jogo. Sem escolha vale o `/etc/localtime` da imagem (São Paulo).
+- `Config/hora-manual` (criado ao desligar o acerto pela internet) faz o `pingo-wifi` não rodar o `ntpd`; religar o acerto roda o `ntpd` na hora.
+
+### Checklist
+
+- [ ] Trocar o fuso: o relógio da barra muda na hora e vale nos jogos ("Salvo hoje, HH:MM")
+- [ ] Hora manual: data e hora gravadas continuam certas depois de desligar e ligar
+- [ ] Voltar para "pela internet": a hora volta a ficar certa

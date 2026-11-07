@@ -88,7 +88,9 @@ do_start() {
 	[ -f "$RUN/udhcpc.pid" ] && kill -0 "$(cat "$RUN/udhcpc.pid")" 2>/dev/null ||
 		udhcpc -b -i wlan0 -p "$RUN/udhcpc.pid" -s /usr/share/udhcpc/default.script \
 			< /dev/null > /dev/null 2>&1
-	# Acerta o relógio pela internet e grava no RTC (o kernel lê o rtc0 no boot)
+	# Acerta o relógio pela internet e grava no RTC (o kernel lê o rtc0 no
+	# boot), a não ser que a hora seja manual (Data e hora no launcher)
+	[ -e /mnt/sd1/Config/hora-manual ] ||
 	( for i in 1 2 3 4 5 6; do
 		ntpd -n -q -p pool.ntp.org > /dev/null 2>&1 && { hwclock -w -u; break; }
 		sleep 10

@@ -152,4 +152,15 @@
 #define S_KB_DELETE          "apagar"
 #define S_KB_OK              "OK"
 
+/* data e hora */
+#define S_DT_TITLE           "Data e hora"
+#define S_DT_ZONE            "Fuso horário"
+#define S_DT_NTP             "Acertar pela internet"
+#define S_DT_NTP_INFO        "A hora é acertada quando o Wi-Fi conecta"
+#define S_DT_NTP_ON          "A hora será acertada pela internet"
+#define S_DT_DATE            "Data"
+#define S_DT_TIME            "Hora"
+#define S_DT_ADJUST          "ajustar"
+#define S_DT_SAVED           "Data e hora gravadas"
+
 #endif
