@@ -25,6 +25,6 @@
 
 ### Checklist
 
-- [ ] Trocar o fuso: o relógio da barra muda na hora e vale nos jogos ("Salvo hoje, HH:MM")
-- [ ] Hora manual: data e hora gravadas continuam certas depois de desligar e ligar
-- [ ] Voltar para "pela internet": a hora volta a ficar certa
+- [x] Trocar o fuso: o relógio da barra muda na hora e vale nos jogos ("Salvo hoje, HH:MM")
+- [x] Hora manual: data e hora gravadas continuam certas depois de desligar e ligar
+- [x] Voltar para "pela internet": a hora volta a ficar certa
