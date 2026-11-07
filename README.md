@@ -8,9 +8,9 @@ A interface segue a filosofia do MinUI: direta ao ponto, sem boxart, temas ou me
 
 Um projeto do Retrogamer Brasil.
 
-**Comunidade:** dúvidas, sugestões e notícias do Pingo no [Discord do Retrogamer Brasil](https://discord.gg/5qfSc6JR6J).
+**Comunidade:** dúvidas, sugestões e notícias do Pingo no [Discord do Retrogamer Brasil](https://discord.gg/DqBtrEWJak).
 
-<a href="https://discord.gg/5qfSc6JR6J"><img src="https://img.shields.io/badge/Discord-Retrogamer%20Brasil-5865F2?logo=discord&logoColor=white" alt="Discord do Retrogamer Brasil" height="28"></a>
+<a href="https://discord.gg/DqBtrEWJak"><img src="https://img.shields.io/badge/Discord-Retrogamer%20Brasil-5865F2?logo=discord&logoColor=white" alt="Discord do Retrogamer Brasil" height="28"></a>
 
 Gostou do projeto? Ajude a manter o desenvolvimento:
 
