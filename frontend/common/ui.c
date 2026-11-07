@@ -253,13 +253,32 @@ void ui_rect(int x, int y, int w, int h, Uint32 rgb)
 	SDL_RenderFillRect(ren, &r);
 }
 
+/* cantos já desenhados, por raio (as telas usam poucos raios diferentes) */
+static SDL_Texture *corner_cache[4];
+static float corner_cache_r[4];
+static int corner_next;
+
 void ui_round_rect(int x, int y, int w, int h, int r, Uint32 rgb)
 {
+	if (r > h / 2)
+		r = h / 2; /* pílula: cantos totalmente redondos */
+	if (r > w / 2)
+		r = w / 2;
 	if (!corner_tex || corner_r != r) {
-		if (corner_tex)
-			SDL_DestroyTexture(corner_tex);
+		corner_tex = NULL;
+		for (int i = 0; i < 4; i++)
+			if (corner_cache[i] && corner_cache_r[i] == r)
+				corner_tex = corner_cache[i];
+		if (!corner_tex) {
+			int i = corner_next;
+			corner_next = (corner_next + 1) % 4;
+			if (corner_cache[i])
+				SDL_DestroyTexture(corner_cache[i]);
+			corner_cache_r[i] = (float)r;
+			corner_cache[i] = raster(2 * r, 2 * r, in_disc, &corner_cache_r[i]);
+			corner_tex = corner_cache[i];
+		}
 		corner_r = (float)r;
-		corner_tex = raster(2 * r, 2 * r, in_disc, &corner_r);
 	}
 	SDL_SetTextureColorMod(corner_tex, (rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255);
 
@@ -444,7 +463,13 @@ static void free_assets(void)
 			TTF_CloseFont(fonts[i]);
 			fonts[i] = NULL;
 		}
-	SDL_Texture **tex[] = { &corner_tex, &wifi_tex, &battery_tex, &chevron_tex, &dot_fill_tex,
+	for (int i = 0; i < 4; i++)
+		if (corner_cache[i]) {
+			SDL_DestroyTexture(corner_cache[i]);
+			corner_cache[i] = NULL;
+		}
+	corner_tex = NULL; /* era um dos do cache */
+	SDL_Texture **tex[] = { &wifi_tex, &battery_tex, &chevron_tex, &dot_fill_tex,
 				&dot_ring_tex };
 	for (unsigned i = 0; i < sizeof(tex) / sizeof(tex[0]); i++)
 		if (*tex[i]) {
@@ -475,7 +500,12 @@ SDL_Renderer *ui_renderer(void)
 
 void ui_clear(void)
 {
-	SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
+	ui_clear_rgb(COL_BG);
+}
+
+void ui_clear_rgb(Uint32 rgb)
+{
+	SDL_SetRenderDrawColor(ren, (rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, 255);
 	SDL_RenderClear(ren);
 }
 

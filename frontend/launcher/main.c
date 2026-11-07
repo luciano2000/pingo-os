@@ -509,6 +509,16 @@ static void status_update(void)
 
 /* ---- desenho ---------------------------------------------------------- */
 
+/* Cores da tela: o Início é escuro; as listas de jogos, claras (fundo
+ * claro, destaque preto), como no Analogue Pocket */
+static struct theme {
+	Uint32 bg, text, dim, sel_bg, sel_fg;
+} th_dark = { COL_BG, COL_TEXT, COL_DIM, COL_SEL_BG, COL_SEL_FG },
+  th_light = { 0xF2F2F2, 0x141414, 0x6A6A6A, 0x141414, 0xF2F2F2 }, th;
+
+#define LIST_INDENT 12 /* margem esquerda extra das listas */
+#define SEL_INSET_LIGHT 3 /* destaque um pouco mais baixo nas listas de jogos */
+
 static int list_y(int row)
 {
 	return PAD_Y + BAR_H + LIST_GAP + row * (ROW_H + ROW_GAP);
@@ -521,13 +531,13 @@ static void draw_status_right(void)
 
 	if (status.battery >= 0) {
 		snprintf(pct, sizeof(pct), "%d%%", status.battery);
-		x -= ui_text(F_BAR, pct, x, y, COL_DIM, 1, 0);
+		x -= ui_text(F_BAR, pct, x, y, th.dim, 1, 0);
 		x -= 10 + 26;
-		ui_icon_battery(x, y, status.battery, status.charging, COL_DIM);
+		ui_icon_battery(x, y, status.battery, status.charging, th.dim);
 	}
 	if (status.wifi) {
 		x -= 10 + 18;
-		ui_icon_wifi(x, y, COL_DIM);
+		ui_icon_wifi(x, y, th.dim);
 	}
 }
 
@@ -535,9 +545,9 @@ static void draw_status_right(void)
 static int draw_hint(int right, const char *button, const char *text)
 {
 	int y = UI_H - PAD_Y - BAR_H / 2;
-	int w = ui_text(F_BAR, text, right, y, COL_DIM, 1, 0);
+	int w = ui_text(F_BAR, text, right, y, th.dim, 1, 0);
 	int sp = ui_text_width(F_BAR, " ");
-	ui_text(F_BAR_BOLD, button, right - w - sp, y, COL_TEXT, 1, 0);
+	ui_text(F_BAR_BOLD, button, right - w - sp, y, th.text, 1, 0);
 	return w + sp + ui_text_width(F_BAR_BOLD, button);
 }
 
@@ -558,17 +568,18 @@ static void draw(void)
 	bool at_home = depth == 0;
 	int bar_y = PAD_Y + BAR_H / 2, foot_y = UI_H - PAD_Y - BAR_H / 2;
 
-	ui_clear();
+	th = at_home ? th_dark : th_light;
+	ui_clear_rgb(th.bg);
 
 	/* barra superior */
 	if (at_home) {
-		ui_text(F_BAR, status.clock, PAD_X, bar_y, COL_DIM, 0, 0);
+		ui_text(F_BAR, status.clock, PAD_X, bar_y, th.dim, 0, 0);
 	} else {
 		char cnt[32];
 		count_text(l->dir, cnt, sizeof(cnt));
 		int cw = ui_text_width(F_BAR, cnt);
-		int w = ui_text(F_BAR_BOLD, l->dir->label, PAD_X, bar_y, COL_TEXT, 0, 380 - cw);
-		ui_text(F_BAR, cnt, PAD_X + w + 10, bar_y, COL_DIM, 0, 0);
+		int w = ui_text(F_BAR_BOLD, l->dir->label, PAD_X, bar_y, th.text, 0, 380 - cw);
+		ui_text(F_BAR, cnt, PAD_X + w + 10, bar_y, th.dim, 0, 0);
 	}
 	draw_status_right();
 
@@ -576,33 +587,35 @@ static void draw(void)
 	int n = l->dir ? l->dir->nkids : 0;
 	if (n == 0) {
 		ui_text(F_TITLE, have_roms ? S_EMPTY_TITLE : S_NO_CARD, UI_W / 2, UI_H / 2 - 16,
-			COL_TEXT, 2, UI_W - 2 * PAD_X);
+			th.text, 2, UI_W - 2 * PAD_X);
 		if (have_roms)
 			ui_text(F_BAR, S_EMPTY_HINT,
-				UI_W / 2, UI_H / 2 + 18, COL_DIM, 2, UI_W - 2 * PAD_X);
+				UI_W / 2, UI_H / 2 + 18, th.dim, 2, UI_W - 2 * PAD_X);
 	}
 	for (int row = 0; row < ROWS && l->top + row < n; row++) {
 		int i = l->top + row;
 		struct node *it = l->dir->kids[i];
 		bool sel = i == l->sel;
-		int y = list_y(row), x = PAD_X, w = UI_W - 2 * PAD_X;
-		Uint32 fg = sel ? COL_SEL_FG : COL_TEXT;
+		int y = list_y(row), x = PAD_X + LIST_INDENT, w = UI_W - 2 * PAD_X - LIST_INDENT;
+		Uint32 fg = sel ? th.sel_fg : th.text;
 
-		if (sel)
-			ui_round_rect(x, y, w, ROW_H, ROW_RADIUS, COL_SEL_BG);
+		if (sel) {
+			int in = at_home ? 0 : SEL_INSET_LIGHT;
+			ui_round_rect(x, y + in, w, ROW_H - 2 * in, ROW_RADIUS, th.sel_bg);
+		}
 
 		int right = 0;
 		if (!at_home && it->discs > 1) { /* "3 discos", como no mockup */
 			char d[32];
 			snprintf(d, sizeof(d), S_DISCS_N, it->discs);
 			right = ui_text(F_SMALL, d, x + w - ROW_PAD, y + ROW_H / 2,
-					sel ? COL_SEL_FG : COL_DIM, 1, 0) + 12;
+					sel ? th.sel_fg : th.dim, 1, 0) + 12;
 		}
 		if (at_home) { /* contagem à direita */
 			char cnt[16];
 			snprintf(cnt, sizeof(cnt), "%d", it->games);
 			right = ui_text(F_COUNT, cnt, x + w - ROW_PAD, y + ROW_H / 2,
-					sel ? COL_SEL_FG : COL_DIM, 1, 0) + 12;
+					sel ? th.sel_fg : th.dim, 1, 0) + 12;
 		}
 		ui_text(sel ? F_ITEM_SEL : F_ITEM, it->label, x + ROW_PAD, y + ROW_H / 2, fg, 0,
 			w - 2 * ROW_PAD - right);
@@ -611,13 +624,13 @@ static void draw(void)
 	/* rodapé */
 	int right = UI_W - PAD_X;
 	if (toast[0] && SDL_GetTicks() < toast_until) {
-		ui_text(F_BAR, toast, PAD_X, foot_y, COL_TEXT, 0, UI_W - 2 * PAD_X);
+		ui_text(F_BAR, toast, PAD_X, foot_y, th.text, 0, UI_W - 2 * PAD_X);
 	} else {
 		toast[0] = 0;
 		if (!at_home && n > 0) {
 			char pos[32];
 			snprintf(pos, sizeof(pos), "%d / %d", l->sel + 1, n);
-			ui_text(F_BAR, pos, PAD_X, foot_y, COL_DIM, 0, 0);
+			ui_text(F_BAR, pos, PAD_X, foot_y, th.dim, 0, 0);
 		}
 		if (at_home) {
 			right -= draw_hint(right, "MENU", S_OPTIONS) + 22;
@@ -635,6 +648,7 @@ static void draw(void)
 
 	osd_draw(ui_renderer(), UI_W, UI_H);
 	ui_present();
+	th = th_dark; /* as outras telas são escuras */
 	dirty = false;
 }
 
@@ -1247,6 +1261,7 @@ static void home_menu(void)
 
 int main(int argc, char **argv)
 {
+	th = th_dark;
 	struct stat st;
 
 	/* Mensagem de tela cheia até receber SIGTERM (usado no boot) */

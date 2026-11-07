@@ -1610,8 +1610,8 @@ static void draw_menu(int sel)
 
 	/* prévia do slot */
 	int px = PAD_X + 252 + 24, pw = UI_W - PAD_X - px, ph = 240;
-	ui_round_rect(px, top, pw, ph, ROW_RADIUS, 0x3A3A3A);
-	ui_round_rect(px + 2, top + 2, pw - 4, ph - 4, ROW_RADIUS - 2, 0x111111);
+	ui_round_rect(px, top, pw, ph, 10, 0x3A3A3A); /* moldura da prévia: cantos discretos */
+	ui_round_rect(px + 2, top + 2, pw - 4, ph - 4, 8, 0x111111);
 	if (slot_preview[slot]) {
 		int tw, th;
 		SDL_QueryTexture(slot_preview[slot], NULL, NULL, &tw, &th);

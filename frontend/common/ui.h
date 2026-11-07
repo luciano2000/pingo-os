@@ -27,7 +27,7 @@
 #define ROW_H       44
 #define ROW_GAP     2
 #define ROW_PAD     16
-#define ROW_RADIUS  10
+#define ROW_RADIUS  (ROW_H / 2) /* pílula */
 #define ROWS        8
 
 enum font_id {
@@ -59,6 +59,7 @@ void ui_icon_chevron(int x, int y_center, Uint32 rgb);
 
 SDL_Renderer *ui_renderer(void);
 void ui_clear(void);
+void ui_clear_rgb(Uint32 rgb);
 void ui_present(void);
 
 /* Texto: devolve a largura desenhada. align: 0 esquerda, 1 direita, 2 centro */
