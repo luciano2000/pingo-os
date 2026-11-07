@@ -14,4 +14,4 @@
 
 - [x] Backend no aparelho: importa o `pingo-wifi.txt` e apaga, conecta, lista redes, desliga/liga, senha errada volta para a rede salva
 - [x] Tela: ligar/desligar (corrigido o travamento ao religar), estado e lista de redes
-- [ ] Conectar numa rede nova com o teclado na tela; esquecer uma rede salva
+- [x] Conectar numa rede nova (roteador do celular) com o teclado na tela
