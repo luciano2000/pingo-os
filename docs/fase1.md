@@ -218,4 +218,6 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - [x] Sem o SD2, console que só tem jogos nele some do Início
 - [x] Tirar o SD2 com o aparelho ligado: a lista se atualiza
 - [x] Recolocar o SD2: a lista volta sozinha
+- [x] Cartão do MinUI (TrimUI, FAT32) no slot 2: lido como está, subpastas do SNES/Mega Drive/MSX, nada criado no cartão; boot sem atraso
+- [x] Scanlines no SNES
 - [x] Tirar o SD2 com um jogo dele aberto: pausa e aviso
