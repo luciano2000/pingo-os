@@ -1351,9 +1351,18 @@ static int wifi_run(const char *a1, const char *a2, const char *input, char *out
 	pid_t pid = fork();
 	if (pid == 0) {
 		dup2(in_p[0], 0);
-		dup2(out_p[1], 1);
-		close(in_p[1]);
-		close(out_p[0]);
+		if (out) {
+			dup2(out_p[1], 1);
+		} else { /* sem resposta: a saída vai para /dev/null */
+			int dn = open("/dev/null", O_WRONLY);
+			if (dn >= 0)
+				dup2(dn, 1);
+		}
+		/* Nada além de 0, 1 e 2: o wpa_supplicant e o udhcpc ficam rodando
+		 * depois do script e, herdando a ponta do cano, o launcher nunca
+		 * veria o fim da resposta (e herdariam também as fontes, a tela...) */
+		for (int fd = 3; fd < 1024; fd++)
+			close(fd);
 		const char *cmd = wifi_cmd();
 		execl(cmd, cmd, a1, a2, (char *)NULL);
 		_exit(127);
