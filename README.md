@@ -21,9 +21,34 @@ Gostou do projeto? Ajude a manter o desenvolvimento:
 
 | Aparelho | SoC | Estado |
 |---|---|---|
-| Anbernic RG35XX-H | Allwinner H700 | **Fase 0** (prova de conceito) |
-| Anbernic RG40XX-H / V | Allwinner H700 | Fase 2 (mesmo SoC) |
-| TrimUI Brick | Allwinner A133P | Fase 3 |
+| Anbernic RG35XX-H | Allwinner H700 | **Beta** |
+| Anbernic RG40XX-H / V | Allwinner H700 | Planejado (mesmo SoC) |
+| TrimUI Brick | Allwinner A133P | Planejado |
+
+## O que já faz
+
+- Início com os consoles que têm jogos, Recentes, Favoritos (Y num jogo) e Jogo aleatório (X).
+- Menu dentro do jogo (MENU): 4 save states com prévia, opções por jogo ou por console, botões remapeáveis.
+- Filtros de tela: cores de GB/GBC/GBA (DMG, GBC, GBA, SP 101), grade LCD, rastro e scanlines.
+- Arcade (FBNeo) com o nome dos jogos, dip switches, recordes e jogos verticais em pé.
+- Dois cartões: jogos no SD1, no SD2 ou nos dois juntos; um cartão do MinUI no slot 2 funciona como está.
+- Suspender no botão power, voltar ao jogo onde parou, desligamento seguro.
+- Wi-Fi com teclado na tela, data, hora e fuso.
+
+Consoles: Game Boy, Game Boy Color, Game Boy Advance, NES, Famicom Disk System, Super Nintendo, Virtual Boy, Pokémon mini, Master System, Game Gear, Mega Drive, Sega CD, 32X, PC Engine, PC Engine CD, Neo Geo Pocket, WonderSwan, MSX, Atari 2600, Atari 7800, Atari Lynx, PlayStation, Arcade e Neo Geo.
+
+## Instalação
+
+1. Baixe o `pingo-os-rg35xxh.img.xz` na página de [releases](https://github.com/luciano2000/pingo-os/releases).
+2. Grave no cartão do slot 1 (TF1) com o [balenaEtcher](https://etcher.balena.io) ou o [Raspberry Pi Imager](https://www.raspberrypi.com/software/) (os dois aceitam o `.xz` direto). **Tudo no cartão é apagado.**
+3. Ligue o aparelho. No primeiro boot, o Pingo pergunta se pode criar a partição de jogos (`ROMS`) no resto do cartão.
+4. Desligue, ponha o cartão no PC e copie os jogos para `Roms/<CONSOLE>/` (as pastas já estão criadas: `GB`, `SNES`, `MD`, `PS`, `ARCADE`...). As BIOS vão em `Bios/` (veja [docs/bios.md](docs/bios.md)).
+5. **Segundo cartão (opcional):** no slot 2, um cartão novo é preparado pelo Pingo (ele pergunta), e um cartão do MinUI funciona sem mudar nada. Saves e configurações ficam sempre no SD1.
+6. **Wi-Fi:** MENU no Início → Wi-Fi.
+
+Atualizar: grave a imagem nova no mesmo cartão. A partição `ROMS` (jogos, saves, configurações) é mantida.
+
+Problemas e sugestões: [issues](https://github.com/luciano2000/pingo-os/issues) ou o [Discord](https://discord.gg/5qfSc6JR6J).
 
 ## Como compilar
 
@@ -46,7 +71,7 @@ Outros alvos do Buildroot: `scripts/build.sh rg35xxh menuconfig`, `scripts/build
 ```
 docs/                  especificação, mockup da interface, notas de cada fase, BIOS (bios.md)
 docker/                ambiente de build
-frontend/              pingo-retro, o frontend libretro (Fase 0: mínimo)
+frontend/              pingo-launcher (listas), pingo-retro (jogos, libretro) e pingo-shell
 scripts/build.sh       build dentro do Docker
 scripts/sync-rocknix.sh  importa patches, device trees e firmwares do ROCKNIX
 external/              árvore BR2_EXTERNAL do Buildroot
@@ -61,7 +86,31 @@ external/              árvore BR2_EXTERNAL do Buildroot
 - [rocknix-joypad](https://github.com/hackbar/rocknix-joypad): driver dos controles.
 - [Buildroot](https://buildroot.org), [U-Boot](https://u-boot.org), [Trusted Firmware-A](https://www.trustedfirmware.org).
 - [MinUI](https://github.com/shauninman/MinUI): referência de interface.
-- [libretro](https://www.libretro.com): API dos cores (`libretro.h`, MIT) e o core [gambatte](https://github.com/libretro/gambatte-libretro).
+- [Inter](https://rsms.me/inter/) (OFL-1.1): fonte da interface.
+- [libretro](https://www.libretro.com): API dos cores (`libretro.h`, MIT).
+- Matrizes de cor GBA/SP 101: Pokefan531 e hunterk ([slang-shaders](https://github.com/libretro/slang-shaders), domínio público).
+
+Cores (todos do [libretro](https://github.com/libretro)):
+
+| Core | Consoles | Licença |
+|---|---|---|
+| Gambatte | Game Boy, Game Boy Color | GPL-2.0 |
+| mGBA | Game Boy Advance | MPL-2.0 |
+| FCEUmm | NES, Famicom Disk System | GPL-2.0 |
+| Snes9x | Super Nintendo | não comercial |
+| Beetle VB | Virtual Boy | GPL-2.0 |
+| PokeMini | Pokémon mini | GPL-3.0 |
+| Genesis Plus GX | Master System, Game Gear, Mega Drive, Sega CD | não comercial |
+| PicoDrive | 32X | não comercial |
+| Beetle PCE Fast | PC Engine, PC Engine CD | GPL-2.0 |
+| Beetle NGP | Neo Geo Pocket | GPL-2.0 |
+| Beetle WonderSwan | WonderSwan | GPL-2.0 |
+| blueMSX | MSX | não comercial |
+| Stella 2014 | Atari 2600 | GPL-2.0 |
+| ProSystem | Atari 7800 | GPL-2.0 |
+| Handy | Atari Lynx | Zlib |
+| PCSX ReARMed | PlayStation | GPL-2.0 |
+| FBNeo | Arcade, Neo Geo | não comercial |
 
 ## Licença
 
