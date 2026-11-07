@@ -205,6 +205,7 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 - Cartões de até 32 GB vêm em FAT32 (arquivos até 4 GB): não atrapalha nenhum console do Pingo.
 - Saves, save states, configurações e BIOS ficam sempre no SD1.
 - Recentes guardam o caminho relativo à pasta do console e procuram o jogo nas pastas do console nos dois cartões.
+- **Favoritos**: Y num jogo (em qualquer lista) entra ou sai dos Favoritos, com aviso; ★ ao lado dos favoritos nas listas e "Y favoritar/desfavoritar" no rodapé. Item "Favoritos" no Início (depois de Recentes), em ordem alfabética, salvo em `Config/favoritos.txt` no mesmo formato dos Recentes (vale nos dois cartões).
 - Cache da biblioteca (versão 6) com o caminho completo de cada item e, por console, a origem, a pasta no outro cartão e as contagens.
 
 ### Checklist

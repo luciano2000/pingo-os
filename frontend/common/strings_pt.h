@@ -8,6 +8,11 @@
 #define PINGO_STRINGS_H
 
 #define S_RECENTS        "Recentes"
+#define S_FAVORITES      "Favoritos"
+#define S_FAV_ADDED      "Adicionado aos Favoritos"
+#define S_FAV_REMOVED    "Removido dos Favoritos"
+#define S_FAV_HINT       "favoritar"
+#define S_FAV_HINT_OFF   "desfavoritar"
 #define S_RANDOM         "Aleatório"
 #define S_RANDOM_HINT    "aleatório"
 #define S_ORIGIN         "Origem"

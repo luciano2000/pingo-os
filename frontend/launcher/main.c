@@ -38,6 +38,9 @@
 #define RECENTS_FILE  "/mnt/sd1/Config/recentes.txt"
 #define RECENTS_MAX   30
 #define RECENTS_PATH  "pingo:recentes"
+#define FAV_FILE      "/mnt/sd1/Config/favoritos.txt"
+#define FAV_MAX       1000
+#define FAV_PATH      "pingo:favoritos"
 
 /* entrada (evdev), usada também pelas telas modais */
 enum { DEV_PAD, DEV_POWER, DEV_VOLUME, DEV_N };
@@ -62,6 +65,7 @@ static struct level stack[64];
 static int depth;            /* stack[depth] é a tela atual */
 static struct node *lib;     /* árvore da biblioteca (dona dos nós) */
 static struct node *recents; /* "Recentes" (dono dos nós dele) */
+static struct node *favorites; /* "Favoritos" (idem), em ordem alfabética */
 static struct node home;     /* Início: aponta para recents e lib->kids */
 static struct node random_item; /* "Aleatório" no Início */
 #define RANDOM_PATH "pingo:aleatorio"
@@ -102,21 +106,23 @@ static const char *rel_path(const struct node *game)
 	return game->path;
 }
 
-static void recents_load(void)
+/* Lista de jogos num arquivo "CONSOLE<tab>caminho relativo" (Recentes e
+ * Favoritos). Jogos que não estão mais em nenhum dos cartões ficam de fora. */
+static struct node *game_list_load(const char *file, int max, const char *label,
+				   const char *vpath)
 {
-	FILE *f = fopen(RECENTS_FILE, "r");
+	FILE *f = fopen(file, "r");
 	char line[4096];
 
-	library_free(recents);
-	recents = calloc(1, sizeof(*recents));
-	recents->fname = strdup(RECENTS_PATH);
-	recents->path = strdup(RECENTS_PATH);
-	recents->label = strdup(S_RECENTS);
-	recents->dir = true;
-	recents->console = -1;
+	struct node *list = calloc(1, sizeof(*list));
+	list->fname = strdup(vpath);
+	list->path = strdup(vpath);
+	list->label = strdup(label);
+	list->dir = true;
+	list->console = -1;
 	if (!f)
-		return;
-	while (fgets(line, sizeof(line), f) && recents->nkids < RECENTS_MAX) {
+		return list;
+	while (fgets(line, sizeof(line), f) && list->nkids < max) {
 		char *tab = strchr(line, '\t'), *nl = strchr(line, '\n');
 		if (!tab)
 			continue;
@@ -145,11 +151,31 @@ static void recents_load(void)
 		if (!found) /* jogo apagado, renomeado ou no cartão que saiu */
 			continue;
 		struct node *g = library_game_node(c, path);
-		recents->kids = realloc(recents->kids, sizeof(*recents->kids) * (recents->nkids + 1));
-		recents->kids[recents->nkids++] = g;
+		list->kids = realloc(list->kids, sizeof(*list->kids) * (list->nkids + 1));
+		list->kids[list->nkids++] = g;
 	}
-	recents->games = recents->nkids;
+	list->games = list->nkids;
 	fclose(f);
+	return list;
+}
+
+static void recents_load(void)
+{
+	library_free(recents);
+	recents = game_list_load(RECENTS_FILE, RECENTS_MAX, S_RECENTS, RECENTS_PATH);
+}
+
+static int label_cmp(const void *a, const void *b)
+{
+	const struct node *x = *(const struct node *const *)a, *y = *(const struct node *const *)b;
+	return natural_cmp(x->label, y->label);
+}
+
+static void favorites_load(void)
+{
+	library_free(favorites);
+	favorites = game_list_load(FAV_FILE, FAV_MAX, S_FAVORITES, FAV_PATH);
+	qsort(favorites->kids, favorites->nkids, sizeof(*favorites->kids), label_cmp);
 }
 
 static void recents_add(const struct node *game)
@@ -173,6 +199,54 @@ static void recents_add(const struct node *game)
 	rename(tmp, RECENTS_FILE);
 }
 
+static int favorite_index(const struct node *game)
+{
+	for (int i = 0; favorites && i < favorites->nkids; i++)
+		if (!strcmp(favorites->kids[i]->path, game->path))
+			return i;
+	return -1;
+}
+
+static void favorites_save(void)
+{
+	char tmp[] = FAV_FILE ".tmp";
+	FILE *f = fopen(tmp, "w");
+	if (!f)
+		return;
+	for (int i = 0; i < favorites->nkids; i++)
+		fprintf(f, "%s\t%s\n", consoles[favorites->kids[i]->console].code,
+			rel_path(favorites->kids[i]));
+	fflush(f);
+	fsync(fileno(f));
+	fclose(f);
+	rename(tmp, FAV_FILE);
+}
+
+static void home_build(void);
+
+/* Y num jogo: entra ou sai dos Favoritos */
+static void favorite_toggle(struct node *game)
+{
+	if (!game || game->dir || game->console < 0 || !favorites)
+		return;
+	int i = favorite_index(game);
+	if (i >= 0) {
+		library_free(favorites->kids[i]);
+		memmove(&favorites->kids[i], &favorites->kids[i + 1],
+			sizeof(*favorites->kids) * (favorites->nkids - i - 1));
+		favorites->nkids--;
+		show_toast(S_FAV_REMOVED);
+	} else {
+		favorites->kids = realloc(favorites->kids,
+					  sizeof(*favorites->kids) * (favorites->nkids + 1));
+		favorites->kids[favorites->nkids++] = library_game_node(game->console, game->path);
+		qsort(favorites->kids, favorites->nkids, sizeof(*favorites->kids), label_cmp);
+		show_toast(S_FAV_ADDED);
+	}
+	favorites->games = favorites->nkids;
+	favorites_save();
+}
+
 /* ---- Início ---------------------------------------------------------- */
 
 static void home_build(void)
@@ -183,10 +257,12 @@ static void home_build(void)
 	home.console = -1;
 	home.path = (char *)"pingo:inicio";
 	home.label = (char *)"";
-	int n = (lib ? lib->nkids : 0) + 2;
+	int n = (lib ? lib->nkids : 0) + 3;
 	home.kids = calloc(n, sizeof(*home.kids));
 	if (recents && recents->nkids > 0)
 		home.kids[home.nkids++] = recents;
+	if (favorites && favorites->nkids > 0)
+		home.kids[home.nkids++] = favorites;
 	if (lib && lib->games > 0) {
 		random_item = (struct node){ 0 };
 		random_item.fname = random_item.path = (char *)RANDOM_PATH;
@@ -310,12 +386,14 @@ static void swap_library(struct node *fresh)
 	struct node *old = lib;
 	lib = fresh;
 	recents_load();
+	favorites_load();
 	home_build();
 	restore_paths(paths, n);
 	if (pending_console >= 0) { /* acabou de trocar a origem: abre o console de novo */
 		depth = 0;
 		for (int i = 0; i < home.nkids; i++)
-			if (home.kids[i]->console == pending_console && home.kids[i] != recents) {
+			if (home.kids[i]->console == pending_console && home.kids[i] != recents &&
+			    home.kids[i] != favorites) {
 				stack[0].sel = i;
 				clamp_level(&stack[0]);
 				stack[++depth] = (struct level){ home.kids[i], 0, 0 };
@@ -611,6 +689,11 @@ static void draw(void)
 			right = ui_text(F_SMALL, d, x + w - ROW_PAD, y + ROW_H / 2,
 					sel ? th.sel_fg : th.dim, 1, 0) + 12;
 		}
+		if (!at_home && !it->dir && l->dir != favorites && favorite_index(it) >= 0) {
+			/* ★ nos favoritos (na lista Favoritos todos são) */
+			right += ui_text(F_COUNT, "★", x + w - ROW_PAD - right, y + ROW_H / 2,
+					 sel ? th.sel_fg : th.dim, 1, 0) + 10;
+		}
 		if (at_home) { /* contagem à direita */
 			char cnt[16];
 			snprintf(cnt, sizeof(cnt), "%d", it->games);
@@ -641,6 +724,9 @@ static void draw(void)
 			struct node *s = selected();
 			if (s)
 				right -= draw_hint(right, "A", s->dir ? S_OPEN : S_PLAY) + 22;
+			if (s && !s->dir)
+				right -= draw_hint(right, "Y", favorite_index(s) >= 0 ? S_FAV_HINT_OFF
+										   : S_FAV_HINT) + 22;
 			if (l->dir != recents && l->dir->games > 1)
 				draw_hint(right, "X", S_RANDOM_HINT);
 		}
@@ -987,6 +1073,16 @@ static bool press(int code)
 		if (depth > 0 && cur()->dir != recents)
 			return open_random(cur()->dir);
 		break;
+	case BTN_NORTH: /* Y (à esquerda; no device tree é BTN_NORTH): favorito */
+		if (depth > 0) {
+			struct level *l = cur();
+			favorite_toggle(selected());
+			if (l->dir == favorites) /* saiu da lista em que estamos */
+				clamp_level(l);
+			home_build();
+			dirty = true;
+		}
+		break;
 	}
 	return false;
 }
@@ -1312,6 +1408,7 @@ int main(int argc, char **argv)
 	if (lib && !from_cache)
 		library_save_cache(lib, CACHE_FILE);
 	recents_load(); /* depois da biblioteca: precisa das pastas dos consoles */
+	favorites_load();
 	home_build();
 	stack[0] = (struct level){ &home, 0, 0 };
 	state_load();
