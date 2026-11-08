@@ -12,6 +12,10 @@ PORTS=/mnt/sd1/Ports
 URL=https://github.com/PortsMaster/PortMaster-GUI/releases/latest/download
 HOMEDIR=/mnt/sd1/.system/home
 
+# O curl do sistema usa o mbed TLS, que não procura os certificados sozinho
+export CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
 say() { echo "pingo-portmaster: $*" > /dev/kmsg; }
 
 do_install() {
