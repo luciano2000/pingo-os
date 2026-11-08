@@ -96,11 +96,25 @@ $PAD_MAP"
 	printf '%s\n' "$want" > "$db"
 }
 
+# Ajustes do Pingo OS que todo port carrega (o control.txt do PortMaster lê
+# mod_<nome do sistema>.txt): o gptokeyb passa pelo pingo-gptokeyb, que
+# completa com as setas o direcional que o port deixou vazio
+mod_install() {
+	mod="$PORTS/PortMaster/mod_Pingo OS.txt"
+	[ -d "$PORTS/PortMaster" ] || return 0
+	cat > "$mod" <<'MOD'
+#!/bin/bash
+# Pingo OS (gerado pelo pingo-portmaster a cada abertura: não edite)
+export GPTOKEYB="/usr/sbin/pingo-gptokeyb $controlfolder/gptokeyb $ESUDOKILL"
+MOD
+}
+
 do_run() {
 	script=$1
 	use_ports || return $?
 	[ -f "$script" ] || return 1
 	pad_map_install
+	mod_install
 	export SDL_GAMECONTROLLERCONFIG="$PAD_MAP"
 	mkdir -p "$HOMEDIR/.config" "$HOMEDIR/.local/share"
 	# a raiz é somente leitura: os ports gravam a configuração no cartão

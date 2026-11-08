@@ -1,0 +1,44 @@
+#!/bin/sh
+# Intermediário do gptokeyb do PortMaster (ligado pelo "mod_Pingo OS.txt").
+#
+#   pingo-gptokeyb <gptokeyb de verdade> [argumentos do port...]
+#
+# Muitos ports deixam o direcional e o analógico esquerdo vazios no .gptk
+# ("up = \""): nos sistemas em que foram feitos, o próprio sistema já entrega
+# o direcional como setas. No Pingo OS não: o jogo ficava sem andar. Aqui,
+# numa cópia do .gptk, o que estiver vazio nessas oito linhas vira as setas;
+# o resto fica como o port definiu e o arquivo dele nunca é alterado.
+real=$1
+shift
+[ -x "$real" ] || exit 1
+
+i=0
+out=""
+next_is_cfg=0
+for a in "$@"; do
+	if [ $next_is_cfg -eq 1 ] && [ -f "$a" ]; then
+		tmp="/tmp/pingo-gptk-$$.gptk"
+		sed -E \
+			-e 's/^(up|left_analog_up)[[:space:]]*=[[:space:]]*\\"[[:space:]]*$/\1 = up/' \
+			-e 's/^(down|left_analog_down)[[:space:]]*=[[:space:]]*\\"[[:space:]]*$/\1 = down/' \
+			-e 's/^(left|left_analog_left)[[:space:]]*=[[:space:]]*\\"[[:space:]]*$/\1 = left/' \
+			-e 's/^(right|left_analog_right)[[:space:]]*=[[:space:]]*\\"[[:space:]]*$/\1 = right/' \
+			"$a" > "$tmp" && a=$tmp
+	fi
+	next_is_cfg=0
+	[ "$a" = "-c" ] && next_is_cfg=1
+	# guarda os argumentos um por linha (nomes com espaço continuam inteiros)
+	out="$out$a
+"
+	i=$((i + 1))
+done
+
+# remonta a lista de argumentos e troca o processo (o nome continua
+# "gptokeyb": os ports o encerram com pidof/kill)
+set --
+while IFS= read -r a; do
+	set -- "$@" "$a"
+done <<EOF
+$(printf '%s' "$out")
+EOF
+exec "$real" "$@"
