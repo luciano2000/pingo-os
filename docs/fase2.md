@@ -90,5 +90,5 @@
 
 - [x] Instalar o PortMaster pelo menu (reconhece "Pingo OS", Anbernic RG35XX H, 640x480, Panfrost)
 - [x] Abrir o PortMaster (interface dele aparece e responde aos botões)
-- [x] Instalar ports gratuitos e jogar: Cave Story (nxengine-evo) e Ticoban com o direcional; Celeste Classic precisa do `taskset -c` (próxima imagem)
+- [x] Instalar ports gratuitos e jogar: Cave Story (nxengine-evo) e Ticoban com o direcional e Celeste Classic
 - [ ] Sair do port e voltar ao launcher
