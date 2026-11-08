@@ -195,3 +195,6 @@ PM_NO_SPACE=Could not write to the card
 PM_OPEN=Open PortMaster
 PM_INFO=Installed ports show up in Ports on the home screen
 PM_INSTALL_INFO=Downloads the latest official release (needs Wi-Fi)
+PM_WHERE=Install on
+PM_WHERE_INFO=Card for PortMaster and ports (changing does not move installed ones)
+PM_NO_SD2=SD2 is not inserted

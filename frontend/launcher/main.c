@@ -68,9 +68,33 @@ static struct node *recents; /* "Recentes" (dono dos nós dele) */
 static struct node *favorites; /* "Favoritos" (idem), em ordem alfabética */
 static struct node *ports;     /* "Ports": PortMaster e os ports instalados */
 
-#define PORTS_DIR  "/mnt/sd1/Ports"
 #define PORTS_PATH "pingo:ports"
-#define PM_SCRIPT  PORTS_DIR "/PortMaster/PortMaster.sh"
+#define PORTS_CFG  "/mnt/sd1/Config/ports.txt" /* "sd1" (padrão) ou "sd2" */
+
+/* Pasta Ports do cartão escolhido (MENU → PortMaster → Instalar no) */
+static bool ports_on_sd2(void)
+{
+	char b[8] = "";
+	FILE *f = fopen(PORTS_CFG, "r");
+	if (f) {
+		if (!fgets(b, sizeof(b), f))
+			b[0] = 0;
+		fclose(f);
+	}
+	return !strncmp(b, "sd2", 3);
+}
+
+static const char *ports_dir(void)
+{
+	return ports_on_sd2() ? "/mnt/sd2/Ports" : "/mnt/sd1/Ports";
+}
+
+static const char *pm_script(void)
+{
+	static char p[64];
+	snprintf(p, sizeof(p), "%s/PortMaster/PortMaster.sh", ports_dir());
+	return p;
+}
 static struct node home;     /* Início: aponta para recents e lib->kids */
 static struct node random_item; /* "Aleatório" no Início */
 #define RANDOM_PATH "pingo:aleatorio"
@@ -279,7 +303,8 @@ static void ports_add(struct node *n)
 
 static bool is_port(const struct node *n)
 {
-	return n && !n->dir && !strncmp(n->path, PORTS_DIR "/", strlen(PORTS_DIR) + 1);
+	return n && !n->dir && (!strncmp(n->path, "/mnt/sd1/Ports/", 15) ||
+				!strncmp(n->path, "/mnt/sd2/Ports/", 15));
 }
 
 static void ports_load(void)
@@ -293,14 +318,15 @@ static void ports_load(void)
 	ports->dir = true;
 	ports->console = -1;
 	int first = ports->nkids; /* o PortMaster não entra: ele fica no MENU do Início */
-	DIR *d = opendir(PORTS_DIR);
+	const char *pdir = ports_dir();
+	DIR *d = opendir(pdir);
 	struct dirent *e;
 	while (d && (e = readdir(d))) {
 		size_t len = strlen(e->d_name);
 		if (e->d_name[0] == '.' || len < 4 || strcasecmp(e->d_name + len - 3, ".sh"))
 			continue;
 		char path[4096], *label = library_clean_name(e->d_name, false);
-		snprintf(path, sizeof(path), "%s/%s", PORTS_DIR, e->d_name);
+		snprintf(path, sizeof(path), "%s/%s", pdir, e->d_name);
 		if (stat(path, &st) == 0 && S_ISREG(st.st_mode))
 			ports_add(port_node(e->d_name, path, label ? label : e->d_name));
 		free(label);
@@ -2388,38 +2414,73 @@ static bool launch_port(struct node *port);
 static void portmaster_install(void);
 static bool portmaster_screen(void)
 {
+	int sel = 0;
 	for (;;) {
 		struct stat st;
-		bool installed = stat(PM_SCRIPT, &st) == 0;
+		bool sd2 = ports_on_sd2();
+		bool card_ok = !sd2 || sd2_present;
+		bool installed = card_ok && stat(pm_script(), &st) == 0;
 		ui_clear();
 		ui_text(F_BAR_BOLD, "PortMaster", PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 0);
 		draw_status_right();
-		int y = PAD_Y + BAR_H + LIST_GAP;
-		ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
-		ui_text(F_ITEM_SEL, installed ? S_PM_OPEN : S_PM_INSTALL, PAD_X + ROW_PAD, y + ROW_H / 2,
-			COL_SEL_FG, 0, 0);
-		ui_text(F_BAR, installed ? S_PM_INFO : S_PM_INSTALL_INFO, PAD_X + ROW_PAD,
-			y + ROW_H + 24, COL_DIM, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD);
+		int y0 = PAD_Y + BAR_H + LIST_GAP;
+		const char *labels[2] = { installed ? S_PM_OPEN : S_PM_INSTALL, S_PM_WHERE };
+		for (int i = 0; i < 2; i++) {
+			int y = y0 + i * (ROW_H + ROW_GAP);
+			bool s = i == sel;
+			if (s)
+				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+			int vw = 0;
+			if (i == 1)
+				vw = ui_text(F_COUNT, sd2 ? "SD2" : "SD1", UI_W - PAD_X - ROW_PAD, y + ROW_H / 2,
+					     s ? COL_SEL_FG : COL_DIM, 1, 0) + 16;
+			ui_text(s ? F_ITEM_SEL : F_ITEM, labels[i], PAD_X + ROW_PAD, y + ROW_H / 2,
+				s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
+		}
+		const char *info = !card_ok ? S_PM_NO_SD2 : sel == 1 ? S_PM_WHERE_INFO
+				 : installed ? S_PM_INFO : S_PM_INSTALL_INFO;
+		ui_text(F_BAR, info, PAD_X + ROW_PAD, y0 + 2 * (ROW_H + ROW_GAP) + 16, COL_DIM, 0,
+			UI_W - 2 * PAD_X - 2 * ROW_PAD);
 		int right = UI_W - PAD_X;
 		if (toast[0] && SDL_GetTicks() < toast_until) {
 			ui_text(F_BAR, toast, PAD_X, UI_H - PAD_Y - BAR_H / 2, COL_TEXT, 0, UI_W - 2 * PAD_X);
 		} else {
 			toast[0] = 0;
 			right -= draw_hint(right, "B", S_BACK) + 22;
-			draw_hint(right, "A", S_CONFIRM);
+			draw_hint(right, sel == 1 ? "◀ ▶" : "A", sel == 1 ? S_HINT_CHANGE : S_CONFIRM);
 		}
 		osd_draw(ui_renderer(), UI_W, UI_H);
 		ui_present();
 		int k = wait_key();
 		if (k == BTN_SOUTH || k == BTN_MODE)
 			return false;
+		if (k == BTN_DPAD_UP || k == BTN_DPAD_DOWN) {
+			sel = !sel;
+			continue;
+		}
+		if (sel == 1 && (k == BTN_EAST || k == BTN_DPAD_LEFT || k == BTN_DPAD_RIGHT)) {
+			FILE *f = fopen(PORTS_CFG ".tmp", "w");
+			if (f) {
+				fprintf(f, "%s\n", sd2 ? "sd1" : "sd2");
+				fclose(f);
+				rename(PORTS_CFG ".tmp", PORTS_CFG);
+			}
+			ports_load(); /* a lista de Ports passa a ser a do outro cartão */
+			home_build();
+			clamp_level(&stack[0]);
+			continue;
+		}
 		if (k != BTN_EAST)
 			continue;
+		if (!card_ok) {
+			show_toast(S_PM_NO_SD2);
+			continue;
+		}
 		if (!installed) {
 			portmaster_install();
 			continue;
 		}
-		struct node pm = { .fname = (char *)"PortMaster.sh", .path = (char *)PM_SCRIPT,
+		struct node pm = { .fname = (char *)"PortMaster.sh", .path = (char *)pm_script(),
 				   .label = (char *)"PortMaster", .console = -1 };
 		return launch_port(&pm);
 	}
@@ -2431,7 +2492,8 @@ static void portmaster_install(void)
 	message_screen(S_PM_INSTALLING, S_PM_INSTALLING_TXT);
 	const char *e = getenv("PINGO_PORTMASTER");
 	int rc = proc_run(e && *e ? e : "/usr/sbin/pingo-portmaster", "install", NULL, NULL, NULL, 0);
-	show_toast(rc == 0 ? S_PM_DONE : rc == 2 ? S_PM_NO_NET : rc == 3 ? S_PM_BAD : S_PM_NO_SPACE);
+	show_toast(rc == 0 ? S_PM_DONE : rc == 2 ? S_PM_NO_NET : rc == 3 ? S_PM_BAD
+		   : rc == 5 ? S_PM_NO_SD2 : S_PM_NO_SPACE);
 	ports_load();
 	home_build();
 	clamp_level(&stack[0]);

@@ -7,8 +7,41 @@
 #                              roda um port (ou o próprio PortMaster) com o
 #                              ambiente que eles esperam
 #
-# Saída do install: 0 ok, 2 sem conexão, 3 download corrompido, 4 sem espaço.
-PORTS=/mnt/sd1/Ports
+#   pingo-portmaster dir       mostra a pasta Ports do cartão escolhido
+#
+# Cartão: Config/ports.txt no SD1 ("sd1", o padrão, ou "sd2"). No SD2 (que
+# fica só para leitura), a escrita é liberada enquanto o PortMaster ou o port
+# roda e volta a ser só leitura no fim.
+#
+# Saída do install: 0 ok, 2 sem conexão, 3 download corrompido, 4 sem espaço,
+# 5 SD2 escolhido e fora do aparelho.
+CHOICE=$(head -n1 /mnt/sd1/Config/ports.txt 2>/dev/null | tr -d '\r')
+if [ "$CHOICE" = "sd2" ]; then
+	PORTS=/mnt/sd2/Ports
+else
+	PORTS=/mnt/sd1/Ports
+fi
+SD2_RW=0
+
+# /roms/ports -> /run/pingo/ports -> pasta do cartão escolhido
+use_ports() {
+	if [ "$CHOICE" = "sd2" ]; then
+		mountpoint -q /mnt/sd2 || { say "SD2 escolhido e fora do aparelho"; return 5; }
+		mount -o remount,rw /mnt/sd2 || return 4
+		SD2_RW=1
+		trap release EXIT INT TERM
+	fi
+	mkdir -p "$PORTS" /run/pingo || return 4
+	ln -sfn "$PORTS" /run/pingo/ports
+}
+
+# SD2 volta a ser só leitura (tirar o cartão depois não estraga nada)
+release() {
+	[ $SD2_RW -eq 1 ] || return 0
+	sync
+	mount -o remount,ro /mnt/sd2 2>/dev/null
+	SD2_RW=0
+}
 URL=https://github.com/PortsMaster/PortMaster-GUI/releases/latest/download
 HOMEDIR=/mnt/sd1/.system/home
 
@@ -19,7 +52,7 @@ export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 say() { echo "pingo-portmaster: $*" > /dev/kmsg; }
 
 do_install() {
-	mkdir -p "$PORTS" || return 4
+	use_ports || return $?
 	tmp="$PORTS/.PortMaster.zip"
 	rm -f "$tmp"
 	curl -fsSL --retry 2 --connect-timeout 15 -o "$tmp" "$URL/PortMaster.zip" || { rm -f "$tmp"; return 2; }
@@ -45,17 +78,25 @@ do_install() {
 # (BTN_WEST, b3), Y à esquerda (BTN_NORTH, b2). Índices na ordem do SDL.
 PAD_MAP="190000004b480000df14000000010000,H700 Gamepad,a:b1,b:b0,x:b3,y:b2,back:b8,guide:b10,start:b9,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a2,righty:a3,platform:Linux,"
 
-# O PortMaster reescreve o gamecontrollerdb.txt dele ao se atualizar: a linha
-# do aparelho volta a cada abertura
+# Tabela de controles do PortMaster: só a linha do aparelho. Num sistema que
+# ele não conhece, os ports põem a tabela inteira (1.800 controles, centenas
+# de KB) numa variável de ambiente; passa do limite do Linux (128 KB) e nada
+# do port roda ("Argument list too long"). O aparelho só tem o controle
+# embutido; a tabela original fica em gamecontrollerdb.full.txt. O
+# PortMaster a reescreve ao se atualizar: refeita a cada abertura.
 pad_map_install() {
 	db="$PORTS/PortMaster/gamecontrollerdb.txt"
 	[ -f "$db" ] || return 0
-	grep -q "^190000004b480000df14000000010000," "$db" && return 0
-	printf '%s\n' "$PAD_MAP" >> "$db"
+	want="# Pingo OS: só o controle do aparelho (a tabela completa está em gamecontrollerdb.full.txt)
+$PAD_MAP"
+	[ "$(cat "$db")" = "$want" ] && return 0
+	grep -q "^# Pingo OS:" "$db" || cp -f "$db" "$PORTS/PortMaster/gamecontrollerdb.full.txt"
+	printf '%s\n' "$want" > "$db"
 }
 
 do_run() {
 	script=$1
+	use_ports || return $?
 	[ -f "$script" ] || return 1
 	pad_map_install
 	export SDL_GAMECONTROLLERCONFIG="$PAD_MAP"
@@ -71,7 +112,8 @@ do_run() {
 }
 
 case "$1" in
-	install) do_install ;;
-	run) do_run "$2" ;;
-	*) echo "uso: $0 install | run <script.sh>" >&2; exit 2 ;;
+	install) do_install; rc=$?; release; exit $rc ;;
+	run) do_run "$2"; rc=$?; release; exit $rc ;;
+	dir) echo "$PORTS" ;;
+	*) echo "uso: $0 install | run <script.sh> | dir" >&2; exit 2 ;;
 esac
