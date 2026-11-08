@@ -5,7 +5,8 @@
 
 #include <SDL2/SDL.h>
 
-/* NULL se o arquivo não existe ou não é um PNG válido */
-SDL_Texture *img_load(SDL_Renderer *ren, const char *path);
+/* NULL se o arquivo não existe ou não é um PNG válido. gray: em preto e
+ * branco (conquista ainda bloqueada) */
+SDL_Texture *img_load(SDL_Renderer *ren, const char *path, int gray);
 
 #endif

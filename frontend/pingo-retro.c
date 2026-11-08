@@ -2157,7 +2157,7 @@ static void ra_draw_note(void)
 	typeof(ra_notes[0]) *n = &ra_notes[0];
 	/* a imagem pode chegar depois (download): tenta de tempos em tempos */
 	if (n->image[0] && !n->tex && now >= n->next_try) {
-		n->tex = img_load(renderer, n->image);
+		n->tex = img_load(renderer, n->image, 0);
 		n->next_try = now + 500;
 	}
 	const int img = 64, pad = 14;
@@ -2291,7 +2291,8 @@ static void run_cheevos(void)
 		if (SDL_GetTicks() >= next_try) {
 			for (int r = 0; r < rows && top + r < n; r++)
 				if (!tex[top + r])
-					tex[top + r] = img_load(renderer, list[top + r].image);
+					tex[top + r] = img_load(renderer, list[top + r].image,
+								!list[top + r].unlocked);
 			next_try = SDL_GetTicks() + 700;
 		}
 
@@ -2310,9 +2311,7 @@ static void run_cheevos(void)
 			int vw = ui_text(F_COUNT, pts, UI_W - PAD_X - ROW_PAD, y + ROW_H / 2, fg, 1, 0) + 16;
 			int ix = PAD_X + ROW_PAD - 4, isz = ROW_H - 10;
 			SDL_Texture *t = tex[top + r];
-			if (t) { /* bloqueada: imagem escurecida */
-				Uint8 v = c->unlocked ? 255 : 90;
-				SDL_SetTextureColorMod(t, v, v, v);
+			if (t) { /* bloqueada: em preto e branco; conquistada: colorida */
 				SDL_RenderCopy(renderer, t, NULL, &(SDL_Rect){ ix, y + 5, isz, isz });
 			} else {
 				ui_round_rect(ix, y + 5, isz, isz, 6, s ? 0x9A9A9A : 0x2A2A2A);
