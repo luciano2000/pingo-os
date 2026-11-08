@@ -48,7 +48,7 @@ Consoles: Game Boy, Game Boy Color, Game Boy Advance, NES, Famicom Disk System, 
 
 Atualizar: grave a imagem nova no mesmo cartão. A partição `ROMS` (jogos, saves, configurações) é mantida.
 
-Problemas e sugestões: [issues](https://github.com/luciano2000/pingo-os/issues) ou o [Discord](https://discord.gg/5qfSc6JR6J).
+Problemas e sugestões: [issues](https://github.com/luciano2000/pingo-os/issues) ou o [Discord](https://discord.gg/DqBtrEWJak).
 
 ## Como compilar
 
