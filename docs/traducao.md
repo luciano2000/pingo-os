@@ -8,7 +8,7 @@ A interface vem em português e troca de idioma em **MENU no Início → Idioma*
 2. Troque a linha `NOME=` pelo nome do idioma como ele aparece no menu (`NOME=Español`).
 3. Traduza o texto depois do `=` em cada linha. **Não mude a chave** (a parte antes do `=`).
 4. Teste no aparelho: copie o arquivo para a pasta `Idiomas/` do cartão (SD1, partição ROMS; crie a pasta se não existir) e escolha o idioma no menu. Não precisa gravar a imagem de novo.
-5. Mande o arquivo pronto como pull request (em `frontend/idiomas/`) ou no [Discord do Retrogamer Brasil](https://discord.gg/DqBtrEWJak): ele entra na próxima versão.
+5. Mande o arquivo pronto como pull request (em `frontend/idiomas/`) ou no [Discord do Retrogamer Brasil](https://discord.gg/S3SBnaKh58): ele entra na próxima versão.
 
 ## Regras
 

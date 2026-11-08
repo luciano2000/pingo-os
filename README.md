@@ -8,9 +8,9 @@ A interface segue a filosofia do MinUI: direta ao ponto, sem boxart, temas ou me
 
 Um projeto do Retrogamer Brasil.
 
-**Comunidade:** dúvidas, sugestões e notícias do Pingo no [Discord do Retrogamer Brasil](https://discord.gg/DqBtrEWJak).
+**Comunidade:** dúvidas, sugestões e notícias do Pingo no [Discord do Retrogamer Brasil](https://discord.gg/S3SBnaKh58).
 
-<a href="https://discord.gg/DqBtrEWJak"><img src="https://img.shields.io/badge/Discord-Retrogamer%20Brasil-5865F2?logo=discord&logoColor=white" alt="Discord do Retrogamer Brasil" height="28"></a>
+<a href="https://discord.gg/S3SBnaKh58"><img src="https://img.shields.io/badge/Discord-Retrogamer%20Brasil-5865F2?logo=discord&logoColor=white" alt="Discord do Retrogamer Brasil" height="28"></a>
 
 Gostou do projeto? Ajude a manter o desenvolvimento:
 
@@ -50,7 +50,7 @@ Consoles: Game Boy, Game Boy Color, Game Boy Advance, NES, Famicom Disk System, 
 
 Atualizar: grave a imagem nova no mesmo cartão. A partição `ROMS` (jogos, saves, configurações) é mantida.
 
-Problemas e sugestões: [issues](https://github.com/luciano2000/pingo-os/issues) ou o [Discord](https://discord.gg/DqBtrEWJak).
+Problemas e sugestões: [issues](https://github.com/luciano2000/pingo-os/issues) ou o [Discord](https://discord.gg/S3SBnaKh58).
 
 ## Como compilar
 
