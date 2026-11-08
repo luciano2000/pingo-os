@@ -28,3 +28,15 @@
 - [x] Trocar o fuso: o relógio da barra muda na hora e vale nos jogos ("Salvo hoje, HH:MM")
 - [x] Hora manual: data e hora gravadas continuam certas depois de desligar e ligar
 - [x] Voltar para "pela internet": a hora volta a ficar certa
+
+## Idiomas e Desligar
+
+- Textos em `common/textos_pt.h` (lista X-macro): cada `S_NOME` é um ponteiro, em português por padrão. `textos.c` carrega `<código>.txt` (`CHAVE=Texto`, a chave sem o `S_`) de `/usr/share/pingo/idiomas` ou de `Idiomas/` no SD1 (vale mais). Linhas com `%d`/`%s`/`%u` diferentes do original são ignoradas (formatos de data, com `%H`, podem mudar). Escolha em `Config/idioma.txt`; launcher e `pingo-retro` leem ao abrir, e o launcher troca na hora.
+- Inglês completo (`frontend/idiomas/en.txt`). Guia para a comunidade: `docs/traducao.md`.
+- MENU no Início: Wi-Fi, Data e hora, **Idioma** (◀ ▶), Preparar o SD2 (quando há cartão novo) e **Desligar** (último, com confirmação).
+
+### Checklist
+
+- [ ] Trocar para English no menu: Início, listas, menu do jogo, Wi-Fi, Data e hora
+- [ ] Voltar para Português
+- [ ] Desligar pelo menu

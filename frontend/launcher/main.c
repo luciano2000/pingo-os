@@ -28,7 +28,7 @@
 #include "library.h"
 #include "fbcopy.h"
 #include "osd.h"
-#include "strings_pt.h"
+#include "textos.h"
 #include "ui.h"
 
 #define RUN_DIR       "/run/pingo"
@@ -2064,12 +2064,58 @@ static void datetime_screen(void)
 }
 
 /* MENU no Início: Wi-Fi, data e hora e, com um cartão novo no slot 2, prepará-lo */
+/* Confirmação simples: A sim, B não */
+static bool confirm(const char *title, const char *text)
+{
+	for (;;) {
+		ui_clear();
+		ui_text(F_BIG, title, UI_W / 2, UI_H / 2 - 18, COL_TEXT, 2, UI_W - 2 * PAD_X);
+		if (text)
+			ui_text(F_BODY, text, UI_W / 2, UI_H / 2 + 24, COL_DIM, 2, UI_W - 2 * PAD_X);
+		int right = UI_W - PAD_X;
+		right -= draw_hint(right, "B", S_NO) + 22;
+		draw_hint(right, "A", S_YES);
+		osd_draw(ui_renderer(), UI_W, UI_H);
+		ui_present();
+		int k = wait_key();
+		if (k == BTN_EAST)
+			return true;
+		if (k == BTN_SOUTH || k == BTN_MODE)
+			return false;
+	}
+}
+
+/* Idioma trocado: os textos já mudaram; as listas com nome fixo (Recentes,
+ * Favoritos) são refeitas */
+static void language_changed(void)
+{
+	recents_load();
+	favorites_load();
+	home_build();
+	clamp_level(&stack[0]);
+	dirty = true;
+}
+
+/* MENU no Início: Wi-Fi, Data e hora, Idioma, (cartão novo no slot 2:
+ * prepará-lo) e Desligar, sempre o último */
+enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_SD2, HM_POWEROFF };
+
 static void home_menu(void)
 {
 	int sel = 0;
+	struct lang langs[LANG_MAX];
+	int nlangs = lang_list(langs, LANG_MAX), cur_lang = 0;
+	for (int i = 0; i < nlangs; i++)
+		if (!strcmp(langs[i].code, lang_current()))
+			cur_lang = i;
 	for (;;) {
-		bool sd2_item = sd2_present && !sd2_ready;
-		int n = sd2_item ? 3 : 2;
+		int items[5], n = 0;
+		items[n++] = HM_WIFI;
+		items[n++] = HM_DATETIME;
+		items[n++] = HM_LANGUAGE;
+		if (sd2_present && !sd2_ready)
+			items[n++] = HM_SD2;
+		items[n++] = HM_POWEROFF;
 		if (sel >= n)
 			sel = n - 1;
 		ui_clear();
@@ -2079,33 +2125,52 @@ static void home_menu(void)
 			bool s = i == sel;
 			if (s)
 				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
-			const char *items[3] = { S_WIFI, S_DT_TITLE, S_PREPARE_SD2 };
-			ui_text(s ? F_ITEM_SEL : F_ITEM, items[i], PAD_X + ROW_PAD,
-				y + ROW_H / 2, s ? COL_SEL_FG : COL_TEXT, 0, 0);
-			if (i < 2 && s)
+			const char *label = items[i] == HM_WIFI ? S_WIFI : items[i] == HM_DATETIME ? S_DT_TITLE
+					  : items[i] == HM_LANGUAGE ? S_LANGUAGE
+					  : items[i] == HM_SD2 ? S_PREPARE_SD2 : S_POWER_OFF_ITEM;
+			int vw = 0;
+			if (items[i] == HM_LANGUAGE)
+				vw = ui_text(F_COUNT, langs[cur_lang].name, UI_W - PAD_X - ROW_PAD,
+					     y + ROW_H / 2, s ? COL_SEL_FG : COL_DIM, 1, 300) + 16;
+			ui_text(s ? F_ITEM_SEL : F_ITEM, label, PAD_X + ROW_PAD, y + ROW_H / 2,
+				s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
+			if ((items[i] == HM_WIFI || items[i] == HM_DATETIME) && s)
 				ui_icon_chevron(UI_W - PAD_X - ROW_PAD - 16, y + ROW_H / 2, COL_SEL_FG);
 		}
 		int right = UI_W - PAD_X;
 		right -= draw_hint(right, "B", S_BACK) + 22;
-		draw_hint(right, "A", S_CONFIRM);
+		if (items[sel] == HM_LANGUAGE)
+			draw_hint(right, "◀ ▶", S_HINT_CHANGE);
+		else
+			draw_hint(right, "A", S_CONFIRM);
 		osd_draw(ui_renderer(), UI_W, UI_H);
 		ui_present();
 		int k = wait_key();
-		if (k == BTN_DPAD_UP)
+		int it = items[sel];
+		int d = k == BTN_DPAD_LEFT ? -1 : (k == BTN_DPAD_RIGHT || k == BTN_EAST) ? 1 : 0;
+		if (k == BTN_DPAD_UP) {
 			sel = (sel - 1 + n) % n;
-		else if (k == BTN_DPAD_DOWN)
+		} else if (k == BTN_DPAD_DOWN) {
 			sel = (sel + 1) % n;
-		else if (k == BTN_EAST) {
-			if (sel == 0) {
+		} else if (it == HM_LANGUAGE && d && nlangs > 1) {
+			cur_lang = (cur_lang + d + nlangs) % nlangs;
+			lang_set(langs[cur_lang].code);
+			language_changed();
+		} else if (k == BTN_EAST) {
+			if (it == HM_WIFI) {
 				wifi_screen();
-			} else if (sel == 1) {
+			} else if (it == HM_DATETIME) {
 				datetime_screen();
-			} else {
+			} else if (it == HM_SD2) {
 				sd2_prepare_now();
 				break;
+			} else if (it == HM_POWEROFF) {
+				if (confirm(S_POWER_OFF_ASK, NULL))
+					shutdown_now();
 			}
-		} else if (k == BTN_SOUTH || k == BTN_MODE)
+		} else if (k == BTN_SOUTH || k == BTN_MODE) {
 			break;
+		}
 	}
 	dirty = true;
 }
@@ -2115,6 +2180,7 @@ static void home_menu(void)
 int main(int argc, char **argv)
 {
 	th = th_dark;
+	lang_load();
 	if (!getenv("TZ")) /* o pingo-shell já passa; sem ele, lê o arquivo */
 		zone_apply(zone_index());
 	struct stat st;

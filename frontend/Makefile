@@ -10,8 +10,8 @@ ALSA_LIBS = $(shell $(PKG_CONFIG) --libs alsa)
 ZIP_CFLAGS = $(shell $(PKG_CONFIG) --cflags libzip)
 ZIP_LIBS = $(shell $(PKG_CONFIG) --libs libzip)
 
-COMMON_SRC = common/osd.c common/fbcopy.c common/ui.c
-COMMON_HDR = common/osd.h common/fbcopy.h common/ui.h common/strings_pt.h
+COMMON_SRC = common/osd.c common/fbcopy.c common/ui.c common/textos.c
+COMMON_HDR = common/osd.h common/fbcopy.h common/ui.h common/textos.h common/textos_pt.h
 LAUNCHER_SRC = launcher/main.c launcher/library.c
 LAUNCHER_HDR = launcher/library.h
 
@@ -29,6 +29,9 @@ install: all
 	install -D -m 0755 pingo-retro $(DESTDIR)/usr/bin/pingo-retro
 	install -D -m 0755 pingo-launcher $(DESTDIR)/usr/bin/pingo-launcher
 	install -D -m 0755 pingo-shell $(DESTDIR)/usr/bin/pingo-shell
+	for f in idiomas/*.txt; do \
+		install -D -m 0644 $$f $(DESTDIR)/usr/share/pingo/idiomas/$$(basename $$f) || exit 1; \
+	done
 	for f in cores/*.opts; do \
 		install -D -m 0644 $$f $(DESTDIR)/usr/share/pingo/cores/$$(basename $$f) || exit 1; \
 	done

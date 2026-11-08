@@ -43,7 +43,7 @@
 #include "fbcopy.h"
 #include "libretro.h"
 #include "osd.h"
-#include "strings_pt.h"
+#include "textos.h"
 #include "ui.h"
 
 #define GAMEPAD_NAME "H700 Gamepad"
@@ -434,6 +434,8 @@ static const char *const dip_words[][2] = {
 
 static const char *dip_text(const char *en)
 {
+	if (!lang_is_pt()) /* a tabela é só para o português; senão, como vem do FBNeo */
+		return en;
 	for (size_t i = 0; i < sizeof(dip_words) / sizeof(*dip_words); i++)
 		if (!strcasecmp(dip_words[i][0], en))
 			return dip_words[i][1];
@@ -2336,6 +2338,7 @@ int main(int argc, char **argv)
 	signal(SIGSEGV, crash_handler);
 	signal(SIGBUS, crash_handler);
 	signal(SIGABRT, crash_handler);
+	lang_load();
 	names_from_path(argv[2], argc > 3 ? argv[3] : NULL);
 	bool resume = argc > 4 && !strcmp(argv[4], "resume");
 	snprintf(resume_core, sizeof(resume_core), "%s", argv[1]);

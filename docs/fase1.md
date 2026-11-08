@@ -105,7 +105,7 @@ Código em `frontend/launcher/` (`pingo-launcher`) e `frontend/common/osd.c` (vo
 
 ## Fatia 3: jogo completo
 
-`frontend/pingo-retro.c` reescrito; a camada de desenho (`common/ui.c`) e os textos (`common/strings_pt.h`) agora são compartilhados com o launcher.
+`frontend/pingo-retro.c` reescrito; a camada de desenho (`common/ui.c`) e os textos (`common/strings_pt.h`, hoje `common/textos_pt.h`) agora são compartilhados com o launcher.
 
 - **Menu do jogo** (MENU ao soltar), como no mockup: Continuar, Salvar, Carregar, Opções, Sair, com o jogo escurecido atrás; prévia do slot à direita, 4 slots (◀ ▶), "Salvo hoje, HH:MM". Salvar volta ao jogo, como no MinUI.
 - **Save states**: `States/<console>/<jogo>.st0..st3` + prévia `.bmp`; o slot inicial é o salvo mais recentemente.
