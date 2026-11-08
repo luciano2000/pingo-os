@@ -47,7 +47,9 @@
 - **Conta:** MENU no Início → **RetroAchievements** → Entrar (usuário e senha no teclado na tela). O launcher roda `pingo-retro --ra-login <usuário>` com a senha pela entrada padrão; o servidor devolve um token e só ele fica no cartão (`.system/retroachievements.txt`: usuário, token, hardcore). "Sair da conta" apaga o arquivo. Modo hardcore liga/desliga ali.
 - **No jogo** (`frontend/ra.c`): com conta, o `pingo-retro` entra com o token e identifica o jogo pelo hash (rc_client); a memória vem do `SET_MEMORY_MAPS` do core ou do `retro_get_memory_data` (rc_libretro). A internet roda numa thread (libcurl); as respostas voltam ao rc_client no laço principal, então o jogo nunca espera a rede. Sem conexão, os desbloqueios ficam pendentes e vão quando ela volta.
 - **Avisos** em cima da tela: conquista desbloqueada (pontos e nome), jogo completo, desafios (placares), sem conexão / conectado de novo, jogo não reconhecido. Ao abrir: "Jogo: X de Y conquistas".
-- **Menu do jogo → Conquistas**: lista com ✓ e pontos, descrição da selecionada embaixo.
+- **Imagens das conquistas:** quando o jogo é reconhecido, as imagens (PNG 64×64, `badge_url`) de todas as conquistas são baixadas em segundo plano para `.system/cache/ra/<badge>.png` (o mesmo jogo não baixa de novo). PNG lido com o `stb_image` (domínio público/MIT, `frontend/include/stb_image.h`, em `common/imagem.c`).
+- **Notificação:** caixa escura com borda branca, imagem da conquista à esquerda, "Conquista desbloqueada · N pontos" e o nome em destaque; desliza de cima, fica 5 s. Avisos sem imagem usam a mesma caixa.
+- **Menu do jogo → Conquistas**: em ordem de pontos (mais fáceis primeiro), imagem pequena (escurecida nas bloqueadas), ✓ e pontos; descrição da selecionada numa caixa de diálogo embaixo (fonte do nome, até 3 linhas); ◀ ▶ passam página.
 - **Hardcore:** Carregar (save state) e o retorno automático ao jogo ficam desligados. As opções de core proibidas pelo rcheevos para aquele core e console (`rc_libretro_get_disallowed_settings_for_system`: região PAL, camadas desligadas no Snes9x, trapaças no Genesis Plus GX...) voltam ao primeiro valor permitido e são puladas no menu de opções; core não permitido para o console desliga o hardcore na sessão, com aviso. Por isso o RetroAchievements começa antes de carregar o jogo.
 - **User agent:** `PingoOS/<versão> (Linux) <Core>/<versão do core> rcheevos/12.5`. O "Warning: Unknown Emulator" (conquista falsa com id ≥ 101000001) é o servidor avisando que o Pingo OS ainda não está aprovado para o hardcore: aparece como aviso e fica fora da lista. Pedido de aprovação: `docs/retroachievements-pedido.md`.
 - **Limites:** jogos em `.chd` (PS, Sega CD, PC Engine CD) não são identificados ainda (o leitor de CD do rcheevos só lê `.cue`/`.bin`/`.iso`); falta o libchdr. Sem imagens das conquistas (só texto).
@@ -57,6 +59,7 @@
 - [x] HTTPS com o servidor (login com usuário inexistente devolve "senha errada", nada gravado)
 - [x] Entrar com uma conta de verdade pela tela
 - [x] Jogo de cartucho reconhecido (Super Mario World: "3 de 89 conquistas")
-- [ ] Conquista desbloqueada na tela
-- [ ] Lista de conquistas no menu do jogo
+- [x] Conquista desbloqueada na tela (Mario Kart)
+- [ ] Notificação com a imagem da conquista
+- [x] Lista de conquistas no menu do jogo (ordem por pontos, caixa de descrição)
 - [ ] Hardcore: Carregar bloqueado

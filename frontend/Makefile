@@ -26,9 +26,9 @@ CURL_CFLAGS = $(shell $(PKG_CONFIG) --cflags libcurl)
 CURL_LIBS = $(shell $(PKG_CONFIG) --libs libcurl)
 endif
 
-pingo-retro: pingo-retro.c ra.c ra.h include/libretro.h $(COMMON_SRC) $(COMMON_HDR)
+pingo-retro: pingo-retro.c ra.c ra.h common/imagem.c common/imagem.h include/libretro.h include/stb_image.h $(COMMON_SRC) $(COMMON_HDR)
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(ZIP_CFLAGS) $(RC_CFLAGS) $(CURL_CFLAGS) $(LDFLAGS) \
-		-o $@ pingo-retro.c ra.c $(COMMON_SRC) $(RC_LIBS) $(CURL_LIBS) \
+		-o $@ pingo-retro.c ra.c common/imagem.c $(COMMON_SRC) $(RC_LIBS) $(CURL_LIBS) \
 		$(TTF_LIBS) $(SDL_LIBS) $(ALSA_LIBS) $(ZIP_LIBS) -ldl -lm
 
 pingo-launcher: $(LAUNCHER_SRC) $(LAUNCHER_HDR) $(COMMON_SRC) $(COMMON_HDR)

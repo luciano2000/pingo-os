@@ -41,6 +41,7 @@
 #include <zip.h>
 
 #include "fbcopy.h"
+#include "imagem.h"
 #include "libretro.h"
 #include "osd.h"
 #include "ra.h"
@@ -2108,41 +2109,91 @@ static bool run_options(void)
 /* ---- RetroAchievements: avisos e lista ------------------------------- */
 
 #define RA_NOTES 4
-static struct { char title[128], text[192]; } ra_notes[RA_NOTES];
+#define RA_NOTE_MS 5000
+static struct {
+	char title[128], text[192], image[200];
+	SDL_Texture *tex;
+	Uint32 next_try;
+} ra_notes[RA_NOTES];
 static int ra_nnotes;
-static Uint32 ra_note_until;
+static Uint32 ra_note_start;
 
-static void ra_note(const char *title, const char *text)
+static void ra_note_drop(void)
 {
-	if (ra_nnotes == RA_NOTES) { /* cheio: o mais antigo sai */
-		memmove(&ra_notes[0], &ra_notes[1], sizeof(ra_notes[0]) * (RA_NOTES - 1));
-		ra_nnotes--;
-	}
-	snprintf(ra_notes[ra_nnotes].title, sizeof(ra_notes[0].title), "%s", title ? title : "");
-	snprintf(ra_notes[ra_nnotes].text, sizeof(ra_notes[0].text), "%s", text ? text : "");
-	if (ra_nnotes++ == 0)
-		ra_note_until = SDL_GetTicks() + 4500;
+	if (ra_notes[0].tex)
+		SDL_DestroyTexture(ra_notes[0].tex);
+	memmove(&ra_notes[0], &ra_notes[1], sizeof(ra_notes[0]) * (RA_NOTES - 1));
+	memset(&ra_notes[RA_NOTES - 1], 0, sizeof(ra_notes[0]));
+	ra_nnotes--;
+	ra_note_start = SDL_GetTicks();
 }
 
-/* Aviso em cima, sobre o jogo: título em negrito e o texto embaixo */
+static void ra_note(const char *title, const char *text, const char *image)
+{
+	if (ra_nnotes == RA_NOTES) /* cheio: o mais antigo sai */
+		ra_note_drop();
+	int i = ra_nnotes++;
+	snprintf(ra_notes[i].title, sizeof(ra_notes[i].title), "%s", title ? title : "");
+	snprintf(ra_notes[i].text, sizeof(ra_notes[i].text), "%s", text ? text : "");
+	snprintf(ra_notes[i].image, sizeof(ra_notes[i].image), "%s", image ? image : "");
+	ra_notes[i].tex = NULL;
+	ra_notes[i].next_try = 0;
+	if (i == 0)
+		ra_note_start = SDL_GetTicks();
+}
+
+/* Notificação em cima: caixa escura com borda branca, a imagem da conquista
+ * à esquerda (quando há) e o texto ao lado; desliza de cima e volta */
 static void ra_draw_note(void)
 {
 	if (!ra_nnotes)
 		return;
-	if (SDL_GetTicks() >= ra_note_until) {
-		memmove(&ra_notes[0], &ra_notes[1], sizeof(ra_notes[0]) * (RA_NOTES - 1));
-		if (--ra_nnotes == 0)
+	Uint32 now = SDL_GetTicks();
+	if (now - ra_note_start >= RA_NOTE_MS) {
+		ra_note_drop();
+		if (!ra_nnotes)
 			return;
-		ra_note_until = SDL_GetTicks() + 4500;
 	}
-	const char *t = ra_notes[0].title, *x = ra_notes[0].text;
-	int w = SDL_max(ui_text_width(F_BAR_BOLD, t), x[0] ? ui_text_width(F_BAR, x) : 0);
-	w = SDL_min(w + 2 * ROW_PAD, UI_W - 2 * PAD_X);
-	int h = x[0] ? 58 : 36;
-	ui_round_rect((UI_W - w) / 2, PAD_Y, w, h, 14, 0x101010);
-	ui_text(F_BAR_BOLD, t, UI_W / 2, PAD_Y + (x[0] ? 18 : h / 2), COL_TEXT, 2, w - 2 * ROW_PAD);
-	if (x[0])
-		ui_text(F_BAR, x, UI_W / 2, PAD_Y + 40, COL_DIM, 2, w - 2 * ROW_PAD);
+	typeof(ra_notes[0]) *n = &ra_notes[0];
+	/* a imagem pode chegar depois (download): tenta de tempos em tempos */
+	if (n->image[0] && !n->tex && now >= n->next_try) {
+		n->tex = img_load(renderer, n->image);
+		n->next_try = now + 500;
+	}
+	const int img = 64, pad = 14;
+	bool has_img = n->image[0] != 0;
+	int text_w = SDL_max(ui_text_width(F_BAR, n->title),
+			     n->text[0] ? ui_text_width(F_ITEM_SEL, n->text) : 0);
+	int w = (has_img ? img + pad : 0) + text_w + 2 * pad + 6;
+	w = SDL_min(w, UI_W - 2 * PAD_X);
+	int h = has_img ? img + 2 * pad : (n->text[0] ? 72 : 48);
+	/* entra e sai deslizando (250 ms) */
+	Uint32 t = now - ra_note_start;
+	int slide = 0;
+	if (t < 250)
+		slide = (int)((250 - t) * (h + PAD_Y) / 250);
+	else if (t > RA_NOTE_MS - 250)
+		slide = (int)((t - (RA_NOTE_MS - 250)) * (h + PAD_Y) / 250);
+	int x = (UI_W - w) / 2, y = PAD_Y - slide;
+	ui_round_rect(x, y, w, h, 16, 0xF0F0F0);           /* borda */
+	ui_round_rect(x + 3, y + 3, w - 6, h - 6, 13, 0x0C0C0C); /* fundo */
+	int tx = x + pad + 3;
+	if (has_img) {
+		SDL_Rect r = { tx, y + pad, img, img };
+		if (n->tex) {
+			SDL_RenderCopy(renderer, n->tex, NULL, &r);
+		} else { /* ainda baixando: um quadro discreto no lugar */
+			ui_round_rect(r.x, r.y, img, img, 8, 0x2A2A2A);
+		}
+		tx += img + pad;
+	}
+	int avail = x + w - pad - 3 - tx;
+	if (n->text[0]) {
+		ui_text(F_BAR, n->title, tx, y + h / 2 - 14, COL_DIM, 0, avail);
+		ui_text(F_ITEM_SEL, n->text, tx, y + h / 2 + 12, COL_TEXT, 0, avail);
+	} else {
+		ui_text(F_ITEM_SEL, n->title, tx, y + h / 2, COL_TEXT, 0, avail);
+	}
 }
 
 #define RA_LIST_MAX 400
@@ -2202,9 +2253,12 @@ static void dialog_box(const char *text, int x, int y, int w, int max_lines, enu
 static void run_cheevos(void)
 {
 	static struct ra_cheevo list[RA_LIST_MAX];
+	static SDL_Texture *tex[RA_LIST_MAX];
 	unsigned got, total;
 	int n = ra_list(list, RA_LIST_MAX, &got, &total);
 	qsort(list, n, sizeof(*list), cheevo_cmp);
+	memset(tex, 0, sizeof(tex));
+	Uint32 next_try = 0;
 	int sel = 0, top = 0;
 	char head[96];
 	snprintf(head, sizeof(head), S_RA_SUMMARY, got, total);
@@ -2216,7 +2270,7 @@ static void run_cheevos(void)
 		poll_devices();
 		ra_idle();
 		if (quit_requested)
-			return;
+			break;
 		if (n && was_pressed(BTN_DPAD_UP))
 			sel = (sel - 1 + n) % n;
 		if (n && was_pressed(BTN_DPAD_DOWN))
@@ -2227,12 +2281,19 @@ static void run_cheevos(void)
 			sel = SDL_min(n - 1, sel + rows);
 		if (was_pressed(BTN_SOUTH) || menu_requested) {
 			menu_requested = false;
-			return;
+			break;
 		}
 		if (sel < top)
 			top = sel;
 		if (sel >= top + rows)
 			top = sel - rows + 1;
+		/* imagens das linhas visíveis (as que ainda estão baixando: de novo daqui a pouco) */
+		if (SDL_GetTicks() >= next_try) {
+			for (int r = 0; r < rows && top + r < n; r++)
+				if (!tex[top + r])
+					tex[top + r] = img_load(renderer, list[top + r].image);
+			next_try = SDL_GetTicks() + 700;
+		}
 
 		draw_dimmed_game();
 		draw_bar(S_M_CHEEVOS);
@@ -2247,8 +2308,18 @@ static void run_cheevos(void)
 				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
 			Uint32 fg = s ? COL_SEL_FG : (c->unlocked ? COL_TEXT : COL_DIM);
 			int vw = ui_text(F_COUNT, pts, UI_W - PAD_X - ROW_PAD, y + ROW_H / 2, fg, 1, 0) + 16;
-			ui_text(s ? F_ITEM_SEL : F_ITEM, c->title, PAD_X + ROW_PAD, y + ROW_H / 2, fg, 0,
-				UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
+			int ix = PAD_X + ROW_PAD - 4, isz = ROW_H - 10;
+			SDL_Texture *t = tex[top + r];
+			if (t) { /* bloqueada: imagem escurecida */
+				Uint8 v = c->unlocked ? 255 : 90;
+				SDL_SetTextureColorMod(t, v, v, v);
+				SDL_RenderCopy(renderer, t, NULL, &(SDL_Rect){ ix, y + 5, isz, isz });
+			} else {
+				ui_round_rect(ix, y + 5, isz, isz, 6, s ? 0x9A9A9A : 0x2A2A2A);
+			}
+			int tx = ix + isz + 12;
+			ui_text(s ? F_ITEM_SEL : F_ITEM, c->title, tx, y + ROW_H / 2, fg, 0,
+				UI_W - PAD_X - ROW_PAD - vw - tx);
 		}
 		if (n)
 			dialog_box(list[sel].description, PAD_X, box_y, UI_W - 2 * PAD_X, box_lines, F_ITEM,
@@ -2260,6 +2331,9 @@ static void run_cheevos(void)
 		osd_draw(renderer, screen_w, screen_h);
 		SDL_RenderPresent(renderer);
 	}
+	for (int i = 0; i < n; i++)
+		if (tex[i])
+			SDL_DestroyTexture(tex[i]);
 }
 
 /* devolve false para sair do jogo */

@@ -90,7 +90,7 @@ external/              árvore BR2_EXTERNAL do Buildroot
 - [MinUI](https://github.com/shauninman/MinUI): referência de interface.
 - [Inter](https://rsms.me/inter/) (OFL-1.1): fonte da interface.
 - [libretro](https://www.libretro.com): API dos cores (`libretro.h`, MIT).
-- [rcheevos](https://github.com/RetroAchievements/rcheevos) (MIT): RetroAchievements; [libcurl](https://curl.se) e [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/).
+- [rcheevos](https://github.com/RetroAchievements/rcheevos) (MIT): RetroAchievements; [stb_image](https://github.com/nothings/stb) (domínio público/MIT): imagens das conquistas; [libcurl](https://curl.se) e [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/).
 - Matrizes de cor GBA/SP 101: Pokefan531 e hunterk ([slang-shaders](https://github.com/libretro/slang-shaders), domínio público).
 
 Cores (todos do [libretro](https://github.com/libretro)):

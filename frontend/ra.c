@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "rc_client.h"
@@ -48,6 +49,7 @@ static size_t (*core_size)(unsigned);
 
 struct job {
 	char *url, *post, *ctype;
+	char *save_to; /* download de imagem: grava aqui (sem resposta ao rc_client) */
 	rc_client_server_callback_t cb;
 	void *cb_data;
 	/* resposta */
@@ -129,6 +131,24 @@ static void *worker_main(void *arg)
 
 		http(j);
 
+		if (j->save_to) { /* imagem: grava e pronto */
+			if (j->status == 200 && j->len > 0) {
+				char tmp[300];
+				snprintf(tmp, sizeof(tmp), "%s.tmp", j->save_to);
+				FILE *f = fopen(tmp, "wb");
+				if (f) {
+					fwrite(j->body, 1, j->len, f);
+					fclose(f);
+					rename(tmp, j->save_to);
+				}
+			}
+			free(j->url);
+			free(j->save_to);
+			free(j->body);
+			free(j);
+			continue;
+		}
+
 		pthread_mutex_lock(&q_lock);
 		j->next = NULL;
 		struct job **t = &done; /* mantém a ordem */
@@ -191,6 +211,52 @@ void ra_pump(void)
 	}
 }
 
+/* ---- imagens das conquistas ------------------------------------------------ *
+ * Baixadas quando o jogo é reconhecido, para o aviso já ter a imagem na
+ * hora do desbloqueio. Ficam no cartão: o mesmo jogo não baixa de novo. */
+#define BADGE_DIR "/mnt/sd1/.system/cache/ra"
+
+static void badge_path(const rc_client_achievement_t *a, char *out, size_t n)
+{
+	snprintf(out, n, "%s/%s.png", BADGE_DIR, a->badge_name);
+}
+
+static void badge_fetch(const rc_client_achievement_t *a)
+{
+	char path[200];
+	if (!a->badge_name[0] || !a->badge_url || !a->badge_url[0])
+		return;
+	badge_path(a, path, sizeof(path));
+	if (access(path, F_OK) == 0)
+		return;
+	struct job *j = calloc(1, sizeof(*j));
+	if (!j)
+		return;
+	j->url = strdup(a->badge_url);
+	j->save_to = strdup(path);
+	pthread_mutex_lock(&q_lock);
+	struct job **t = &pending; /* depois das chamadas do rc_client já na fila */
+	while (*t)
+		t = &(*t)->next;
+	*t = j;
+	pthread_cond_signal(&q_cond);
+	pthread_mutex_unlock(&q_lock);
+}
+
+static void badges_fetch_all(void)
+{
+	mkdir(BADGE_DIR, 0755);
+	rc_client_achievement_list_t *l =
+		rc_client_create_achievement_list(client, RC_CLIENT_ACHIEVEMENT_CATEGORY_CORE,
+						  RC_CLIENT_ACHIEVEMENT_LIST_GROUPING_LOCK_STATE);
+	for (uint32_t b = 0; l && b < l->num_buckets; b++)
+		for (uint32_t i = 0; i < l->buckets[b].num_achievements; i++)
+			if (l->buckets[b].achievements[i]->id < RA_WARNING_ID)
+				badge_fetch(l->buckets[b].achievements[i]);
+	if (l)
+		rc_client_destroy_achievement_list(l);
+}
+
 /* ---- memória do core --------------------------------------------------- */
 
 static void core_info(uint32_t id, rc_libretro_core_memory_info_t *info)
@@ -223,11 +289,16 @@ void ra_set_memory_map(const struct retro_memory_map *m)
 
 /* ---- conta e eventos ----------------------------------------------------- */
 
-static void say(const char *title, const char *text)
+static void say_img(const char *title, const char *text, const char *image)
 {
 	fprintf(stderr, "ra: %s%s%s\n", title, text ? ": " : "", text ? text : "");
 	if (notify)
-		notify(title, text);
+		notify(title, text, image);
+}
+
+static void say(const char *title, const char *text)
+{
+	say_img(title, text, NULL);
 }
 
 static void on_event(const rc_client_event_t *e, rc_client_t *cl)
@@ -244,8 +315,13 @@ static void on_event(const rc_client_event_t *e, rc_client_t *cl)
 								  : e->achievement->title);
 			break;
 		}
-		snprintf(t, sizeof(t), S_RA_UNLOCKED, e->achievement->points);
-		say(t, e->achievement->title);
+		{
+			char img[200];
+			badge_fetch(e->achievement); /* se ainda não veio */
+			badge_path(e->achievement, img, sizeof(img));
+			snprintf(t, sizeof(t), S_RA_UNLOCKED, e->achievement->points);
+			say_img(t, e->achievement->title, img);
+		}
 		break;
 	case RC_CLIENT_EVENT_GAME_COMPLETED:
 		say(S_RA_COMPLETED, rc_client_get_game_info(client)->title);
@@ -421,6 +497,7 @@ static void on_game(int result, const char *err, rc_client_t *cl, void *ud)
 		return;
 	}
 	game_ok = true;
+	badges_fetch_all();
 	rc_client_user_game_summary_t s;
 	rc_client_get_user_game_summary(client, &s);
 	char t[96];
@@ -501,6 +578,7 @@ int ra_list(struct ra_cheevo *out, int max, unsigned *unlocked, unsigned *total)
 			if (a->unlocked)
 				(*unlocked)++;
 			if (n < max) {
+				badge_path(a, out[n].image, sizeof(out[n].image));
 				snprintf(out[n].title, sizeof(out[n].title), "%s", a->title);
 				snprintf(out[n].description, sizeof(out[n].description), "%s", a->description);
 				out[n].points = a->points;

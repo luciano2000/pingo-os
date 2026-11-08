@@ -12,10 +12,12 @@
 /* Conta salva pela tela do launcher (usuário e token, nunca a senha) */
 #define RA_FILE "/mnt/sd1/.system/retroachievements.txt"
 
-/* Aviso na tela: o pingo-retro desenha (título e texto) */
-typedef void (*ra_notify_fn)(const char *title, const char *text);
+/* Aviso na tela: o pingo-retro desenha (título, texto e, se houver, a
+ * imagem da conquista: PNG no cache, que pode chegar depois do aviso) */
+typedef void (*ra_notify_fn)(const char *title, const char *text, const char *image);
 
 struct ra_cheevo {
+	char image[160]; /* PNG no cache (pode ainda não existir) */
 	char title[96];
 	char description[160];
 	unsigned points;

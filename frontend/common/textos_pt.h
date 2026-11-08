@@ -172,7 +172,7 @@ STR(S_NO, "não")
 /* RetroAchievements */
 STR(S_RA, "RetroAchievements")
 STR(S_M_CHEEVOS, "Conquistas")
-STR(S_RA_UNLOCKED, "Conquista! %u pontos")
+STR(S_RA_UNLOCKED, "Conquista desbloqueada · %u pontos")
 STR(S_RA_COMPLETED, "Jogo completo!")
 STR(S_RA_LB_STARTED, "Desafio começou")
 STR(S_RA_LB_FAILED, "Desafio falhou")
