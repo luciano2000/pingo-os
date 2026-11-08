@@ -76,7 +76,9 @@ do_install() {
 # e o SDL caía no layout do Xbox: A e B trocados). Rótulos como no aparelho:
 # A à direita (BTN_EAST, b1), B embaixo (BTN_SOUTH, b0), X em cima
 # (BTN_WEST, b3), Y à esquerda (BTN_NORTH, b2). Índices na ordem do SDL.
-PAD_MAP="190000004b480000df14000000010000,H700 Gamepad,a:b1,b:b0,x:b3,y:b2,back:b8,guide:b10,start:b9,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a2,righty:a3,platform:Linux,"
+# O SDL 2.32 põe no GUID um CRC do nome (f6a2 para "H700 Gamepad"): a linha
+# vai com o GUID exato que ele calcula
+PAD_MAP="1900f6a24b480000df14000000010000,H700 Gamepad,a:b1,b:b0,x:b3,y:b2,back:b8,guide:b10,start:b9,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a2,righty:a3,platform:Linux,"
 
 # Tabela de controles do PortMaster: só a linha do aparelho. Num sistema que
 # ele não conhece, os ports põem a tabela inteira (1.800 controles, centenas
