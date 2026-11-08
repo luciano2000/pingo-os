@@ -1732,6 +1732,7 @@ static void draw_menu(int sel)
 	right -= draw_hint(right, "B", S_BACK) + 22;
 	draw_hint(right, "A", S_CONFIRM);
 	osd_draw(renderer, screen_w, screen_h);
+	ui_screenshot_check(renderer);
 	SDL_RenderPresent(renderer);
 }
 
@@ -1837,6 +1838,7 @@ static void draw_options(int sel, int top_item)
 	else
 		draw_hint(right, "A", S_CONFIRM);
 	osd_draw(renderer, screen_w, screen_h);
+	ui_screenshot_check(renderer);
 	SDL_RenderPresent(renderer);
 }
 
@@ -1930,6 +1932,7 @@ static void draw_buttons(int sel, int top_item, bool waiting)
 		draw_hint(right, "A", sel < nbfunc ? S_HINT_CHANGE : S_CONFIRM);
 	}
 	osd_draw(renderer, screen_w, screen_h);
+	ui_screenshot_check(renderer);
 	SDL_RenderPresent(renderer);
 }
 
@@ -2011,6 +2014,7 @@ static void draw_dips(int sel, int top_item)
 	else
 		draw_hint(right, "A", S_CONFIRM);
 	osd_draw(renderer, screen_w, screen_h);
+	ui_screenshot_check(renderer);
 	SDL_RenderPresent(renderer);
 }
 
@@ -2328,6 +2332,7 @@ static void run_cheevos(void)
 		if (n > rows)
 			draw_hint(right, "◀ ▶", S_RA_PAGE);
 		osd_draw(renderer, screen_w, screen_h);
+		ui_screenshot_check(renderer);
 		SDL_RenderPresent(renderer);
 	}
 	for (int i = 0; i < n; i++)
@@ -2609,6 +2614,7 @@ int main(int argc, char **argv)
 	signal(SIGBUS, crash_handler);
 	signal(SIGABRT, crash_handler);
 	lang_load();
+	ui_screenshot_init();
 	names_from_path(argv[2], argc > 3 ? argv[3] : NULL);
 	bool resume = argc > 4 && !strcmp(argv[4], "resume");
 	snprintf(resume_core, sizeof(resume_core), "%s", argv[1]);
@@ -2784,6 +2790,7 @@ int main(int argc, char **argv)
 			ui_text(F_BAR, toast, UI_W / 2, PAD_Y + (BAR_H + 4) / 2, COL_TEXT, 2, 0);
 		}
 		osd_draw(renderer, screen_w, screen_h);
+		ui_screenshot_check(renderer);
 		SDL_RenderPresent(renderer);
 
 		frames++;

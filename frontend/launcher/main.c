@@ -935,6 +935,8 @@ static int wait_key(void)
 {
 	struct input_event ev;
 	for (;;) {
+		if (ui_screenshot_pending())
+			return -1; /* redesenha: o print sai no próximo quadro */
 		poll(fds, DEV_N, power_down ? 50 : 1000);
 		while (fds[DEV_PAD].fd >= 0 && read(fds[DEV_PAD].fd, &ev, sizeof(ev)) == sizeof(ev)) {
 			if (ev.type != EV_KEY)
@@ -2412,6 +2414,7 @@ int main(int argc, char **argv)
 {
 	th = th_dark;
 	lang_load();
+	ui_screenshot_init();
 	if (!getenv("TZ")) /* o pingo-shell já passa; sem ele, lê o arquivo */
 		zone_apply(zone_index());
 	struct stat st;
@@ -2487,6 +2490,8 @@ int main(int argc, char **argv)
 	sd2_maybe_ask();
 	last_input = SDL_GetTicks();
 	while (!quit) {
+		if (ui_screenshot_pending())
+			dirty = true;
 		if (dirty && !screen_off)
 			draw();
 

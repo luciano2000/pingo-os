@@ -78,4 +78,11 @@ void ui_rect(int x, int y, int w, int h, Uint32 rgb);
 int ui_icon_wifi(int x, int y_center, Uint32 rgb);
 int ui_icon_battery(int x, int y_center, int percent, bool charging, Uint32 rgb);
 
+/* Print da tela (SIGUSR1, pelo SSH): salva o que acabou de ser desenhado
+ * em /mnt/sd1/Screenshots antes de exibir. ui_screenshot_check() vai logo
+ * antes de cada SDL_RenderPresent. */
+void ui_screenshot_init(void);
+void ui_screenshot_check(SDL_Renderer *ren);
+int ui_screenshot_pending(void); /* o launcher redesenha para o print sair */
+
 #endif

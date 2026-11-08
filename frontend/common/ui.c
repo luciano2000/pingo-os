@@ -521,5 +521,55 @@ void ui_clear_rgb(Uint32 rgb)
 
 void ui_present(void)
 {
+	ui_screenshot_check(ren);
 	SDL_RenderPresent(ren);
+}
+
+/* ---- print da tela ------------------------------------------------------ */
+
+#include <signal.h>
+#include <sys/stat.h>
+#include <time.h>
+
+static volatile sig_atomic_t shot_wanted;
+
+static void on_usr1(int sig)
+{
+	(void)sig;
+	shot_wanted = 1;
+}
+
+int ui_screenshot_pending(void)
+{
+	return shot_wanted;
+}
+
+void ui_screenshot_init(void)
+{
+	signal(SIGUSR1, on_usr1);
+}
+
+void ui_screenshot_check(SDL_Renderer *r)
+{
+	if (!shot_wanted || !r)
+		return;
+	shot_wanted = 0;
+	int w, h;
+	if (SDL_GetRendererOutputSize(r, &w, &h) < 0)
+		return;
+	SDL_Surface *s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
+	if (!s)
+		return;
+	if (SDL_RenderReadPixels(r, NULL, SDL_PIXELFORMAT_ARGB8888, s->pixels, s->pitch) == 0) {
+		char path[128], stamp[32];
+		time_t t = time(NULL);
+		struct tm tm;
+		localtime_r(&t, &tm);
+		strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &tm);
+		mkdir("/mnt/sd1/Screenshots", 0755);
+		snprintf(path, sizeof(path), "/mnt/sd1/Screenshots/pingo-%s.bmp", stamp);
+		if (SDL_SaveBMP(s, path) == 0)
+			fprintf(stderr, "print: %s\n", path);
+	}
+	SDL_FreeSurface(s);
 }
