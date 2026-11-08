@@ -2538,7 +2538,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	ra_set_notify(ra_note);
-	if (ra_start(console_code))
+	if (ra_start(console_code, sysinfo.library_name, sysinfo.library_version))
 		ra_load_game(game.path, game.data, game.size, core.get_memory_data, core.get_memory_size);
 	core.get_system_av_info(&av);
 	aspect = av.geometry.aspect_ratio;

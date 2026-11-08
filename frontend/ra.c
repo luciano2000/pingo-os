@@ -34,6 +34,7 @@ static ra_notify_fn notify;
 static uint32_t console_id;
 static bool hardcore, game_ok;
 static char user[64], token[128];
+static char core_clause[96]; /* "Snes9x/1.62.3", como o RetroArch manda */
 
 static struct retro_memory_descriptor *mmap_desc;
 static struct retro_memory_map mmap_copy;
@@ -344,7 +345,8 @@ static void make_client(void)
 		}
 	if (f)
 		fclose(f);
-	snprintf(user_agent, sizeof(user_agent), "PingoOS/%s (Linux) %s", ver, clause);
+	snprintf(user_agent, sizeof(user_agent), "PingoOS/%s (Linux)%s%s %s", ver,
+		 core_clause[0] ? " " : "", core_clause, clause);
 	fprintf(stderr, "ra: %s\n", user_agent);
 }
 
@@ -358,8 +360,21 @@ static void on_login(int result, const char *err, rc_client_t *cl, void *ud)
 	}
 }
 
-bool ra_start(const char *console_code)
+/* nome e versão do core sem espaços ("FinalBurn Neo" -> "FinalBurn_Neo") */
+static void set_core_clause(const char *name, const char *version)
 {
+	core_clause[0] = 0;
+	if (!name || !*name)
+		return;
+	snprintf(core_clause, sizeof(core_clause), "%s/%s", name, version && *version ? version : "0");
+	for (char *p = core_clause; *p; p++)
+		if (*p == ' ')
+			*p = '_';
+}
+
+bool ra_start(const char *console_code, const char *core_name, const char *core_version)
+{
+	set_core_clause(core_name, core_version);
 	read_account();
 	console_id = console_of(console_code);
 	if (!user[0] || !token[0] || !console_id)

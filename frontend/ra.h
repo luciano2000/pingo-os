@@ -24,7 +24,7 @@ struct ra_cheevo {
 
 #ifdef PINGO_RA
 void ra_set_notify(ra_notify_fn fn);
-bool ra_start(const char *console_code);       /* lê a conta e entra (em segundo plano) */
+bool ra_start(const char *console_code, const char *core_name, const char *core_version);
 void ra_set_memory_map(const struct retro_memory_map *mmap);
 void ra_load_game(const char *path, const void *data, size_t size,
 		  void *(*get_mem)(unsigned), size_t (*get_size)(unsigned));
@@ -39,7 +39,8 @@ int ra_list(struct ra_cheevo *out, int max, unsigned *unlocked, unsigned *total)
 int ra_login_cli(const char *user); /* --ra-login: senha pela entrada padrão */
 #else
 static inline void ra_set_notify(ra_notify_fn fn) { (void)fn; }
-static inline bool ra_start(const char *c) { (void)c; return false; }
+static inline bool ra_start(const char *c, const char *n, const char *v)
+{ (void)c; (void)n; (void)v; return false; }
 static inline void ra_set_memory_map(const struct retro_memory_map *m) { (void)m; }
 static inline void ra_load_game(const char *p, const void *d, size_t s, void *(*a)(unsigned),
 				size_t (*b)(unsigned)) { (void)p; (void)d; (void)s; (void)a; (void)b; }
