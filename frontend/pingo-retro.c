@@ -2146,14 +2146,72 @@ static void ra_draw_note(void)
 }
 
 #define RA_LIST_MAX 400
+
+/* Ordem da lista: por pontos (no RetroAchievements, a pontuação acompanha a
+ * dificuldade), as mais fáceis primeiro; empate pelo nome */
+static int cheevo_cmp(const void *a, const void *b)
+{
+	const struct ra_cheevo *x = a, *y = b;
+	if (x->points != y->points)
+		return x->points < y->points ? -1 : 1;
+	return strcasecmp(x->title, y->title);
+}
+
+/* Caixa de texto embaixo, como a dos diálogos de RPG: quebra por palavra,
+ * até max_lines linhas; o que não couber termina em "…" */
+static void dialog_box(const char *text, int x, int y, int w, int max_lines, enum font_id f,
+		       int line_h)
+{
+	int h = max_lines * line_h + 28;
+	ui_round_rect(x, y, w, h, 14, 0xD8D8D8);
+	ui_round_rect(x + 3, y + 3, w - 6, h - 6, 11, 0x101010);
+	int inner = w - 2 * 22, ly = y + 14 + line_h / 2;
+	const char *p = text;
+	for (int line = 0; line < max_lines && *p; line++) {
+		while (*p == ' ')
+			p++;
+		/* o máximo de palavras que cabe na linha */
+		char buf[512];
+		size_t best = 0, len = strlen(p);
+		for (size_t i = 0; i <= len && i < sizeof(buf) - 1; i++) {
+			if (p[i] != ' ' && p[i] != 0)
+				continue;
+			memcpy(buf, p, i);
+			buf[i] = 0;
+			if (ui_text_width(f, buf) > inner)
+				break;
+			best = i;
+			if (!p[i])
+				break;
+		}
+		if (best == 0) /* palavra maior que a linha: corta nela */
+			best = SDL_min(len, sizeof(buf) - 1);
+		bool last = line == max_lines - 1;
+		memcpy(buf, p, best);
+		buf[best] = 0;
+		if (last && p[best]) {
+			/* sobrou texto: a última linha leva o resto, cortado com "…" */
+			snprintf(buf, sizeof(buf), "%s", p);
+		}
+		ui_text(f, buf, x + 22, ly, COL_TEXT, 0, inner);
+		p += best;
+		ly += line_h;
+	}
+}
+
 static void run_cheevos(void)
 {
 	static struct ra_cheevo list[RA_LIST_MAX];
 	unsigned got, total;
 	int n = ra_list(list, RA_LIST_MAX, &got, &total);
+	qsort(list, n, sizeof(*list), cheevo_cmp);
 	int sel = 0, top = 0;
 	char head[96];
 	snprintf(head, sizeof(head), S_RA_SUMMARY, got, total);
+	const int line_h = 28, box_lines = 3, box_h = box_lines * line_h + 28;
+	const int box_y = UI_H - PAD_Y - BAR_H - 8 - box_h;
+	const int list_y = PAD_Y + BAR_H + LIST_GAP;
+	const int rows = SDL_max(1, (box_y - 8 - list_y) / (ROW_H + ROW_GAP));
 	for (;;) {
 		poll_devices();
 		ra_idle();
@@ -2163,11 +2221,14 @@ static void run_cheevos(void)
 			sel = (sel - 1 + n) % n;
 		if (n && was_pressed(BTN_DPAD_DOWN))
 			sel = (sel + 1) % n;
+		if (n && was_pressed(BTN_DPAD_LEFT))
+			sel = SDL_max(0, sel - rows);
+		if (n && was_pressed(BTN_DPAD_RIGHT))
+			sel = SDL_min(n - 1, sel + rows);
 		if (was_pressed(BTN_SOUTH) || menu_requested) {
 			menu_requested = false;
 			return;
 		}
-		const int rows = ROWS - 1; /* a última fileira mostra a descrição */
 		if (sel < top)
 			top = sel;
 		if (sel >= top + rows)
@@ -2180,7 +2241,7 @@ static void run_cheevos(void)
 			const struct ra_cheevo *c = &list[top + r];
 			char pts[24];
 			snprintf(pts, sizeof(pts), "%s%u", c->unlocked ? "✓  " : "", c->points);
-			int y = PAD_Y + BAR_H + LIST_GAP + r * (ROW_H + ROW_GAP);
+			int y = list_y + r * (ROW_H + ROW_GAP);
 			bool s = top + r == sel;
 			if (s)
 				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
@@ -2190,10 +2251,12 @@ static void run_cheevos(void)
 				UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
 		}
 		if (n)
-			ui_text(F_BAR, list[sel].description, PAD_X, UI_H - PAD_Y - BAR_H / 2 - 30, COL_DIM,
-				0, UI_W - 2 * PAD_X);
+			dialog_box(list[sel].description, PAD_X, box_y, UI_W - 2 * PAD_X, box_lines, F_ITEM,
+				   line_h);
 		int right = UI_W - PAD_X;
-		draw_hint(right, "B", S_BACK);
+		right -= draw_hint(right, "B", S_BACK) + 22;
+		if (n > rows)
+			draw_hint(right, "◀ ▶", S_RA_PAGE);
 		osd_draw(renderer, screen_w, screen_h);
 		SDL_RenderPresent(renderer);
 	}
