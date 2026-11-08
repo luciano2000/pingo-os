@@ -77,17 +77,18 @@
 
 ## PortMaster
 
-- **No sistema:** bash, Python 3 (ssl, ctypes, zlib, bz2, xz, xml, unicodedata), SDL2_image (PNG/JPEG), SDL2_mixer, OpenAL (LÖVE) e o `curl` (com `CURL_CA_BUNDLE`, o mbed TLS não acha os certificados sozinho). No BusyBox: `pgrep`/`pkill` (o PortMaster cai sem eles), `timeout`, `stat`, `taskset` e o `tar` com gz/xz/bz2 (os runtimes). O kernel já tinha uinput, loop, squashfs, overlay e FUSE. A raiz cresceu de 73 para 86 MB.
+- **No sistema:** bash, Python 3 (ssl, ctypes, zlib, bz2, xz, xml, unicodedata), SDL2_image (PNG/JPEG), SDL2_mixer, OpenAL (LÖVE) e o `curl` (com `CURL_CA_BUNDLE`, o mbed TLS não acha os certificados sozinho). No BusyBox: `pgrep`/`pkill` (o PortMaster cai sem eles), `timeout`, `stat`, `taskset` com lista de núcleos (`-c 0,1,2,3`, o `$TASKSET` dos ports) e o `tar` com gz/xz/bz2 (os runtimes). O kernel já tinha uinput, loop, squashfs, overlay e FUSE. A raiz cresceu de 73 para 86 MB.
 - **`/roms/ports` → `/run/pingo/ports` → pasta Ports do cartão escolhido** (MENU → PortMaster → Instalar no: SD1/SD2; `Config/ports.txt`). É onde o PortMaster e os ports procuram tudo. No SD2, o `pingo-portmaster` libera a escrita enquanto o PortMaster ou o port roda e volta a só leitura no fim; sem o SD2, aviso. Trocar não move o que já está instalado.
 - **Tabela de controles:** só a linha do H700 Gamepad no `gamecontrollerdb.txt` do PortMaster (a original vai para `gamecontrollerdb.full.txt`; refeita a cada abertura). Num sistema que o PortMaster não conhece, os ports punham a tabela inteira (~1.800 controles) numa variável de ambiente, acima do limite de 128 KB do Linux: nada do port rodava ("Argument list too long"). Rótulos como no aparelho: A à direita, B embaixo, X em cima, Y à esquerda. Sistema desconhecido para ele = plataforma genérica, com o nome do `/etc/os-release` ("Pingo OS").
 - **MENU no Início → PortMaster:** "Instalar o PortMaster" enquanto ele não está instalado, depois "Abrir o PortMaster". Fica fora da lista de jogos (decisão: não sujar os consoles com o instalador).
 - **Instalar:** `pingo-portmaster install` baixa o `PortMaster.zip` oficial mais recente do GitHub, confere o md5 e extrai em `Ports/PortMaster/`. Depois ele se atualiza sozinho.
 - **Ports no Início** (depois dos consoles, só quando há algum port): os `Ports/*.sh` em ordem alfabética (as pastas de dados dos ports não aparecem). A abre: o launcher grava `port` em `/run/pingo/next` e o `pingo-shell` roda `pingo-portmaster run <script>`, com `HOME` e `XDG_*` em `.system/home` no SD1 (a raiz é somente leitura). Ao sair do port, volta ao launcher.
+- **Direcional vazio no `.gptk`:** muitos ports deixam o direcional e o analógico esquerdo vazios (`up = \"`), porque nos sistemas onde foram feitos o próprio sistema entrega o direcional como setas. O `pingo-portmaster` gera o `mod_Pingo OS.txt` (que todo port carrega), passando o gptokeyb pelo `pingo-gptokeyb`: numa cópia do `.gptk`, só essas linhas vazias viram setas.
 - **Sair de um port:** o atalho é o do próprio port (gptokeyb do PortMaster, normalmente SELECT + START).
 
 ### Checklist
 
 - [x] Instalar o PortMaster pelo menu (reconhece "Pingo OS", Anbernic RG35XX H, 640x480, Panfrost)
-- [ ] Abrir o PortMaster (interface dele aparece e responde aos botões)
-- [ ] Instalar um port gratuito pelo PortMaster e jogar
+- [x] Abrir o PortMaster (interface dele aparece e responde aos botões)
+- [x] Instalar ports gratuitos e jogar: Cave Story (nxengine-evo) e Ticoban com o direcional; Celeste Classic precisa do `taskset -c` (próxima imagem)
 - [ ] Sair do port e voltar ao launcher
