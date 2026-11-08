@@ -254,8 +254,8 @@ static void favorite_toggle(struct node *game)
 
 /* ---- Ports (PortMaster) ------------------------------------------------- *
  * O PortMaster instala cada port como Ports/<Nome>.sh (+ uma pasta com os
- * dados, que não aparece). O próprio PortMaster fica em
- * Ports/PortMaster/PortMaster.sh e vai no topo da lista. */
+ * dados, que não aparece). O próprio PortMaster (Ports/PortMaster/
+ * PortMaster.sh) fica no MENU do Início, não na lista de jogos. */
 static struct node *port_node(const char *fname, const char *path, const char *label)
 {
 	struct node *n = calloc(1, sizeof(*n));
@@ -292,9 +292,7 @@ static void ports_load(void)
 	ports->label = strdup(S_PORTS);
 	ports->dir = true;
 	ports->console = -1;
-	if (stat(PM_SCRIPT, &st) == 0)
-		ports_add(port_node("PortMaster.sh", PM_SCRIPT, "PortMaster"));
-	int first = ports->nkids;
+	int first = ports->nkids; /* o PortMaster não entra: ele fica no MENU do Início */
 	DIR *d = opendir(PORTS_DIR);
 	struct dirent *e;
 	while (d && (e = readdir(d))) {
@@ -2383,6 +2381,50 @@ static void ra_screen(void)
 	dirty = true;
 }
 
+static bool launch_port(struct node *port);
+
+/* MENU → PortMaster: "Instalar" enquanto não está instalado, depois
+ * "Abrir" (ele se atualiza sozinho). Devolve true para abrir. */
+static void portmaster_install(void);
+static bool portmaster_screen(void)
+{
+	for (;;) {
+		struct stat st;
+		bool installed = stat(PM_SCRIPT, &st) == 0;
+		ui_clear();
+		ui_text(F_BAR_BOLD, "PortMaster", PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 0);
+		draw_status_right();
+		int y = PAD_Y + BAR_H + LIST_GAP;
+		ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+		ui_text(F_ITEM_SEL, installed ? S_PM_OPEN : S_PM_INSTALL, PAD_X + ROW_PAD, y + ROW_H / 2,
+			COL_SEL_FG, 0, 0);
+		ui_text(F_BAR, installed ? S_PM_INFO : S_PM_INSTALL_INFO, PAD_X + ROW_PAD,
+			y + ROW_H + 24, COL_DIM, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD);
+		int right = UI_W - PAD_X;
+		if (toast[0] && SDL_GetTicks() < toast_until) {
+			ui_text(F_BAR, toast, PAD_X, UI_H - PAD_Y - BAR_H / 2, COL_TEXT, 0, UI_W - 2 * PAD_X);
+		} else {
+			toast[0] = 0;
+			right -= draw_hint(right, "B", S_BACK) + 22;
+			draw_hint(right, "A", S_CONFIRM);
+		}
+		osd_draw(ui_renderer(), UI_W, UI_H);
+		ui_present();
+		int k = wait_key();
+		if (k == BTN_SOUTH || k == BTN_MODE)
+			return false;
+		if (k != BTN_EAST)
+			continue;
+		if (!installed) {
+			portmaster_install();
+			continue;
+		}
+		struct node pm = { .fname = (char *)"PortMaster.sh", .path = (char *)PM_SCRIPT,
+				   .label = (char *)"PortMaster", .console = -1 };
+		return launch_port(&pm);
+	}
+}
+
 /* Baixa e instala o PortMaster oficial (pingo-portmaster install) */
 static void portmaster_install(void)
 {
@@ -2431,7 +2473,7 @@ static void language_changed(void)
  * prepará-lo) e Desligar, sempre o último */
 enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_RA, HM_PORTMASTER, HM_SD2, HM_POWEROFF };
 
-static void home_menu(void)
+static bool home_menu(void)
 {
 	int sel = 0;
 	struct lang langs[LANG_MAX];
@@ -2441,13 +2483,11 @@ static void home_menu(void)
 			cur_lang = i;
 	for (;;) {
 		int items[7], n = 0;
-		struct stat pst;
 		items[n++] = HM_WIFI;
 		items[n++] = HM_DATETIME;
 		items[n++] = HM_LANGUAGE;
 		items[n++] = HM_RA;
-		if (stat(PM_SCRIPT, &pst) != 0) /* depois de instalado, ele se atualiza sozinho */
-			items[n++] = HM_PORTMASTER;
+		items[n++] = HM_PORTMASTER;
 		if (sd2_present && !sd2_ready)
 			items[n++] = HM_SD2;
 		items[n++] = HM_POWEROFF;
@@ -2463,7 +2503,7 @@ static void home_menu(void)
 			const char *label = items[i] == HM_WIFI ? S_WIFI : items[i] == HM_DATETIME ? S_DT_TITLE
 					  : items[i] == HM_LANGUAGE ? S_LANGUAGE
 					  : items[i] == HM_RA ? S_RA
-					  : items[i] == HM_PORTMASTER ? S_PM_INSTALL
+					  : items[i] == HM_PORTMASTER ? "PortMaster"
 					  : items[i] == HM_SD2 ? S_PREPARE_SD2 : S_POWER_OFF_ITEM;
 			int vw = 0;
 			if (items[i] == HM_LANGUAGE)
@@ -2471,7 +2511,8 @@ static void home_menu(void)
 					     y + ROW_H / 2, s ? COL_SEL_FG : COL_DIM, 1, 300) + 16;
 			ui_text(s ? F_ITEM_SEL : F_ITEM, label, PAD_X + ROW_PAD, y + ROW_H / 2,
 				s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
-			if ((items[i] == HM_WIFI || items[i] == HM_DATETIME || items[i] == HM_RA) && s)
+			if ((items[i] == HM_WIFI || items[i] == HM_DATETIME || items[i] == HM_RA ||
+			     items[i] == HM_PORTMASTER) && s)
 				ui_icon_chevron(UI_W - PAD_X - ROW_PAD - 16, y + ROW_H / 2, COL_SEL_FG);
 		}
 		int right = UI_W - PAD_X;
@@ -2501,7 +2542,10 @@ static void home_menu(void)
 			} else if (it == HM_RA) {
 				ra_screen();
 			} else if (it == HM_PORTMASTER) {
-				portmaster_install();
+				if (portmaster_screen()) {
+					dirty = true;
+					return true; /* abre o PortMaster */
+				}
 			} else if (it == HM_SD2) {
 				sd2_prepare_now();
 				break;
@@ -2514,6 +2558,7 @@ static void home_menu(void)
 		}
 	}
 	dirty = true;
+	return false;
 }
 
 /* ---- principal -------------------------------------------------------- */
@@ -2643,7 +2688,7 @@ int main(int argc, char **argv)
 				if (osd_menu_tapped()) {
 					held = -1;
 					if (depth == 0)
-						home_menu();
+						quit = home_menu(); /* true: abrir o PortMaster */
 					else if (cur()->dir->console >= 0 && cur()->dir != recents)
 						console_menu(cur()->dir->console);
 				}
