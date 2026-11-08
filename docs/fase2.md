@@ -72,5 +72,5 @@
 
 ### Checklist
 
-- [ ] Entrar e voltar deslizando, sem tremer nem piscar
-- [ ] Navegação rápida (A/B seguidos) não fica presa na animação
+- [x] Entrar e voltar deslizando, sem tremer nem piscar
+- [x] Navegação rápida (A/B seguidos) não fica presa na animação
