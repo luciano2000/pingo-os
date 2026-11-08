@@ -26,6 +26,8 @@
 #include "textos.h"
 
 #define CA_FILE "/etc/ssl/certs/ca-certificates.crt"
+/* Conquistas com id a partir daqui são avisos do servidor (rc_client.c) */
+#define RA_WARNING_ID 101000001u
 
 static rc_client_t *client;
 static ra_notify_fn notify;
@@ -232,6 +234,14 @@ static void on_event(const rc_client_event_t *e, rc_client_t *cl)
 	char t[192];
 	switch (e->type) {
 	case RC_CLIENT_EVENT_ACHIEVEMENT_TRIGGERED:
+		if (e->achievement->id >= RA_WARNING_ID) {
+			/* aviso do servidor disfarçado de conquista (ex.: "Unknown Emulator":
+			 * o Pingo OS ainda não está entre os emuladores aprovados para o
+			 * hardcore) */
+			say(S_RA, e->achievement->description[0] ? e->achievement->description
+								  : e->achievement->title);
+			break;
+		}
 		snprintf(t, sizeof(t), S_RA_UNLOCKED, e->achievement->points);
 		say(t, e->achievement->title);
 		break;
@@ -316,9 +326,26 @@ static void make_client(void)
 	client = rc_client_create(read_memory, server_call);
 	rc_client_enable_logging(client, RC_CLIENT_LOG_LEVEL_WARN, log_msg);
 	rc_client_set_event_handler(client, on_event);
-	char clause[64] = "";
+	/* "PingoOS/0.1.0-beta (Linux) rcheevos/12.5": a versão vem do sistema */
+	char clause[64] = "", ver[48] = "dev", line[128];
 	rc_client_get_user_agent_clause(client, clause, sizeof(clause));
-	snprintf(user_agent, sizeof(user_agent), "PingoOS/0.1 (Linux) %s", clause);
+	FILE *f = fopen("/etc/os-release", "r");
+	while (f && fgets(line, sizeof(line), f))
+		if (!strncmp(line, "VERSION_ID=", 11)) {
+			char *v = line + 11;
+			v[strcspn(v, "\r\n")] = 0;
+			if (*v == '"')
+				v++;
+			v[strcspn(v, "\"")] = 0;
+			if (*v == 'v') /* tag "v0.1.0-beta" -> "0.1.0-beta" */
+				v++;
+			if (*v)
+				snprintf(ver, sizeof(ver), "%s", v);
+		}
+	if (f)
+		fclose(f);
+	snprintf(user_agent, sizeof(user_agent), "PingoOS/%s (Linux) %s", ver, clause);
+	fprintf(stderr, "ra: %s\n", user_agent);
 }
 
 static void on_login(int result, const char *err, rc_client_t *cl, void *ud)
@@ -438,6 +465,8 @@ int ra_list(struct ra_cheevo *out, int max, unsigned *unlocked, unsigned *total)
 	for (uint32_t b = 0; l && b < l->num_buckets; b++)
 		for (uint32_t i = 0; i < l->buckets[b].num_achievements; i++) {
 			const rc_client_achievement_t *a = l->buckets[b].achievements[i];
+			if (a->id >= RA_WARNING_ID) /* aviso do servidor, não conquista */
+				continue;
 			(*total)++;
 			if (a->unlocked)
 				(*unlocked)++;
