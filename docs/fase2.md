@@ -60,6 +60,6 @@
 - [x] Entrar com uma conta de verdade pela tela
 - [x] Jogo de cartucho reconhecido (Super Mario World: "3 de 89 conquistas")
 - [x] Conquista desbloqueada na tela (Mario Kart)
-- [ ] Notificação com a imagem da conquista
+- [x] Notificação com a imagem da conquista; imagens na lista (bloqueadas em preto e branco)
 - [x] Lista de conquistas no menu do jogo (ordem por pontos, caixa de descrição)
 - [ ] Hardcore: Carregar bloqueado
