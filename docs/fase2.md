@@ -37,6 +37,6 @@
 
 ### Checklist
 
-- [ ] Trocar para English no menu: Início, listas, menu do jogo, Wi-Fi, Data e hora
-- [ ] Voltar para Português
-- [ ] Desligar pelo menu
+- [x] Trocar para English no menu: Início, listas, menu do jogo, Wi-Fi, Data e hora
+- [x] Voltar para Português
+- [x] Desligar pelo menu
