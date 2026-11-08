@@ -4,6 +4,13 @@ Uma distro Linux mínima para consoles portáteis retrô. Grave a `.img` no cart
 
 A interface segue a filosofia do MinUI: direta ao ponto, sem boxart, temas ou menus de emulador. O sistema roda em uma partição somente leitura, então um cartão corrompido se resolve gravando a imagem de novo.
 
+<p align="center">
+  <img src="docs/img/inicio.png" width="32%" alt="Início: consoles, Recentes, Favoritos e Aleatório">
+  <img src="docs/img/lista.png" width="32%" alt="Lista de jogos do PlayStation">
+  <img src="docs/img/conquistas.png" width="32%" alt="Conquistas do RetroAchievements no menu do jogo">
+</p>
+<p align="center"><sub>Início · lista de jogos · conquistas do RetroAchievements (prints do RG35XX-H)</sub></p>
+
 > O nome vem do Pingo, o cachorro de infância do autor: curto, com cara de mascote, e representa algo pequeno.
 
 Um projeto do Retrogamer Brasil.
