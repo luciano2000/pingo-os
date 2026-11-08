@@ -13,7 +13,7 @@ A interface segue a filosofia do MinUI: direta ao ponto, sem boxart, temas ou me
 
 > O nome vem do Pingo, o cachorro de infância do autor: curto, com cara de mascote, e representa algo pequeno.
 
-Um projeto do Retrogamer Brasil.
+Um projeto do [Retrogamer Brasil](https://www.retrogamer.com.br).
 
 **Comunidade:** dúvidas, sugestões e notícias do Pingo no [Discord do Retrogamer Brasil](https://discord.gg/S3SBnaKh58).
 

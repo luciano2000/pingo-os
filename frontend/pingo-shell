@@ -24,6 +24,11 @@ while true; do
 		rm -f /run/pingo/next
 		load_tz # pode ter mudado no launcher
 		echo "== $(date '+%F %T') $rom"
+		if [ "$core" = "port" ]; then
+			# port do PortMaster (ou o próprio): roda o script e volta ao launcher
+			/usr/sbin/pingo-portmaster run "$rom"
+			continue
+		fi
 		/usr/bin/pingo-retro "$core" "$rom" "$console" $mode
 		if [ $? -eq 3 ]; then # power segurado no jogo
 			# desenha e deixa no fb0 (fica na tela até apagar)

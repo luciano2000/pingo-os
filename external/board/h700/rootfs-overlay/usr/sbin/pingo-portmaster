@@ -1,0 +1,56 @@
+#!/bin/sh
+# PortMaster no Pingo OS.
+#
+#   pingo-portmaster install   baixa a versão oficial mais recente e extrai em
+#                              /mnt/sd1/Ports/PortMaster (confere o md5)
+#   pingo-portmaster run <script.sh>
+#                              roda um port (ou o próprio PortMaster) com o
+#                              ambiente que eles esperam
+#
+# Saída do install: 0 ok, 2 sem conexão, 3 download corrompido, 4 sem espaço.
+PORTS=/mnt/sd1/Ports
+URL=https://github.com/PortsMaster/PortMaster-GUI/releases/latest/download
+HOMEDIR=/mnt/sd1/.system/home
+
+say() { echo "pingo-portmaster: $*" > /dev/kmsg; }
+
+do_install() {
+	mkdir -p "$PORTS" || return 4
+	tmp="$PORTS/.PortMaster.zip"
+	rm -f "$tmp"
+	curl -fsSL --retry 2 --connect-timeout 15 -o "$tmp" "$URL/PortMaster.zip" || { rm -f "$tmp"; return 2; }
+	want=$(curl -fsSL --connect-timeout 15 "$URL/PortMaster.zip.md5" | cut -c1-32)
+	got=$(md5sum "$tmp" | cut -c1-32)
+	if [ -z "$want" ] || [ "$want" != "$got" ]; then
+		say "md5 não confere ($got, esperado $want)"
+		rm -f "$tmp"
+		return 3
+	fi
+	# exFAT não guarda o bit de execução: o Python extrai e o mount já deixa executável
+	python3 -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])' \
+		"$tmp" "$PORTS" || { rm -f "$tmp"; return 4; }
+	rm -f "$tmp"
+	sync
+	say "PortMaster instalado ($(cat "$PORTS/PortMaster/version" 2>/dev/null))"
+	return 0
+}
+
+do_run() {
+	script=$1
+	[ -f "$script" ] || return 1
+	mkdir -p "$HOMEDIR/.config" "$HOMEDIR/.local/share"
+	# a raiz é somente leitura: os ports gravam a configuração no cartão
+	export HOME="$HOMEDIR"
+	export XDG_CONFIG_HOME="$HOMEDIR/.config"
+	export XDG_DATA_HOME="$HOMEDIR/.local/share"
+	export TERM=linux
+	cd "$(dirname "$script")" || return 1
+	say "rodando $script"
+	bash "$script"
+}
+
+case "$1" in
+	install) do_install ;;
+	run) do_run "$2" ;;
+	*) echo "uso: $0 install | run <script.sh>" >&2; exit 2 ;;
+esac

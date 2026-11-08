@@ -66,6 +66,11 @@ static int depth;            /* stack[depth] é a tela atual */
 static struct node *lib;     /* árvore da biblioteca (dona dos nós) */
 static struct node *recents; /* "Recentes" (dono dos nós dele) */
 static struct node *favorites; /* "Favoritos" (idem), em ordem alfabética */
+static struct node *ports;     /* "Ports": PortMaster e os ports instalados */
+
+#define PORTS_DIR  "/mnt/sd1/Ports"
+#define PORTS_PATH "pingo:ports"
+#define PM_SCRIPT  PORTS_DIR "/PortMaster/PortMaster.sh"
 static struct node home;     /* Início: aponta para recents e lib->kids */
 static struct node random_item; /* "Aleatório" no Início */
 #define RANDOM_PATH "pingo:aleatorio"
@@ -247,6 +252,67 @@ static void favorite_toggle(struct node *game)
 	favorites_save();
 }
 
+/* ---- Ports (PortMaster) ------------------------------------------------- *
+ * O PortMaster instala cada port como Ports/<Nome>.sh (+ uma pasta com os
+ * dados, que não aparece). O próprio PortMaster fica em
+ * Ports/PortMaster/PortMaster.sh e vai no topo da lista. */
+static struct node *port_node(const char *fname, const char *path, const char *label)
+{
+	struct node *n = calloc(1, sizeof(*n));
+	if (!n)
+		return NULL;
+	n->fname = strdup(fname);
+	n->path = strdup(path);
+	n->label = strdup(label);
+	n->console = -1;
+	n->games = 1;
+	return n;
+}
+
+static void ports_add(struct node *n)
+{
+	if (!n)
+		return;
+	ports->kids = realloc(ports->kids, sizeof(*ports->kids) * (ports->nkids + 1));
+	ports->kids[ports->nkids++] = n;
+}
+
+static bool is_port(const struct node *n)
+{
+	return n && !n->dir && !strncmp(n->path, PORTS_DIR "/", strlen(PORTS_DIR) + 1);
+}
+
+static void ports_load(void)
+{
+	struct stat st;
+	library_free(ports);
+	ports = calloc(1, sizeof(*ports));
+	ports->fname = strdup(PORTS_PATH);
+	ports->path = strdup(PORTS_PATH);
+	ports->label = strdup(S_PORTS);
+	ports->dir = true;
+	ports->console = -1;
+	if (stat(PM_SCRIPT, &st) == 0)
+		ports_add(port_node("PortMaster.sh", PM_SCRIPT, "PortMaster"));
+	int first = ports->nkids;
+	DIR *d = opendir(PORTS_DIR);
+	struct dirent *e;
+	while (d && (e = readdir(d))) {
+		size_t len = strlen(e->d_name);
+		if (e->d_name[0] == '.' || len < 4 || strcasecmp(e->d_name + len - 3, ".sh"))
+			continue;
+		char path[4096], *label = library_clean_name(e->d_name, false);
+		snprintf(path, sizeof(path), "%s/%s", PORTS_DIR, e->d_name);
+		if (stat(path, &st) == 0 && S_ISREG(st.st_mode))
+			ports_add(port_node(e->d_name, path, label ? label : e->d_name));
+		free(label);
+	}
+	if (d)
+		closedir(d);
+	qsort(ports->kids + first, ports->nkids - first, sizeof(*ports->kids), label_cmp);
+	ports->games = ports->nkids;
+}
+
 /* ---- Início ---------------------------------------------------------- */
 
 static void home_build(void)
@@ -257,7 +323,7 @@ static void home_build(void)
 	home.console = -1;
 	home.path = (char *)"pingo:inicio";
 	home.label = (char *)"";
-	int n = (lib ? lib->nkids : 0) + 3;
+	int n = (lib ? lib->nkids : 0) + 4;
 	home.kids = calloc(n, sizeof(*home.kids));
 	if (recents && recents->nkids > 0)
 		home.kids[home.nkids++] = recents;
@@ -273,6 +339,8 @@ static void home_build(void)
 	}
 	for (int i = 0; lib && i < lib->nkids; i++)
 		home.kids[home.nkids++] = lib->kids[i];
+	if (ports && ports->nkids > 0) /* depois dos consoles */
+		home.kids[home.nkids++] = ports;
 }
 
 static struct level *cur(void)
@@ -387,6 +455,7 @@ static void swap_library(struct node *fresh)
 	lib = fresh;
 	recents_load();
 	favorites_load();
+	ports_load();
 	home_build();
 	restore_paths(paths, n);
 	if (pending_console >= 0) { /* acabou de trocar a origem: abre o console de novo */
@@ -803,10 +872,31 @@ static void slide_run(int dir)
 
 static void message_screen(const char *title, const char *hint);
 
+static bool launch_port(struct node *port)
+{
+	struct stat st;
+	if (stat(port->path, &st) < 0) {
+		show_toast(S_MISSING_GAME);
+		return false;
+	}
+	message_screen(S_LOADING, port->label);
+	mkdir(RUN_DIR, 0755);
+	FILE *f = fopen(NEXT_FILE ".tmp", "w");
+	if (!f)
+		return false;
+	fprintf(f, "port\n%s\nPORTS\n", port->path);
+	fclose(f);
+	rename(NEXT_FILE ".tmp", NEXT_FILE);
+	return true;
+}
+
 static bool launch(struct node *game)
 {
 	char core[512];
 	struct stat st;
+
+	if (is_port(game))
+		return launch_port(game);
 
 	snprintf(core, sizeof(core), "%s/%s_libretro.so", CORES_DIR, consoles[game->console].core);
 	if (stat(core, &st) < 0) {
@@ -2293,6 +2383,18 @@ static void ra_screen(void)
 	dirty = true;
 }
 
+/* Baixa e instala o PortMaster oficial (pingo-portmaster install) */
+static void portmaster_install(void)
+{
+	message_screen(S_PM_INSTALLING, S_PM_INSTALLING_TXT);
+	const char *e = getenv("PINGO_PORTMASTER");
+	int rc = proc_run(e && *e ? e : "/usr/sbin/pingo-portmaster", "install", NULL, NULL, NULL, 0);
+	show_toast(rc == 0 ? S_PM_DONE : rc == 2 ? S_PM_NO_NET : rc == 3 ? S_PM_BAD : S_PM_NO_SPACE);
+	ports_load();
+	home_build();
+	clamp_level(&stack[0]);
+}
+
 /* Confirmação simples: A sim, B não */
 static bool confirm(const char *title, const char *text)
 {
@@ -2327,7 +2429,7 @@ static void language_changed(void)
 
 /* MENU no Início: Wi-Fi, Data e hora, Idioma, RetroAchievements, (cartão novo no slot 2:
  * prepará-lo) e Desligar, sempre o último */
-enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_RA, HM_SD2, HM_POWEROFF };
+enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_RA, HM_PORTMASTER, HM_SD2, HM_POWEROFF };
 
 static void home_menu(void)
 {
@@ -2338,11 +2440,14 @@ static void home_menu(void)
 		if (!strcmp(langs[i].code, lang_current()))
 			cur_lang = i;
 	for (;;) {
-		int items[6], n = 0;
+		int items[7], n = 0;
+		struct stat pst;
 		items[n++] = HM_WIFI;
 		items[n++] = HM_DATETIME;
 		items[n++] = HM_LANGUAGE;
 		items[n++] = HM_RA;
+		if (stat(PM_SCRIPT, &pst) != 0) /* depois de instalado, ele se atualiza sozinho */
+			items[n++] = HM_PORTMASTER;
 		if (sd2_present && !sd2_ready)
 			items[n++] = HM_SD2;
 		items[n++] = HM_POWEROFF;
@@ -2358,6 +2463,7 @@ static void home_menu(void)
 			const char *label = items[i] == HM_WIFI ? S_WIFI : items[i] == HM_DATETIME ? S_DT_TITLE
 					  : items[i] == HM_LANGUAGE ? S_LANGUAGE
 					  : items[i] == HM_RA ? S_RA
+					  : items[i] == HM_PORTMASTER ? S_PM_INSTALL
 					  : items[i] == HM_SD2 ? S_PREPARE_SD2 : S_POWER_OFF_ITEM;
 			int vw = 0;
 			if (items[i] == HM_LANGUAGE)
@@ -2394,6 +2500,8 @@ static void home_menu(void)
 				datetime_screen();
 			} else if (it == HM_RA) {
 				ra_screen();
+			} else if (it == HM_PORTMASTER) {
+				portmaster_install();
 			} else if (it == HM_SD2) {
 				sd2_prepare_now();
 				break;
@@ -2468,6 +2576,7 @@ int main(int argc, char **argv)
 		library_save_cache(lib, CACHE_FILE);
 	recents_load(); /* depois da biblioteca: precisa das pastas dos consoles */
 	favorites_load();
+	ports_load();
 	home_build();
 	stack[0] = (struct level){ &home, 0, 0 };
 	state_load();

@@ -200,3 +200,13 @@ STR(S_RA_INFO, "Vale para os jogos abertos depois daqui")
 STR(S_RA_HC_INFO, "Hardcore: sem carregar save states, conquistas valem mais")
 STR(S_RA_HC_CORE, "Este core não vale para o hardcore neste console: modo normal")
 STR(S_RA_PAGE, "página")
+
+/* PortMaster */
+STR(S_PORTS, "Ports")
+STR(S_PM_INSTALL, "Instalar o PortMaster")
+STR(S_PM_INSTALLING, "Instalando o PortMaster…")
+STR(S_PM_INSTALLING_TXT, "Baixando uns 25 MB: pode levar um minuto")
+STR(S_PM_DONE, "PortMaster instalado: veja em Ports, no Início")
+STR(S_PM_NO_NET, "Sem conexão: confira o Wi-Fi")
+STR(S_PM_BAD, "O download veio corrompido: tente de novo")
+STR(S_PM_NO_SPACE, "Não foi possível gravar no cartão")

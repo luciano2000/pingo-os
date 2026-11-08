@@ -15,6 +15,10 @@ OS
 # Pontos de montagem: boot (FAT) e cartões
 mkdir -p "$TARGET_DIR/boot" "$TARGET_DIR/mnt/sd1" "$TARGET_DIR/mnt/sd2"
 
+# PortMaster: ele e os ports procuram /roms/ports; aqui é a pasta Ports do SD1
+mkdir -p "$TARGET_DIR/roms"
+ln -sfn /mnt/sd1/Ports "$TARGET_DIR/roms/ports"
+
 # O Mesa precisa do Clang/libclc só no build (shaders internos pré-compilados)
 # e para OpenCL, que não usamos. O libgallium liga só no libLLVM.
 rm -f "$TARGET_DIR"/usr/lib/libclang*.so* "$TARGET_DIR"/usr/lib/libLLVMSPIRVLib.so*

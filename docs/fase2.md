@@ -74,3 +74,18 @@
 
 - [x] Entrar e voltar deslizando, sem tremer nem piscar
 - [x] Navegação rápida (A/B seguidos) não fica presa na animação
+
+## PortMaster
+
+- **No sistema:** bash, Python 3 (ssl, ctypes, zlib, bz2, xz, xml, unicodedata), SDL2_image (PNG/JPEG), SDL2_mixer e o `curl`. O kernel já tinha uinput, loop, squashfs, overlay e FUSE. A raiz cresceu de 73 para 86 MB.
+- **`/roms/ports` → `/mnt/sd1/Ports`** (link na imagem): é onde o PortMaster e os ports procuram tudo. Sistema desconhecido para ele = plataforma genérica, com o nome do `/etc/os-release` ("Pingo OS").
+- **Instalar:** MENU no Início → **Instalar o PortMaster** (só aparece enquanto não está instalado). `pingo-portmaster install` baixa o `PortMaster.zip` oficial mais recente do GitHub, confere o md5 e extrai em `Ports/PortMaster/`. Depois ele se atualiza sozinho.
+- **Ports no Início** (depois dos consoles): PortMaster no topo e os `Ports/*.sh` em ordem alfabética (as pastas de dados dos ports não aparecem). A abre: o launcher grava `port` em `/run/pingo/next` e o `pingo-shell` roda `pingo-portmaster run <script>`, com `HOME` e `XDG_*` em `.system/home` no SD1 (a raiz é somente leitura). Ao sair do port, volta ao launcher.
+- **Sair de um port:** o atalho é o do próprio port (gptokeyb do PortMaster, normalmente SELECT + START).
+
+### Checklist
+
+- [ ] Instalar o PortMaster pelo menu
+- [ ] Abrir o PortMaster (interface dele aparece e responde aos botões)
+- [ ] Instalar um port gratuito pelo PortMaster e jogar
+- [ ] Sair do port e voltar ao launcher
