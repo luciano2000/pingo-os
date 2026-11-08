@@ -1,0 +1,4 @@
+# Cabeçalhos de terceiros (copiados como estão): fora das estatísticas de
+# linguagem do GitHub. O stb_image.h é C, mas o detector o lia como C++.
+frontend/include/stb_image.h linguist-vendored
+frontend/include/libretro.h linguist-vendored
