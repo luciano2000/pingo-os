@@ -17,8 +17,18 @@ LAUNCHER_HDR = launcher/library.h
 
 all: pingo-retro pingo-launcher
 
-pingo-retro: pingo-retro.c include/libretro.h $(COMMON_SRC) $(COMMON_HDR)
-	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(ZIP_CFLAGS) $(LDFLAGS) -o $@ pingo-retro.c $(COMMON_SRC) \
+# RetroAchievements: o Buildroot passa RC_CFLAGS (-DPINGO_RA ...) e RC_LIBS;
+# sem eles (build no PC), o ra.c vira funções vazias
+RC_CFLAGS ?=
+RC_LIBS ?=
+ifneq ($(RC_CFLAGS),)
+CURL_CFLAGS = $(shell $(PKG_CONFIG) --cflags libcurl)
+CURL_LIBS = $(shell $(PKG_CONFIG) --libs libcurl)
+endif
+
+pingo-retro: pingo-retro.c ra.c ra.h include/libretro.h $(COMMON_SRC) $(COMMON_HDR)
+	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(ZIP_CFLAGS) $(RC_CFLAGS) $(CURL_CFLAGS) $(LDFLAGS) \
+		-o $@ pingo-retro.c ra.c $(COMMON_SRC) $(RC_LIBS) $(CURL_LIBS) \
 		$(TTF_LIBS) $(SDL_LIBS) $(ALSA_LIBS) $(ZIP_LIBS) -ldl -lm
 
 pingo-launcher: $(LAUNCHER_SRC) $(LAUNCHER_HDR) $(COMMON_SRC) $(COMMON_HDR)

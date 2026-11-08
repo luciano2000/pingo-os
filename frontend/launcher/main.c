@@ -1337,8 +1337,10 @@ static const char *wifi_cmd(void)
 	return e && *e ? e : "/usr/sbin/pingo-wifi";
 }
 
-/* Roda o pingo-wifi; devolve o código de saída (-1: não rodou) */
-static int wifi_run(const char *a1, const char *a2, const char *input, char *out, size_t outn)
+/* Roda um programa (o pingo-wifi, o login do RetroAchievements...) com a
+ * entrada dada; devolve o código de saída (-1: não rodou) */
+static int proc_run(const char *cmd, const char *a1, const char *a2, const char *input, char *out,
+		    size_t outn)
 {
 	int in_p[2], out_p[2];
 	if (pipe(in_p) < 0)
@@ -1363,7 +1365,6 @@ static int wifi_run(const char *a1, const char *a2, const char *input, char *out
 		 * veria o fim da resposta (e herdariam também as fontes, a tela...) */
 		for (int fd = 3; fd < 1024; fd++)
 			close(fd);
-		const char *cmd = wifi_cmd();
 		execl(cmd, cmd, a1, a2, (char *)NULL);
 		_exit(127);
 	}
@@ -1396,6 +1397,11 @@ static int wifi_run(const char *a1, const char *a2, const char *input, char *out
 	if (waitpid(pid, &st, 0) < 0)
 		return -1;
 	return WIFEXITED(st) ? WEXITSTATUS(st) : -1;
+}
+
+static int wifi_run(const char *a1, const char *a2, const char *input, char *out, size_t outn)
+{
+	return proc_run(wifi_cmd(), a1, a2, input, out, outn);
 }
 
 #define WIFI_MAX_NETS 40
@@ -2064,6 +2070,137 @@ static void datetime_screen(void)
 }
 
 /* MENU no Início: Wi-Fi, data e hora e, com um cartão novo no slot 2, prepará-lo */
+/* ---- RetroAchievements ---------------------------------------------------- *
+ * Login pelo pingo-retro --ra-login (a senha vai pela entrada padrão; no
+ * cartão fica só o token). O jogo lê a conta ao abrir. */
+#define RA_FILE "/mnt/sd1/.system/retroachievements.txt"
+
+static bool confirm(const char *title, const char *text);
+
+static const char *retro_cmd(void)
+{
+	const char *e = getenv("PINGO_RETRO"); /* para testar sem regravar o sistema */
+	return e && *e ? e : "/usr/bin/pingo-retro";
+}
+
+static void ra_read(char *user, size_t un, char *token, size_t tn, bool *hardcore)
+{
+	FILE *f = fopen(RA_FILE, "r");
+	char line[256];
+	user[0] = token[0] = 0;
+	*hardcore = false;
+	if (!f)
+		return;
+	while (fgets(line, sizeof(line), f)) {
+		line[strcspn(line, "\r\n")] = 0;
+		if (!strncmp(line, "usuario=", 8))
+			snprintf(user, un, "%s", line + 8);
+		else if (!strncmp(line, "token=", 6))
+			snprintf(token, tn, "%s", line + 6);
+		else if (!strncmp(line, "hardcore=", 9))
+			*hardcore = line[9] == '1';
+	}
+	fclose(f);
+}
+
+static void ra_write(const char *user, const char *token, bool hardcore)
+{
+	FILE *f = fopen(RA_FILE ".tmp", "w");
+	if (!f)
+		return;
+	fprintf(f, "usuario=%s\ntoken=%s\nhardcore=%d\n", user, token, hardcore ? 1 : 0);
+	fflush(f);
+	fsync(fileno(f));
+	fclose(f);
+	rename(RA_FILE ".tmp", RA_FILE);
+}
+
+static void ra_login(void)
+{
+	char user[64] = "", pass[128] = "", out[256];
+	if (!keyboard(S_RA_USER, user, sizeof(user), 1, NULL))
+		return;
+	if (!keyboard(S_RA_PASSWORD, pass, sizeof(pass), 1, NULL))
+		return;
+	message_screen(S_RA_LOGGING_IN, user);
+	int rc = proc_run(retro_cmd(), "--ra-login", user, pass, out, sizeof(out));
+	memset(pass, 0, sizeof(pass));
+	out[strcspn(out, "\r\n")] = 0;
+	char msg[160];
+	if (rc == 0)
+		snprintf(msg, sizeof(msg), S_RA_LOGGED_IN, out[0] ? out : user);
+	else
+		snprintf(msg, sizeof(msg), "%s", rc == 1 ? S_RA_BAD_LOGIN : S_RA_NO_NET);
+	show_toast(msg);
+}
+
+static void ra_screen(void)
+{
+	int sel = 0;
+	for (;;) {
+		char user[64], token[128];
+		bool hc;
+		ra_read(user, sizeof(user), token, sizeof(token), &hc);
+		bool logged = user[0] && token[0];
+		int n = logged ? 3 : 1; /* conta/entrar, hardcore, sair */
+		if (sel >= n)
+			sel = n - 1;
+
+		ui_clear();
+		ui_text(F_BAR_BOLD, S_RA, PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 0);
+		draw_status_right();
+		int y0 = PAD_Y + BAR_H + LIST_GAP;
+		for (int i = 0; i < n; i++) {
+			int y = y0 + i * (ROW_H + ROW_GAP);
+			bool s = i == sel;
+			if (s)
+				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+			const char *label = !logged ? S_RA_LOGIN : i == 0 ? S_RA_ACCOUNT
+					  : i == 1 ? S_RA_HARDCORE : S_RA_LOGOUT;
+			const char *value = !logged ? S_RA_NOT_LOGGED : i == 0 ? user
+					  : i == 1 ? (hc ? S_O_ON : S_O_OFF) : NULL;
+			int vw = 0;
+			if (value)
+				vw = ui_text(F_COUNT, value, UI_W - PAD_X - ROW_PAD, y + ROW_H / 2,
+					     s ? COL_SEL_FG : COL_DIM, 1, 300) + 16;
+			ui_text(s ? F_ITEM_SEL : F_ITEM, label, PAD_X + ROW_PAD, y + ROW_H / 2,
+				s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
+		}
+		ui_text(F_BAR, logged && sel == 1 ? S_RA_HC_INFO : S_RA_INFO, PAD_X + ROW_PAD,
+			y0 + n * (ROW_H + ROW_GAP) + 16, COL_DIM, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD);
+		int right = UI_W - PAD_X;
+		if (toast[0] && SDL_GetTicks() < toast_until) {
+			ui_text(F_BAR, toast, PAD_X, UI_H - PAD_Y - BAR_H / 2, COL_TEXT, 0, UI_W - 2 * PAD_X);
+		} else {
+			toast[0] = 0;
+			right -= draw_hint(right, "B", S_BACK) + 22;
+			if (!logged || sel > 0)
+				draw_hint(right, logged && sel == 1 ? "◀ ▶" : "A",
+					  logged && sel == 1 ? S_HINT_CHANGE : S_CONFIRM);
+		}
+		osd_draw(ui_renderer(), UI_W, UI_H);
+		ui_present();
+
+		int k = wait_key();
+		bool change = k == BTN_EAST || k == BTN_DPAD_LEFT || k == BTN_DPAD_RIGHT;
+		if (k == BTN_SOUTH || k == BTN_MODE)
+			break;
+		if (k == BTN_DPAD_UP)
+			sel = (sel - 1 + n) % n;
+		else if (k == BTN_DPAD_DOWN)
+			sel = (sel + 1) % n;
+		else if (!logged && k == BTN_EAST)
+			ra_login();
+		else if (logged && sel == 1 && change)
+			ra_write(user, token, !hc);
+		else if (logged && sel == 2 && k == BTN_EAST && confirm(S_RA_LOGOUT, user)) {
+			unlink(RA_FILE);
+			show_toast(S_RA_LOGGED_OUT);
+		}
+	}
+	dirty = true;
+}
+
 /* Confirmação simples: A sim, B não */
 static bool confirm(const char *title, const char *text)
 {
@@ -2096,9 +2233,9 @@ static void language_changed(void)
 	dirty = true;
 }
 
-/* MENU no Início: Wi-Fi, Data e hora, Idioma, (cartão novo no slot 2:
+/* MENU no Início: Wi-Fi, Data e hora, Idioma, RetroAchievements, (cartão novo no slot 2:
  * prepará-lo) e Desligar, sempre o último */
-enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_SD2, HM_POWEROFF };
+enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_RA, HM_SD2, HM_POWEROFF };
 
 static void home_menu(void)
 {
@@ -2109,10 +2246,11 @@ static void home_menu(void)
 		if (!strcmp(langs[i].code, lang_current()))
 			cur_lang = i;
 	for (;;) {
-		int items[5], n = 0;
+		int items[6], n = 0;
 		items[n++] = HM_WIFI;
 		items[n++] = HM_DATETIME;
 		items[n++] = HM_LANGUAGE;
+		items[n++] = HM_RA;
 		if (sd2_present && !sd2_ready)
 			items[n++] = HM_SD2;
 		items[n++] = HM_POWEROFF;
@@ -2127,6 +2265,7 @@ static void home_menu(void)
 				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
 			const char *label = items[i] == HM_WIFI ? S_WIFI : items[i] == HM_DATETIME ? S_DT_TITLE
 					  : items[i] == HM_LANGUAGE ? S_LANGUAGE
+					  : items[i] == HM_RA ? S_RA
 					  : items[i] == HM_SD2 ? S_PREPARE_SD2 : S_POWER_OFF_ITEM;
 			int vw = 0;
 			if (items[i] == HM_LANGUAGE)
@@ -2134,7 +2273,7 @@ static void home_menu(void)
 					     y + ROW_H / 2, s ? COL_SEL_FG : COL_DIM, 1, 300) + 16;
 			ui_text(s ? F_ITEM_SEL : F_ITEM, label, PAD_X + ROW_PAD, y + ROW_H / 2,
 				s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
-			if ((items[i] == HM_WIFI || items[i] == HM_DATETIME) && s)
+			if ((items[i] == HM_WIFI || items[i] == HM_DATETIME || items[i] == HM_RA) && s)
 				ui_icon_chevron(UI_W - PAD_X - ROW_PAD - 16, y + ROW_H / 2, COL_SEL_FG);
 		}
 		int right = UI_W - PAD_X;
@@ -2161,6 +2300,8 @@ static void home_menu(void)
 				wifi_screen();
 			} else if (it == HM_DATETIME) {
 				datetime_screen();
+			} else if (it == HM_RA) {
+				ra_screen();
 			} else if (it == HM_SD2) {
 				sd2_prepare_now();
 				break;

@@ -1,0 +1,8 @@
+config BR2_PACKAGE_RCHEEVOS
+	bool "rcheevos"
+	help
+	  Biblioteca oficial do RetroAchievements (MIT): cliente,
+	  identificação dos jogos (hash) e leitura da memória dos cores
+	  libretro. Compilada como biblioteca estática para o pingo-retro.
+
+	  https://github.com/RetroAchievements/rcheevos

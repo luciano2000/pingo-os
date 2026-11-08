@@ -43,6 +43,7 @@
 #include "fbcopy.h"
 #include "libretro.h"
 #include "osd.h"
+#include "ra.h"
 #include "textos.h"
 #include "ui.h"
 
@@ -1079,6 +1080,7 @@ static int button_by_name(const char *name)
 /* Lê todos os dispositivos (uma vez por quadro, no jogo e no menu) */
 static void poll_devices(void)
 {
+	ra_pump();
 	struct input_event ev;
 
 	npressed = 0;
@@ -1268,6 +1270,9 @@ static bool environment(unsigned cmd, void *data)
 	/* Sem estas duas respostas, o FBNeo acha que é partida em rede (netplay)
 	 * na primeira vez que o save state é consultado e desliga os recordes
 	 * (hiscore.dat). Aqui é sempre: vídeo e som ligados, save state normal. */
+	case RETRO_ENVIRONMENT_SET_MEMORY_MAPS: /* o RetroAchievements lê a memória por aqui */
+		ra_set_memory_map((const struct retro_memory_map *)data);
+		return true;
 	case RETRO_ENVIRONMENT_SET_ROTATION:
 		if (!data)
 			return false;
@@ -1594,8 +1599,8 @@ static void hint_slot(void)
 	ui_text(F_BAR, S_HINT_SLOT, PAD_X + w + ui_text_width(F_BAR, " "), y, COL_DIM, 0, 0);
 }
 
-enum { MI_CONTINUE, MI_SAVE, MI_LOAD, MI_OPTIONS, MI_DISC, MI_FLIP, MI_QUIT };
-static int menu_ids[7], menu_n;
+enum { MI_CONTINUE, MI_SAVE, MI_LOAD, MI_OPTIONS, MI_CHEEVOS, MI_DISC, MI_FLIP, MI_QUIT };
+static int menu_ids[8], menu_n;
 
 static void menu_build(void)
 {
@@ -1604,6 +1609,8 @@ static void menu_build(void)
 	menu_ids[menu_n++] = MI_SAVE;
 	menu_ids[menu_n++] = MI_LOAD;
 	menu_ids[menu_n++] = MI_OPTIONS;
+	if (ra_active())
+		menu_ids[menu_n++] = MI_CHEEVOS;
 	if (disc_count() > 1)
 		menu_ids[menu_n++] = MI_DISC;
 	if (is_fds)
@@ -1618,6 +1625,7 @@ static const char *menu_label(int id, char *buf, size_t n)
 	case MI_SAVE:     return S_M_SAVE;
 	case MI_LOAD:     return S_M_LOAD;
 	case MI_OPTIONS:  return S_M_OPTIONS;
+	case MI_CHEEVOS:  return S_M_CHEEVOS;
 	case MI_DISC:
 		snprintf(buf, n, S_M_DISC, disc_index() + 1, disc_count());
 		return buf;
@@ -1650,7 +1658,7 @@ static void draw_menu(int sel)
 			ui_round_rect(PAD_X, y, 252, ROW_H, ROW_RADIUS, COL_SEL_BG);
 		ui_text(s ? F_ITEM_SEL : F_ITEM, menu_label(id, lbuf, sizeof(lbuf)), PAD_X + ROW_PAD,
 			y + ROW_H / 2, s ? COL_SEL_FG : COL_TEXT, 0, 252 - 2 * ROW_PAD - 20);
-		if (s && (id == MI_SAVE || id == MI_LOAD || id == MI_OPTIONS))
+		if (s && (id == MI_SAVE || id == MI_LOAD || id == MI_OPTIONS || id == MI_CHEEVOS))
 			ui_icon_chevron(PAD_X + 252 - ROW_PAD - 16, y + ROW_H / 2, COL_SEL_FG);
 	}
 
@@ -2016,6 +2024,7 @@ static void run_dips(void)
 				show_toast(S_DIPS_NOCHANGE);
 			} else if (cfg_save(true)) {
 				core.reset();
+				ra_reset();
 				show_toast(S_DIPS_APPLIED); /* aparece nas Opções */
 				return;
 			} else {
@@ -2073,6 +2082,100 @@ static bool run_options(void)
 		if (sel >= top + ROWS)
 			top = sel - ROWS + 1;
 		draw_options(sel, top);
+	}
+}
+
+/* ---- RetroAchievements: avisos e lista ------------------------------- */
+
+#define RA_NOTES 4
+static struct { char title[128], text[192]; } ra_notes[RA_NOTES];
+static int ra_nnotes;
+static Uint32 ra_note_until;
+
+static void ra_note(const char *title, const char *text)
+{
+	if (ra_nnotes == RA_NOTES) { /* cheio: o mais antigo sai */
+		memmove(&ra_notes[0], &ra_notes[1], sizeof(ra_notes[0]) * (RA_NOTES - 1));
+		ra_nnotes--;
+	}
+	snprintf(ra_notes[ra_nnotes].title, sizeof(ra_notes[0].title), "%s", title ? title : "");
+	snprintf(ra_notes[ra_nnotes].text, sizeof(ra_notes[0].text), "%s", text ? text : "");
+	if (ra_nnotes++ == 0)
+		ra_note_until = SDL_GetTicks() + 4500;
+}
+
+/* Aviso em cima, sobre o jogo: título em negrito e o texto embaixo */
+static void ra_draw_note(void)
+{
+	if (!ra_nnotes)
+		return;
+	if (SDL_GetTicks() >= ra_note_until) {
+		memmove(&ra_notes[0], &ra_notes[1], sizeof(ra_notes[0]) * (RA_NOTES - 1));
+		if (--ra_nnotes == 0)
+			return;
+		ra_note_until = SDL_GetTicks() + 4500;
+	}
+	const char *t = ra_notes[0].title, *x = ra_notes[0].text;
+	int w = SDL_max(ui_text_width(F_BAR_BOLD, t), x[0] ? ui_text_width(F_BAR, x) : 0);
+	w = SDL_min(w + 2 * ROW_PAD, UI_W - 2 * PAD_X);
+	int h = x[0] ? 58 : 36;
+	ui_round_rect((UI_W - w) / 2, PAD_Y, w, h, 14, 0x101010);
+	ui_text(F_BAR_BOLD, t, UI_W / 2, PAD_Y + (x[0] ? 18 : h / 2), COL_TEXT, 2, w - 2 * ROW_PAD);
+	if (x[0])
+		ui_text(F_BAR, x, UI_W / 2, PAD_Y + 40, COL_DIM, 2, w - 2 * ROW_PAD);
+}
+
+#define RA_LIST_MAX 400
+static void run_cheevos(void)
+{
+	static struct ra_cheevo list[RA_LIST_MAX];
+	unsigned got, total;
+	int n = ra_list(list, RA_LIST_MAX, &got, &total);
+	int sel = 0, top = 0;
+	char head[96];
+	snprintf(head, sizeof(head), S_RA_SUMMARY, got, total);
+	for (;;) {
+		poll_devices();
+		ra_idle();
+		if (quit_requested)
+			return;
+		if (n && was_pressed(BTN_DPAD_UP))
+			sel = (sel - 1 + n) % n;
+		if (n && was_pressed(BTN_DPAD_DOWN))
+			sel = (sel + 1) % n;
+		if (was_pressed(BTN_SOUTH) || menu_requested) {
+			menu_requested = false;
+			return;
+		}
+		const int rows = ROWS - 1; /* a última fileira mostra a descrição */
+		if (sel < top)
+			top = sel;
+		if (sel >= top + rows)
+			top = sel - rows + 1;
+
+		draw_dimmed_game();
+		draw_bar(S_M_CHEEVOS);
+		ui_text(F_BAR, head, UI_W - PAD_X, PAD_Y + BAR_H / 2, COL_DIM, 1, 0);
+		for (int r = 0; r < rows && top + r < n; r++) {
+			const struct ra_cheevo *c = &list[top + r];
+			char pts[24];
+			snprintf(pts, sizeof(pts), "%s%u", c->unlocked ? "✓  " : "", c->points);
+			int y = PAD_Y + BAR_H + LIST_GAP + r * (ROW_H + ROW_GAP);
+			bool s = top + r == sel;
+			if (s)
+				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+			Uint32 fg = s ? COL_SEL_FG : (c->unlocked ? COL_TEXT : COL_DIM);
+			int vw = ui_text(F_COUNT, pts, UI_W - PAD_X - ROW_PAD, y + ROW_H / 2, fg, 1, 0) + 16;
+			ui_text(s ? F_ITEM_SEL : F_ITEM, c->title, PAD_X + ROW_PAD, y + ROW_H / 2, fg, 0,
+				UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
+		}
+		if (n)
+			ui_text(F_BAR, list[sel].description, PAD_X, UI_H - PAD_Y - BAR_H / 2 - 30, COL_DIM,
+				0, UI_W - 2 * PAD_X);
+		int right = UI_W - PAD_X;
+		draw_hint(right, "B", S_BACK);
+		osd_draw(renderer, screen_w, screen_h);
+		SDL_RenderPresent(renderer);
 	}
 }
 
@@ -2135,6 +2238,14 @@ static bool run_menu(void)
 			if (id == MI_OPTIONS) {
 				if (!run_options())
 					break;
+				continue;
+			}
+			if (id == MI_CHEEVOS) {
+				run_cheevos();
+				continue;
+			}
+			if (id == MI_LOAD && ra_hardcore()) {
+				show_toast(S_RA_NO_LOAD);
 				continue;
 			}
 			if (!has_states) {
@@ -2328,6 +2439,9 @@ int main(int argc, char **argv)
 	struct retro_system_av_info av = { 0 };
 	struct retro_game_info game = { 0 };
 
+	/* Login do RetroAchievements pela tela do launcher (senha pela entrada) */
+	if (argc == 3 && !strcmp(argv[1], "--ra-login"))
+		return ra_login_cli(argv[2]);
 	if (argc < 3) {
 		fprintf(stderr, "uso: %s <core_libretro.so> <rom> [console] [resume]\n", argv[0]);
 		return 2;
@@ -2423,6 +2537,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "pingo-retro: o core recusou a ROM\n");
 		return 1;
 	}
+	ra_set_notify(ra_note);
+	if (ra_start(console_code))
+		ra_load_game(game.path, game.data, game.size, core.get_memory_data, core.get_memory_size);
 	core.get_system_av_info(&av);
 	aspect = av.geometry.aspect_ratio;
 	core_rate = av.timing.sample_rate;
@@ -2462,7 +2579,7 @@ int main(int argc, char **argv)
 	sram_load();
 	slots_refresh();
 	slot_pick_latest();
-	if (resume) {
+	if (resume && !ra_hardcore()) {
 		if (auto_state_load())
 			fprintf(stderr, "pingo-retro: retomado do estado automático\n");
 		clear_resume(); /* um só retorno: se travar, não entra em laço */
@@ -2490,14 +2607,17 @@ int main(int argc, char **argv)
 
 		if (lockstep) {
 			core.run();
+			ra_frame();
 		} else {
 			acc += fps / 60.0;
 			while (acc >= 1.0) {
 				core.run();
+				ra_frame();
 				acc -= 1.0;
 			}
 		}
 		draw_game();
+		ra_draw_note();
 		if (toast[0] && SDL_GetTicks() < toast_until) {
 			int w = ui_text_width(F_BAR, toast) + 2 * ROW_PAD;
 			ui_round_rect((UI_W - w) / 2, PAD_Y, w, BAR_H + 4, ROW_RADIUS, 0x000000);
@@ -2544,6 +2664,7 @@ int main(int argc, char **argv)
 	else
 		clear_resume();
 	sram_save();
+	ra_stop(); /* entrega o que ainda estava a caminho */
 	core.unload_game();
 	core.deinit();
 	if (audio_dev)

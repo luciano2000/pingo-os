@@ -34,6 +34,8 @@ Gostou do projeto? Ajude a manter o desenvolvimento:
 - Dois cartões: jogos no SD1, no SD2 ou nos dois juntos; um cartão do MinUI no slot 2 funciona como está.
 - Suspender no botão power, voltar ao jogo onde parou, desligamento seguro.
 - Wi-Fi com teclado na tela, data, hora e fuso.
+- RetroAchievements: conquistas com avisos na tela, lista no menu do jogo e modo hardcore.
+- Interface em português e inglês; outros idiomas por arquivo ([como traduzir](docs/traducao.md)).
 
 Consoles: Game Boy, Game Boy Color, Game Boy Advance, NES, Famicom Disk System, Super Nintendo, Virtual Boy, Pokémon mini, Master System, Game Gear, Mega Drive, Sega CD, 32X, PC Engine, PC Engine CD, Neo Geo Pocket, WonderSwan, MSX, Atari 2600, Atari 7800, Atari Lynx, PlayStation, Arcade e Neo Geo.
 
@@ -88,6 +90,7 @@ external/              árvore BR2_EXTERNAL do Buildroot
 - [MinUI](https://github.com/shauninman/MinUI): referência de interface.
 - [Inter](https://rsms.me/inter/) (OFL-1.1): fonte da interface.
 - [libretro](https://www.libretro.com): API dos cores (`libretro.h`, MIT).
+- [rcheevos](https://github.com/RetroAchievements/rcheevos) (MIT): RetroAchievements; [libcurl](https://curl.se) e [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/).
 - Matrizes de cor GBA/SP 101: Pokefan531 e hunterk ([slang-shaders](https://github.com/libretro/slang-shaders), domínio público).
 
 Cores (todos do [libretro](https://github.com/libretro)):

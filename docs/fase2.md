@@ -40,3 +40,21 @@
 - [x] Trocar para English no menu: Início, listas, menu do jogo, Wi-Fi, Data e hora
 - [x] Voltar para Português
 - [x] Desligar pelo menu
+
+## RetroAchievements
+
+- **Biblioteca:** rcheevos 12.5.0 (MIT, oficial do RetroAchievements), pacote `external/package/rcheevos` compilado como `librcheevos.a` (sem RAIntegration). HTTPS pelo libcurl com mbed TLS e os certificados do `ca-certificates`.
+- **Conta:** MENU no Início → **RetroAchievements** → Entrar (usuário e senha no teclado na tela). O launcher roda `pingo-retro --ra-login <usuário>` com a senha pela entrada padrão; o servidor devolve um token e só ele fica no cartão (`.system/retroachievements.txt`: usuário, token, hardcore). "Sair da conta" apaga o arquivo. Modo hardcore liga/desliga ali.
+- **No jogo** (`frontend/ra.c`): com conta, o `pingo-retro` entra com o token e identifica o jogo pelo hash (rc_client); a memória vem do `SET_MEMORY_MAPS` do core ou do `retro_get_memory_data` (rc_libretro). A internet roda numa thread (libcurl); as respostas voltam ao rc_client no laço principal, então o jogo nunca espera a rede. Sem conexão, os desbloqueios ficam pendentes e vão quando ela volta.
+- **Avisos** em cima da tela: conquista desbloqueada (pontos e nome), jogo completo, desafios (placares), sem conexão / conectado de novo, jogo não reconhecido. Ao abrir: "Jogo: X de Y conquistas".
+- **Menu do jogo → Conquistas**: lista com ✓ e pontos, descrição da selecionada embaixo.
+- **Hardcore:** Carregar (save state) e o retorno automático ao jogo ficam desligados.
+- **Limites:** jogos em `.chd` (PS, Sega CD, PC Engine CD) não são identificados ainda (o leitor de CD do rcheevos só lê `.cue`/`.bin`/`.iso`); falta o libchdr. Sem imagens das conquistas (só texto).
+
+### Checklist
+
+- [x] HTTPS com o servidor (login com usuário inexistente devolve "senha errada", nada gravado)
+- [ ] Entrar com uma conta de verdade pela tela
+- [ ] Jogo de cartucho reconhecido ("X de Y conquistas") e conquista desbloqueada na tela
+- [ ] Lista de conquistas no menu do jogo
+- [ ] Hardcore: Carregar bloqueado
