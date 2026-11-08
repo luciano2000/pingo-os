@@ -986,6 +986,25 @@ static void console_menu(int c)
 	dirty = true;
 }
 
+/* A última lista de onde se saiu com B: voltando a ela, a seleção volta
+ * para onde estava (sair de outra lista troca a lembrança). O caminho
+ * identifica a pasta mesmo depois de a biblioteca ser relida. */
+static struct {
+	char path[4096];
+	int sel, top;
+} last_left;
+
+static void enter_dir(struct node *dir)
+{
+	struct level l = { dir, 0, 0 };
+	if (last_left.path[0] && dir->path && !strcmp(dir->path, last_left.path)) {
+		l.sel = last_left.sel;
+		l.top = last_left.top;
+	}
+	stack[++depth] = l;
+	clamp_level(&stack[depth]);
+}
+
 static bool open_selected(void)
 {
 	struct node *it = selected();
@@ -997,7 +1016,7 @@ static bool open_selected(void)
 	if (it->dir) {
 		if (depth + 1 >= (int)(sizeof(stack) / sizeof(stack[0])))
 			return false;
-		stack[++depth] = (struct level){ it, 0, 0 };
+		enter_dir(it);
 		dirty = true;
 		return false;
 	}
@@ -1007,6 +1026,10 @@ static bool open_selected(void)
 static void go_back(void)
 {
 	if (depth > 0) {
+		struct level *l = &stack[depth];
+		snprintf(last_left.path, sizeof(last_left.path), "%s", l->dir->path ? l->dir->path : "");
+		last_left.sel = l->sel;
+		last_left.top = l->top;
 		depth--;
 		dirty = true;
 	}

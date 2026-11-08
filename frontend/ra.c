@@ -35,6 +35,7 @@ static uint32_t console_id;
 static bool hardcore, game_ok;
 static char user[64], token[128];
 static char core_clause[96]; /* "Snes9x/1.62.3", como o RetroArch manda */
+static const rc_disallowed_setting_t *disallowed; /* opções proibidas no hardcore */
 
 static struct retro_memory_descriptor *mmap_desc;
 static struct retro_memory_map mmap_copy;
@@ -380,6 +381,13 @@ bool ra_start(const char *console_code, const char *core_name, const char *core_
 	if (!user[0] || !token[0] || !console_id)
 		return false;
 	make_client();
+	/* Hardcore: o rcheevos sabe quais cores não servem para o console e
+	 * quais opções de core são proibidas (overclock, trapaças, região PAL...) */
+	if (hardcore && core_name && !rc_libretro_is_system_allowed(core_name, console_id)) {
+		hardcore = false;
+		say(S_RA, S_RA_HC_CORE);
+	}
+	disallowed = core_name ? rc_libretro_get_disallowed_settings_for_system(core_name, console_id) : NULL;
 	rc_client_set_hardcore_enabled(client, hardcore);
 	worker_on = true;
 	if (pthread_create(&worker, NULL, worker_main, NULL) != 0) {
@@ -466,6 +474,13 @@ bool ra_active(void)
 bool ra_hardcore(void)
 {
 	return client && hardcore;
+}
+
+bool ra_setting_allowed(const char *key, const char *value)
+{
+	if (!ra_hardcore() || !disallowed)
+		return true;
+	return rc_libretro_is_setting_allowed(disallowed, key, value) != 0;
 }
 
 int ra_list(struct ra_cheevo *out, int max, unsigned *unlocked, unsigned *total)

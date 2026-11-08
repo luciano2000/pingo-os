@@ -596,6 +596,25 @@ static void screen_apply(void)
 	lut_build();
 }
 
+/* Hardcore do RetroAchievements: valor proibido volta para o primeiro
+ * permitido (o padrão do core vem primeiro) */
+static void vars_enforce_hardcore(void)
+{
+	for (int i = 0; i < nvars; i++) {
+		struct var *v = &vars[i];
+		if (ra_setting_allowed(v->key, v->values[v->cur]))
+			continue;
+		for (int k = 0; k < v->nvalues; k++)
+			if (ra_setting_allowed(v->key, v->values[k])) {
+				fprintf(stderr, "pingo-retro: hardcore: %s=%s -> %s\n", v->key,
+					v->values[v->cur], v->values[k]);
+				v->cur = k;
+				vars_dirty = true;
+				break;
+			}
+	}
+}
+
 /* interface de troca de disco do core (jogos de vários discos) */
 static struct retro_disk_control_callback disk;
 static bool has_disk;
@@ -1233,6 +1252,7 @@ static bool environment(unsigned cmd, void *data)
 		dips_build();
 		cfg_load_all(); /* valores salvos por console/jogo */
 		screen_apply();
+		vars_enforce_hardcore();
 		return true;
 	case RETRO_ENVIRONMENT_GET_VARIABLE: {
 		struct retro_variable *v = data;
@@ -1822,9 +1842,9 @@ static void draw_options(int sel, int top_item)
 static void var_step(struct var *v, int d)
 {
 	int k = v->cur;
-	do /* pula os valores fora da lista curada */
+	do /* pula os valores fora da lista curada e os proibidos no hardcore */
 		k = (k + d + v->nvalues) % v->nvalues;
-	while (v->vhide[k] && k != v->cur);
+	while ((v->vhide[k] || !ra_setting_allowed(v->key, v->values[k])) && k != v->cur);
 	v->cur = k;
 	vars_dirty = true;
 }
@@ -2478,6 +2498,11 @@ int main(int argc, char **argv)
 	core.get_system_info(&sysinfo);
 	fprintf(stderr, "pingo-retro: core %s %s, console %s\n", sysinfo.library_name,
 		sysinfo.library_version, console_code);
+	/* RetroAchievements antes de carregar o jogo: no hardcore, opções
+	 * proibidas (algumas só valem na carga, como a região) voltam ao padrão */
+	ra_set_notify(ra_note);
+	bool ra_on = ra_start(console_code, sysinfo.library_name, sysinfo.library_version);
+	vars_enforce_hardcore();
 
 	game.path = argv[2];
 	if (has_ext(argv[2], "m3u"))
@@ -2537,8 +2562,7 @@ int main(int argc, char **argv)
 		fprintf(stderr, "pingo-retro: o core recusou a ROM\n");
 		return 1;
 	}
-	ra_set_notify(ra_note);
-	if (ra_start(console_code, sysinfo.library_name, sysinfo.library_version))
+	if (ra_on)
 		ra_load_game(game.path, game.data, game.size, core.get_memory_data, core.get_memory_size);
 	core.get_system_av_info(&av);
 	aspect = av.geometry.aspect_ratio;

@@ -182,3 +182,4 @@ RA_NO_NET=No connection: check Wi-Fi
 RA_LOGGED_OUT=Account removed from the device
 RA_INFO=Applies to games opened from now on
 RA_HC_INFO=Hardcore: no loading save states, achievements are worth more
+RA_HC_CORE=This core is not allowed in hardcore for this console: normal mode

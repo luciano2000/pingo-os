@@ -35,6 +35,7 @@ void ra_reset(void);
 void ra_stop(void);
 bool ra_active(void); /* conta e jogo reconhecido */
 bool ra_hardcore(void);
+bool ra_setting_allowed(const char *key, const char *value); /* hardcore */
 int ra_list(struct ra_cheevo *out, int max, unsigned *unlocked, unsigned *total);
 int ra_login_cli(const char *user); /* --ra-login: senha pela entrada padrão */
 #else
@@ -51,6 +52,7 @@ static inline void ra_reset(void) {}
 static inline void ra_stop(void) {}
 static inline bool ra_active(void) { return false; }
 static inline bool ra_hardcore(void) { return false; }
+static inline bool ra_setting_allowed(const char *k, const char *v) { (void)k; (void)v; return true; }
 static inline int ra_list(struct ra_cheevo *o, int m, unsigned *u, unsigned *t)
 { (void)o; (void)m; *u = *t = 0; return 0; }
 static inline int ra_login_cli(const char *u) { (void)u; return 3; }
