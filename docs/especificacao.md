@@ -353,7 +353,7 @@ Exemplos em tela 640x480 (4:3):
 7. Lógica de origem SD1/SD2.
 
 ### Fase 2: polimento
-1. Transições.
+1. Transições entre menus: deslizar para a esquerda ao entrar numa pasta e para a direita ao voltar (não entre o launcher e o jogo: só atrasaria a entrada no jogo).
 2. PortMaster.
 3. Configurações de Wi-Fi (obrigatório na versão final).
 4. RetroAchievements (depois da tela de Wi-Fi e do menu do jogo).

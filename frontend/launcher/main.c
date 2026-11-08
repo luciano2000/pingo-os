@@ -640,7 +640,8 @@ static void count_text(const struct node *dir, char *buf, size_t n)
 		snprintf(buf, n, dir->nkids == 1 ? S_GAMES_1 : S_GAMES_N, dir->nkids);
 }
 
-static void draw(void)
+/* Desenha a tela atual (sem exibir): na tela ou numa textura da transição */
+static void draw_scene(void)
 {
 	struct level *l = cur();
 	bool at_home = depth == 0;
@@ -733,9 +734,69 @@ static void draw(void)
 	}
 
 	osd_draw(ui_renderer(), UI_W, UI_H);
-	ui_present();
 	th = th_dark; /* as outras telas são escuras */
+}
+
+static void draw(void)
+{
+	draw_scene();
+	ui_present();
 	dirty = false;
+}
+
+/* ---- transição entre listas: deslizar --------------------------------- *
+ * Entrar numa pasta: a tela atual sai pela esquerda e a nova entra pela
+ * direita; voltar (B): o contrário. Rápida (180 ms, desacelerando no fim)
+ * e pulada se um botão for apertado no meio. */
+#define SLIDE_MS 180
+static SDL_Texture *slide_tex[2];
+
+static bool slide_capture(int i)
+{
+	SDL_Renderer *r = ui_renderer();
+	if (!slide_tex[i]) {
+		slide_tex[i] = SDL_CreateTexture(r, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET,
+						 UI_W, UI_H);
+		if (!slide_tex[i])
+			return false;
+	}
+	if (SDL_SetRenderTarget(r, slide_tex[i]) != 0)
+		return false;
+	draw_scene();
+	SDL_SetRenderTarget(r, NULL);
+	return true;
+}
+
+static bool input_waiting(void)
+{
+	struct pollfd p = { fds[DEV_PAD].fd, POLLIN, 0 };
+	return p.fd >= 0 && poll(&p, 1, 0) > 0;
+}
+
+/* dir: +1 entrou (vem da direita), -1 voltou (vem da esquerda). A tela de
+ * antes já está em slide_tex[0]; change() muda a navegação. */
+static void slide_run(int dir)
+{
+	SDL_Renderer *r = ui_renderer();
+	if (!slide_capture(1)) {
+		draw();
+		return;
+	}
+	Uint32 t0 = SDL_GetTicks();
+	for (;;) {
+		Uint32 t = SDL_GetTicks() - t0;
+		if (t >= SLIDE_MS || input_waiting())
+			break;
+		float p = (float)t / SLIDE_MS, e = 1 - (1 - p) * (1 - p) * (1 - p);
+		int off = (int)(e * UI_W);
+		SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
+		SDL_RenderClear(r);
+		SDL_Rect a = { -dir * off, 0, UI_W, UI_H }, b = { dir * (UI_W - off), 0, UI_W, UI_H };
+		SDL_RenderCopy(r, slide_tex[0], NULL, &a);
+		SDL_RenderCopy(r, slide_tex[1], NULL, &b);
+		ui_present(); /* vsync dita o ritmo */
+	}
+	draw();
 }
 
 /* ---- ações ------------------------------------------------------------ */
@@ -1016,7 +1077,10 @@ static bool open_selected(void)
 	if (it->dir) {
 		if (depth + 1 >= (int)(sizeof(stack) / sizeof(stack[0])))
 			return false;
+		bool cap = slide_capture(0);
 		enter_dir(it);
+		if (cap)
+			slide_run(1);
 		dirty = true;
 		return false;
 	}
@@ -1026,11 +1090,14 @@ static bool open_selected(void)
 static void go_back(void)
 {
 	if (depth > 0) {
+		bool cap = slide_capture(0);
 		struct level *l = &stack[depth];
 		snprintf(last_left.path, sizeof(last_left.path), "%s", l->dir->path ? l->dir->path : "");
 		last_left.sel = l->sel;
 		last_left.top = l->top;
 		depth--;
+		if (cap)
+			slide_run(-1);
 		dirty = true;
 	}
 }

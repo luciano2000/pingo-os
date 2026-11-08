@@ -63,3 +63,14 @@
 - [x] Notificação com a imagem da conquista; imagens na lista (bloqueadas em preto e branco)
 - [x] Lista de conquistas no menu do jogo (ordem por pontos, caixa de descrição)
 - [ ] Hardcore: Carregar bloqueado
+
+## Transições entre listas
+
+- Entrar numa pasta/console (A): a tela atual sai pela esquerda e a nova entra pela direita; voltar (B): o contrário. 180 ms, desacelerando no fim (cúbica); um botão apertado no meio pula a animação.
+- As duas telas são desenhadas em texturas (`SDL_TEXTUREACCESS_TARGET`, 640×480) com o `draw_scene()` (o desenho sem exibir) e deslizam juntas; o vsync dita o ritmo.
+- Entre o launcher e o jogo não há transição (decisão: só atrasaria a entrada).
+
+### Checklist
+
+- [ ] Entrar e voltar deslizando, sem tremer nem piscar
+- [ ] Navegação rápida (A/B seguidos) não fica presa na animação
