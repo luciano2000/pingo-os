@@ -1,0 +1,51 @@
+# Pedido de aprovação no RetroAchievements
+
+Texto para enviar à equipe do RetroAchievements (em inglês). Antes de mandar, confira no site deles (docs.retroachievements.org) o canal atual para pedidos de integração de emuladores.
+
+---
+
+**Subject: Hardcore approval request for Pingo OS (pingo-retro libretro frontend)**
+
+Hi RetroAchievements team,
+
+I'm the developer of **Pingo OS**, a free and open-source (GPL-2.0) Linux distribution for retro handhelds, currently targeting the Anbernic RG35XX-H (Allwinner H700). I'd like to request that our frontend be recognized for **hardcore** mode.
+
+**What it is**
+
+- Source code: https://github.com/luciano2000/pingo-os (RetroAchievements code in `frontend/ra.c`)
+- Public beta: https://github.com/luciano2000/pingo-os/releases/tag/v0.1.0-beta
+- The integrating client is **pingo-retro**, our own minimal libretro frontend (written from scratch in C, SDL2/KMS). It loads standard libretro cores; it is not a RetroArch fork.
+- RetroAchievements is integrated with the official **rcheevos 12.5.0** library using **rc_client** (identify-and-load by hash) and **rc_libretro** (memory maps from `RETRO_ENVIRONMENT_SET_MEMORY_MAPS`, falling back to `retro_get_memory_data`).
+
+**User-Agent**
+
+```
+PingoOS/0.1.0-beta (Linux) <core library_name>/<core library_version> rcheevos/12.5
+```
+
+For example: `PingoOS/0.1.0-beta (Linux) Snes9x/1.62.3 rcheevos/12.5`. The core name and version come from `retro_get_system_info`, the same way RetroArch reports them.
+
+**Hardcore enforcement**
+
+- Loading save states is disabled in hardcore (saving is allowed).
+- The automatic resume-from-suspend state is not loaded in hardcore.
+- Core options listed by `rc_libretro_get_disallowed_settings_for_system` are forced to an allowed value before the game loads, and disallowed values cannot be selected in the options menu.
+- If `rc_libretro_is_system_allowed` rejects the core for the console, hardcore is turned off for that session and the user is told.
+- The frontend has no fast-forward, slow motion, rewind, frame advance or cheat support.
+- Pausing opens the in-game menu; `rc_client_idle` is called while paused, and `rc_client_do_frame` once per emulated frame.
+- Network requests run on a worker thread (libcurl); responses are dispatched back to rc_client on the main thread. Unlocks that fail because of connectivity are retried by rc_client.
+
+**Cores** (all from the libretro organization on GitHub, pinned to specific commits): Gambatte (GB/GBC), mGBA (GBA), FCEUmm (NES/FDS), Snes9x (SNES), Beetle VB, PokeMini, Genesis Plus GX (Master System, Game Gear, Mega Drive, Sega CD), PicoDrive (32X), Beetle PCE Fast (PC Engine / CD), Beetle NGP, Beetle WonderSwan, blueMSX, Stella 2014, ProSystem, Handy, PCSX ReARMed (PlayStation) and FinalBurn Neo (arcade).
+
+**Status**
+
+Login (token stored, never the password), game identification and softcore play are working; for example, Super Mario World is identified and shows the user's progress. In hardcore, the server currently returns the "Unknown Emulator" warning, which is why I'm writing.
+
+Known limitation: CHD disc images are not hashed yet (we only use the default rcheevos cdreader for CUE/BIN/ISO).
+
+I'm happy to change anything you need, test builds, or follow any integration guideline you point me to.
+
+Thanks for your work on RetroAchievements!
+
+Luciano Rocha — Pingo OS by Retrogamer Brasil
+GitHub: https://github.com/luciano2000
