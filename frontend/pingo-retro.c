@@ -2302,7 +2302,10 @@ static void run_cheevos(void)
 
 		draw_dimmed_game();
 		draw_bar(S_M_CHEEVOS);
-		ui_text(F_BAR, head, UI_W - PAD_X, PAD_Y + BAR_H / 2, COL_DIM, 1, 0);
+		/* "12 de 110 conquistas" logo depois do título, como "707 jogos" nas
+		 * listas (à direita fica a bateria) */
+		ui_text(F_BAR, head, PAD_X + ui_text_width(F_BAR_BOLD, S_M_CHEEVOS) + 10,
+			PAD_Y + BAR_H / 2, COL_DIM, 0, 0);
 		for (int r = 0; r < rows && top + r < n; r++) {
 			const struct ra_cheevo *c = &list[top + r];
 			char pts[24];
