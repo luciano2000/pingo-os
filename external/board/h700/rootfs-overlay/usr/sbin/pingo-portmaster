@@ -39,9 +39,26 @@ do_install() {
 	return 0
 }
 
+# Controle do aparelho para o SDL (o PortMaster não conhece o "H700 Gamepad"
+# e o SDL caía no layout do Xbox: A e B trocados). Rótulos como no aparelho:
+# A à direita (BTN_EAST, b1), B embaixo (BTN_SOUTH, b0), X em cima
+# (BTN_WEST, b3), Y à esquerda (BTN_NORTH, b2). Índices na ordem do SDL.
+PAD_MAP="190000004b480000df14000000010000,H700 Gamepad,a:b1,b:b0,x:b3,y:b2,back:b8,guide:b10,start:b9,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:b13,dpdown:b14,dpleft:b15,dpright:b16,leftx:a0,lefty:a1,rightx:a2,righty:a3,platform:Linux,"
+
+# O PortMaster reescreve o gamecontrollerdb.txt dele ao se atualizar: a linha
+# do aparelho volta a cada abertura
+pad_map_install() {
+	db="$PORTS/PortMaster/gamecontrollerdb.txt"
+	[ -f "$db" ] || return 0
+	grep -q "^190000004b480000df14000000010000," "$db" && return 0
+	printf '%s\n' "$PAD_MAP" >> "$db"
+}
+
 do_run() {
 	script=$1
 	[ -f "$script" ] || return 1
+	pad_map_install
+	export SDL_GAMECONTROLLERCONFIG="$PAD_MAP"
 	mkdir -p "$HOMEDIR/.config" "$HOMEDIR/.local/share"
 	# a raiz é somente leitura: os ports gravam a configuração no cartão
 	export HOME="$HOMEDIR"
