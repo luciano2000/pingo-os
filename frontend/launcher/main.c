@@ -746,8 +746,10 @@ static void draw(void)
 
 /* ---- transição entre listas: deslizar --------------------------------- *
  * Entrar numa pasta: a tela atual sai pela esquerda e a nova entra pela
- * direita; voltar (B): o contrário. Rápida (180 ms, desacelerando no fim)
- * e pulada se um botão for apertado no meio. */
+ * direita; voltar (B): o contrário. Rápida (180 ms, desacelerando no fim).
+ * Botões apertados no meio ficam na fila e valem logo depois (pular a
+ * animação por "evento esperando" não serve: o soltar do próprio A já está
+ * lá). */
 #define SLIDE_MS 180
 static SDL_Texture *slide_tex[2];
 
@@ -757,20 +759,18 @@ static bool slide_capture(int i)
 	if (!slide_tex[i]) {
 		slide_tex[i] = SDL_CreateTexture(r, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET,
 						 UI_W, UI_H);
-		if (!slide_tex[i])
+		if (!slide_tex[i]) {
+			fprintf(stderr, "pingo-launcher: transição: %s\n", SDL_GetError());
 			return false;
+		}
 	}
-	if (SDL_SetRenderTarget(r, slide_tex[i]) != 0)
+	if (SDL_SetRenderTarget(r, slide_tex[i]) != 0) {
+		fprintf(stderr, "pingo-launcher: transição: %s\n", SDL_GetError());
 		return false;
+	}
 	draw_scene();
 	SDL_SetRenderTarget(r, NULL);
 	return true;
-}
-
-static bool input_waiting(void)
-{
-	struct pollfd p = { fds[DEV_PAD].fd, POLLIN, 0 };
-	return p.fd >= 0 && poll(&p, 1, 0) > 0;
 }
 
 /* dir: +1 entrou (vem da direita), -1 voltou (vem da esquerda). A tela de
@@ -785,7 +785,7 @@ static void slide_run(int dir)
 	Uint32 t0 = SDL_GetTicks();
 	for (;;) {
 		Uint32 t = SDL_GetTicks() - t0;
-		if (t >= SLIDE_MS || input_waiting())
+		if (t >= SLIDE_MS)
 			break;
 		float p = (float)t / SLIDE_MS, e = 1 - (1 - p) * (1 - p) * (1 - p);
 		int off = (int)(e * UI_W);

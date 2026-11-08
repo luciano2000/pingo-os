@@ -66,7 +66,7 @@
 
 ## Transições entre listas
 
-- Entrar numa pasta/console (A): a tela atual sai pela esquerda e a nova entra pela direita; voltar (B): o contrário. 180 ms, desacelerando no fim (cúbica); um botão apertado no meio pula a animação.
+- Entrar numa pasta/console (A): a tela atual sai pela esquerda e a nova entra pela direita; voltar (B): o contrário. 180 ms, desacelerando no fim (cúbica). Botões apertados no meio ficam na fila e valem logo depois (pular por "evento esperando" não serve: o soltar do próprio A já está na fila e cancelava a animação no primeiro quadro).
 - As duas telas são desenhadas em texturas (`SDL_TEXTUREACCESS_TARGET`, 640×480) com o `draw_scene()` (o desenho sem exibir) e deslizam juntas; o vsync dita o ritmo.
 - Entre o launcher e o jogo não há transição (decisão: só atrasaria a entrada).
 
