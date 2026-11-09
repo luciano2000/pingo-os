@@ -1,0 +1,4 @@
+# Arquivos do sistema que ficam fora da imagem deste aparelho (um por linha,
+# caminho a partir da raiz). O RG35XX-H não tem as luzes RGB dos analógicos.
+usr/bin/pingo-leds
+etc/init.d/S45pingo-leds
