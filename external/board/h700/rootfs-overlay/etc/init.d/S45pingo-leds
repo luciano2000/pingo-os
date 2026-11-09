@@ -1,0 +1,13 @@
+#!/bin/sh
+# Luzes RGB dos analógicos: só nos aparelhos que têm (RG40XX-H/V, RG CubeXX)
+case "$1" in
+  start)
+    grep -qE "RG40XX|RG CubeXX" /proc/device-tree/model 2>/dev/null || exit 0
+    [ -e /dev/ttyS2 ] || exit 0
+    start-stop-daemon -S -b -q -m -p /run/pingo-leds.pid -x /usr/bin/pingo-leds
+    ;;
+  stop)
+    start-stop-daemon -K -q -p /run/pingo-leds.pid && sleep 1
+    ;;
+esac
+exit 0

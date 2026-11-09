@@ -44,6 +44,7 @@
 #include "imagem.h"
 #include "libretro.h"
 #include "osd.h"
+#include "luzes.h"
 #include "ra.h"
 #include "textos.h"
 #include "ui.h"
@@ -931,6 +932,129 @@ static void draw_game(void)
 		if (scanlines_on && tex_h > 0)
 			draw_scanlines(&dst);
 	}
+}
+
+/* ---- Ambilight (luzes do RG40XX) -------------------------------------- *
+ * Umas 15 vezes por segundo, a imagem do jogo vira uma grade de 16x12 pontos
+ * (em coordenadas da tela, já com a rotação dos jogos verticais) e cada
+ * metade dá a cor de um analógico. Cor predominante, não média: os pontos
+ * vão para 12 faixas de tom, com peso maior para os de cor viva e claros, e
+ * fica a faixa mais forte. Tela escura ou cinza: luz fraca e neutra. O
+ * pingo-leds suaviza a transição. Custo: 192 pontos a cada 4 quadros.
+ */
+static bool ambi_on;
+
+static void ambi_init(void)
+{
+	FILE *f = fopen(LEDS_CFG, "r");
+	char line[64];
+	ambi_on = false;
+	while (f && fgets(line, sizeof(line), f))
+		if (!strncmp(line, "modo=ambilight", 14))
+			ambi_on = leds_available();
+	if (f)
+		fclose(f);
+}
+
+static void ambi_pixel(int x, int y, float *r, float *g, float *b)
+{
+	const unsigned char *row = (const unsigned char *)frame_buf + (size_t)y * frame_pitch;
+	if (tex_bpp == 4) {
+		uint32_t c = ((const uint32_t *)row)[x];
+		*r = ((c >> 16) & 255) / 255.0f;
+		*g = ((c >> 8) & 255) / 255.0f;
+		*b = (c & 255) / 255.0f;
+	} else {
+		uint16_t c = ((const uint16_t *)row)[x];
+		if (tex_format == SDL_PIXELFORMAT_RGB565) {
+			*r = ((c >> 11) & 31) / 31.0f;
+			*g = ((c >> 5) & 63) / 63.0f;
+			*b = (c & 31) / 31.0f;
+		} else {
+			*r = ((c >> 10) & 31) / 31.0f;
+			*g = ((c >> 5) & 31) / 31.0f;
+			*b = (c & 31) / 31.0f;
+		}
+	}
+}
+
+/* A cor de uma metade da tela (side 0 = esquerda, 1 = direita), "RRGGBB" */
+static void ambi_side(int side, char out[7])
+{
+	float wsum[12] = { 0 }, rs[12] = { 0 }, gs[12] = { 0 }, bs[12] = { 0 };
+	float ar = 0, ag = 0, ab = 0;
+	int n = 0;
+	for (int gy = 0; gy < 12; gy++)
+		for (int gx = 0; gx < 8; gx++) {
+			float u = (side * 8 + gx + 0.5f) / 16.0f, v = (gy + 0.5f) / 12.0f, x, y;
+			/* da tela para a imagem do core (rotation = passos de 90° anti-horário) */
+			switch (rotation & 3) {
+			case 1: x = 1 - v; y = u; break;
+			case 2: x = 1 - u; y = 1 - v; break;
+			case 3: x = v; y = 1 - u; break;
+			default: x = u; y = v; break;
+			}
+			float r, g, b;
+			ambi_pixel((int)(x * (frame_w - 1)), (int)(y * (frame_h - 1)), &r, &g, &b);
+			ar += r;
+			ag += g;
+			ab += b;
+			n++;
+			float mx = SDL_max(r, SDL_max(g, b)), mn = SDL_min(r, SDL_min(g, b));
+			if (mx <= 0.02f)
+				continue;
+			float sat = (mx - mn) / mx, w = sat * sat * mx;
+			float h; /* tom 0..1 */
+			if (mx == mn)
+				h = 0;
+			else if (mx == r)
+				h = fmodf((g - b) / (mx - mn) / 6.0f + 1.0f, 1.0f);
+			else if (mx == g)
+				h = ((b - r) / (mx - mn) + 2) / 6.0f;
+			else
+				h = ((r - g) / (mx - mn) + 4) / 6.0f;
+			int bin = (int)(h * 12) % 12;
+			wsum[bin] += w;
+			rs[bin] += r * w;
+			gs[bin] += g * w;
+			bs[bin] += b * w;
+		}
+	int best = 0;
+	float total = 0;
+	for (int i = 0; i < 12; i++) {
+		total += wsum[i];
+		if (wsum[i] > wsum[best])
+			best = i;
+	}
+	float r, g, b;
+	if (total < 1.5f || wsum[best] < 0.6f) { /* tela escura/cinza: neutra e fraca */
+		r = ar / n * 0.5f;
+		g = ag / n * 0.5f;
+		b = ab / n * 0.5f;
+	} else { /* o tom mais forte, na intensidade máxima (o brilho é das Luzes) */
+		r = rs[best] / wsum[best];
+		g = gs[best] / wsum[best];
+		b = bs[best] / wsum[best];
+		float mx = SDL_max(r, SDL_max(g, b));
+		if (mx > 0) {
+			r /= mx;
+			g /= mx;
+			b /= mx;
+		}
+	}
+	snprintf(out, 7, "%02X%02X%02X", (int)(r * 255 + 0.5f), (int)(g * 255 + 0.5f),
+		 (int)(b * 255 + 0.5f));
+}
+
+static void ambi_frame(void)
+{
+	static unsigned tick;
+	if (!ambi_on || !frame_buf || frame_w < 2 || frame_h < 2 || (tick++ & 3))
+		return;
+	char l[7], r[7];
+	ambi_side(0, l);
+	ambi_side(1, r);
+	leds_cmd("ambi %s %s", l, r);
 }
 
 /* ---- som: reamostragem com controle dinâmico de taxa ------------------ *
@@ -2689,6 +2813,7 @@ int main(int argc, char **argv)
 	lang_load();
 	ui_screenshot_init();
 	names_from_path(argv[2], argc > 3 ? argv[3] : NULL);
+	ambi_init();
 	bool resume = argc > 4 && !strcmp(argv[4], "resume");
 	snprintf(resume_core, sizeof(resume_core), "%s", argv[1]);
 	snprintf(resume_rom, sizeof(resume_rom), "%s", argv[2]);
@@ -2857,6 +2982,7 @@ int main(int argc, char **argv)
 			}
 		}
 		draw_game();
+		ambi_frame();
 		ra_draw_note();
 		if (toast[0] && SDL_GetTicks() < toast_until) {
 			int w = ui_text_width(F_BAR, toast) + 2 * ROW_PAD;
@@ -2911,6 +3037,8 @@ int main(int argc, char **argv)
 	else
 		clear_resume();
 	sram_save();
+	if (ambi_on)
+		leds_cmd("ambi-end"); /* as luzes voltam às cores escolhidas */
 	ra_stop(); /* entrega o que ainda estava a caminho */
 	core.unload_game();
 	core.deinit();

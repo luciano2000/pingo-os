@@ -10,6 +10,7 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 #include "osd.h"
+#include "luzes.h"
 
 #include <dirent.h>
 #include <linux/input.h>
@@ -116,6 +117,7 @@ void osd_screen(bool on)
 		fprintf(f, "%d\n", on ? 0 : 4); /* FB_BLANK_UNBLANK / POWERDOWN */
 		fclose(f);
 	}
+	leds_cmd(on ? "on" : "off"); /* as luzes dos analógicos acompanham a tela */
 }
 
 /* ---- configuração ---------------------------------------------------- */

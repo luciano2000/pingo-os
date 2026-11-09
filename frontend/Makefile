@@ -10,12 +10,12 @@ ALSA_LIBS = $(shell $(PKG_CONFIG) --libs alsa)
 ZIP_CFLAGS = $(shell $(PKG_CONFIG) --cflags libzip)
 ZIP_LIBS = $(shell $(PKG_CONFIG) --libs libzip)
 
-COMMON_SRC = common/osd.c common/fbcopy.c common/ui.c common/textos.c
-COMMON_HDR = common/osd.h common/fbcopy.h common/ui.h common/textos.h common/textos_pt.h
+COMMON_SRC = common/osd.c common/fbcopy.c common/ui.c common/textos.c common/luzes.c
+COMMON_HDR = common/osd.h common/fbcopy.h common/ui.h common/luzes.h common/textos.h common/textos_pt.h
 LAUNCHER_SRC = launcher/main.c launcher/library.c
 LAUNCHER_HDR = launcher/library.h
 
-all: pingo-retro pingo-launcher
+all: pingo-retro pingo-launcher pingo-leds
 
 # RetroAchievements: o Buildroot passa RC_CFLAGS (-DPINGO_RA ...) e RC_LIBS;
 # sem eles (build no PC), o ra.c vira funções vazias
@@ -35,9 +35,13 @@ pingo-launcher: $(LAUNCHER_SRC) $(LAUNCHER_HDR) $(COMMON_SRC) $(COMMON_HDR)
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(LDFLAGS) -o $@ $(LAUNCHER_SRC) $(COMMON_SRC) \
 		$(TTF_LIBS) $(SDL_LIBS) $(ALSA_LIBS) -lm
 
+pingo-leds: pingo-leds.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ pingo-leds.c -lm
+
 install: all
 	install -D -m 0755 pingo-retro $(DESTDIR)/usr/bin/pingo-retro
 	install -D -m 0755 pingo-launcher $(DESTDIR)/usr/bin/pingo-launcher
+	install -D -m 0755 pingo-leds $(DESTDIR)/usr/bin/pingo-leds
 	install -D -m 0755 pingo-shell $(DESTDIR)/usr/bin/pingo-shell
 	for f in idiomas/*.txt; do \
 		install -D -m 0644 $$f $(DESTDIR)/usr/share/pingo/idiomas/$$(basename $$f) || exit 1; \
@@ -47,6 +51,6 @@ install: all
 	done
 
 clean:
-	rm -f pingo-retro pingo-launcher
+	rm -f pingo-retro pingo-launcher pingo-leds
 
 .PHONY: all install clean

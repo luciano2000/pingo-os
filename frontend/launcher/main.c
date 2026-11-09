@@ -28,6 +28,7 @@
 #include "library.h"
 #include "fbcopy.h"
 #include "osd.h"
+#include "luzes.h"
 #include "textos.h"
 #include "ui.h"
 
@@ -2499,6 +2500,148 @@ static void portmaster_install(void)
 	clamp_level(&stack[0]);
 }
 
+/* ---- Luzes (RG40XX-H/V) ------------------------------------------------ *
+ * A tela só escreve Config/luzes.cfg e avisa o pingo-leds; quem fala com as
+ * luzes é ele. Toda mudança aparece na hora nos LEDs (preview). */
+static const struct { const char *hex; const char **name; } led_colors[] = {
+	{ "FF6A00", &S_LED_ORANGE }, { "FF0000", &S_LED_RED },     { "FFD000", &S_LED_YELLOW },
+	{ "00FF40", &S_LED_GREEN },  { "9BFF00", &S_LED_LIME },    { "00FFFF", &S_LED_CYAN },
+	{ "0050FF", &S_LED_BLUE },   { "66CCFF", &S_LED_ICE },     { "8A2BE2", &S_LED_PURPLE },
+	{ "FF3FA0", &S_LED_PINK },   { "FF00FF", &S_LED_MAGENTA }, { "FFFFFF", &S_LED_WHITE },
+	{ "00B2FF", &S_LED_NEON_BLUE }, { "FF3C28", &S_LED_NEON_RED },
+};
+#define NLEDCOLORS ((int)(sizeof(led_colors) / sizeof(*led_colors)))
+
+/* presets: as duas cores (esquerda, direita) pelo índice em led_colors */
+static const struct { const char **name; int l, r; } led_presets[] = {
+	{ &S_LED_P_PINGO, 0, 0 },  { &S_LED_P_SWITCH, 12, 13 }, { &S_LED_P_RED, 1, 1 },
+	{ &S_LED_P_ICE, 7, 7 },    { &S_LED_P_PURPLE, 8, 8 },    { &S_LED_P_GB, 4, 4 },
+	{ &S_LED_P_SUNSET, 0, 9 }, { &S_LED_P_WHITE, 11, 11 },
+};
+#define NLEDPRESETS ((int)(sizeof(led_presets) / sizeof(*led_presets)))
+
+static const char *led_modes[] = { "fixo", "respirar", "arcoiris", "bateria", "ambilight", "desligado" };
+#define NLEDMODES 6
+
+static const char *led_mode_name(int m)
+{
+	const char *n[NLEDMODES] = { S_LED_M_FIXED, S_LED_M_BREATHE, S_LED_M_RAINBOW,
+				     S_LED_M_BATTERY, S_LED_M_AMBI, S_LED_M_OFF };
+	return n[m];
+}
+
+static int led_color_index(const char *hex)
+{
+	for (int i = 0; i < NLEDCOLORS; i++)
+		if (!strcasecmp(hex, led_colors[i].hex))
+			return i;
+	return 0;
+}
+
+static void leds_screen(void)
+{
+	int mode = 0, li = 0, ri = 0, bright = 60, sel = 0;
+	FILE *f = fopen(LEDS_CFG, "r");
+	char line[128];
+	while (f && fgets(line, sizeof(line), f)) {
+		line[strcspn(line, "\r\n")] = 0;
+		char *eq = strchr(line, '=');
+		if (!eq)
+			continue;
+		*eq++ = 0;
+		if (!strcmp(line, "modo")) {
+			for (int i = 0; i < NLEDMODES; i++)
+				if (!strcmp(eq, led_modes[i]))
+					mode = i;
+		} else if (!strcmp(line, "esquerda")) {
+			li = led_color_index(eq);
+		} else if (!strcmp(line, "direita")) {
+			ri = led_color_index(eq);
+		} else if (!strcmp(line, "brilho")) {
+			bright = SDL_clamp(atoi(eq), 10, 100);
+		}
+	}
+	if (f)
+		fclose(f);
+
+	for (;;) {
+		int preset = -1;
+		for (int p = 0; p < NLEDPRESETS; p++)
+			if (led_presets[p].l == li && led_presets[p].r == ri)
+				preset = p;
+		leds_cmd("preview %s %s %d", led_colors[li].hex, led_colors[ri].hex, bright);
+
+		ui_clear();
+		ui_text(F_BAR_BOLD, S_LEDS, PAD_X, PAD_Y + BAR_H / 2, COL_TEXT, 0, 0);
+		draw_status_right();
+		int y0 = PAD_Y + BAR_H + LIST_GAP;
+		const char *labels[5] = { S_LED_MODE, S_LED_PRESET, S_LED_LEFT, S_LED_RIGHT, S_LED_BRIGHT };
+		char bb[16];
+		snprintf(bb, sizeof(bb), "%d%%", bright);
+		const char *values[5] = { led_mode_name(mode),
+					  preset >= 0 ? *led_presets[preset].name : S_LED_P_CUSTOM,
+					  *led_colors[li].name, *led_colors[ri].name, bb };
+		for (int i = 0; i < 5; i++) {
+			int y = y0 + i * (ROW_H + ROW_GAP);
+			bool s = i == sel;
+			if (s)
+				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
+			int right = UI_W - PAD_X - ROW_PAD;
+			if (i == 2 || i == 3) { /* amostra da cor */
+				unsigned v = (unsigned)strtoul(led_colors[i == 2 ? li : ri].hex, NULL, 16);
+				ui_round_rect(right - 26, y + ROW_H / 2 - 13, 26, 26, 13, s ? 0x141414 : 0x3A3A3A);
+				ui_round_rect(right - 23, y + ROW_H / 2 - 10, 20, 20, 10, v);
+				right -= 26 + 12;
+			}
+			int vw = ui_text(F_COUNT, values[i], right, y + ROW_H / 2, s ? COL_SEL_FG : COL_DIM, 1,
+					 260) + 16;
+			ui_text(s ? F_ITEM_SEL : F_ITEM, labels[i], PAD_X + ROW_PAD, y + ROW_H / 2,
+				s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw - 40);
+		}
+		if (mode == 4)
+			ui_text(F_BAR, S_LED_AMBI_INFO, PAD_X + ROW_PAD, y0 + 5 * (ROW_H + ROW_GAP) + 16,
+				COL_DIM, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD);
+		int right = UI_W - PAD_X;
+		right -= draw_hint(right, "B", S_BACK) + 22;
+		draw_hint(right, "◀ ▶", S_HINT_CHANGE);
+		osd_draw(ui_renderer(), UI_W, UI_H);
+		ui_present();
+
+		int k = wait_key();
+		int d = k == BTN_DPAD_LEFT ? -1 : (k == BTN_DPAD_RIGHT || k == BTN_EAST) ? 1 : 0;
+		if (k == BTN_SOUTH || k == BTN_MODE)
+			break;
+		if (k == BTN_DPAD_UP)
+			sel = (sel + 4) % 5;
+		else if (k == BTN_DPAD_DOWN)
+			sel = (sel + 1) % 5;
+		else if (d && sel == 0)
+			mode = (mode + d + NLEDMODES) % NLEDMODES;
+		else if (d && sel == 1) {
+			int p = preset < 0 ? (d > 0 ? 0 : NLEDPRESETS - 1) : (preset + d + NLEDPRESETS) % NLEDPRESETS;
+			li = led_presets[p].l;
+			ri = led_presets[p].r;
+		} else if (d && sel == 2)
+			li = (li + d + NLEDCOLORS) % NLEDCOLORS;
+		else if (d && sel == 3)
+			ri = (ri + d + NLEDCOLORS) % NLEDCOLORS;
+		else if (d && sel == 4)
+			bright = SDL_clamp(bright + d * 10, 10, 100);
+	}
+	/* sai salvando: o serviço volta ao modo escolhido */
+	f = fopen(LEDS_CFG ".tmp", "w");
+	if (f) {
+		fprintf(f, "modo=%s\nesquerda=%s\ndireita=%s\nbrilho=%d\n", led_modes[mode],
+			led_colors[li].hex, led_colors[ri].hex, bright);
+		fflush(f);
+		fsync(fileno(f));
+		fclose(f);
+		rename(LEDS_CFG ".tmp", LEDS_CFG);
+	}
+	leds_cmd("reload");
+	dirty = true;
+}
+
 /* Confirmação simples: A sim, B não */
 static bool confirm(const char *title, const char *text)
 {
@@ -2533,7 +2676,7 @@ static void language_changed(void)
 
 /* MENU no Início: Wi-Fi, Data e hora, Idioma, RetroAchievements, (cartão novo no slot 2:
  * prepará-lo) e Desligar, sempre o último */
-enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_RA, HM_PORTMASTER, HM_SD2, HM_POWEROFF };
+enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_RA, HM_PORTMASTER, HM_LEDS, HM_SD2, HM_POWEROFF };
 
 static bool home_menu(void)
 {
@@ -2544,12 +2687,14 @@ static bool home_menu(void)
 		if (!strcmp(langs[i].code, lang_current()))
 			cur_lang = i;
 	for (;;) {
-		int items[7], n = 0;
+		int items[8], n = 0;
 		items[n++] = HM_WIFI;
 		items[n++] = HM_DATETIME;
 		items[n++] = HM_LANGUAGE;
 		items[n++] = HM_RA;
 		items[n++] = HM_PORTMASTER;
+		if (leds_available()) /* só nos aparelhos com as luzes */
+			items[n++] = HM_LEDS;
 		if (sd2_present && !sd2_ready)
 			items[n++] = HM_SD2;
 		items[n++] = HM_POWEROFF;
@@ -2566,6 +2711,7 @@ static bool home_menu(void)
 					  : items[i] == HM_LANGUAGE ? S_LANGUAGE
 					  : items[i] == HM_RA ? S_RA
 					  : items[i] == HM_PORTMASTER ? "PortMaster"
+					  : items[i] == HM_LEDS ? S_LEDS
 					  : items[i] == HM_SD2 ? S_PREPARE_SD2 : S_POWER_OFF_ITEM;
 			int vw = 0;
 			if (items[i] == HM_LANGUAGE)
@@ -2574,7 +2720,7 @@ static bool home_menu(void)
 			ui_text(s ? F_ITEM_SEL : F_ITEM, label, PAD_X + ROW_PAD, y + ROW_H / 2,
 				s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
 			if ((items[i] == HM_WIFI || items[i] == HM_DATETIME || items[i] == HM_RA ||
-			     items[i] == HM_PORTMASTER) && s)
+			     items[i] == HM_PORTMASTER || items[i] == HM_LEDS) && s)
 				ui_icon_chevron(UI_W - PAD_X - ROW_PAD - 16, y + ROW_H / 2, COL_SEL_FG);
 		}
 		int right = UI_W - PAD_X;
@@ -2603,6 +2749,8 @@ static bool home_menu(void)
 				datetime_screen();
 			} else if (it == HM_RA) {
 				ra_screen();
+			} else if (it == HM_LEDS) {
+				leds_screen();
 			} else if (it == HM_PORTMASTER) {
 				if (portmaster_screen()) {
 					dirty = true;

@@ -60,7 +60,11 @@ while :; do
     echo 0 > "$RTC/wakealarm"
     echo "+$wait_s" > "$RTC/wakealarm"
   fi
+  # luzes dos analógicos (RG40XX): apagam durante a suspensão. "1<>" abre a
+  # FIFO também para leitura: sem o serviço, o echo não fica esperando
+  if [ -p /run/pingo/leds ]; then echo off 1<>/run/pingo/leds; sleep 0.2; fi
   echo mem > /sys/power/state
+  [ -p /run/pingo/leds ] && echo on 1<>/run/pingo/leds
 
   # Alarme ainda armado: quem acordou foi o botão (o alarme vira 0 quando dispara)
   alarm=$(cat "$RTC/wakealarm" 2>/dev/null)
