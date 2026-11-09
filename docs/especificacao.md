@@ -368,6 +368,5 @@ Exemplos em tela 640x480 (4:3):
 
 ## 11. Decisões em aberto
 - Atalho global de saída para os ports.
-- Se uma única `.img` atende o RG35XX-H e o RG40XX, ou se é preciso uma imagem por aparelho.
 
-Decididas na Fase 1 (ver `docs/fase1.md`): frontend escrito do zero (o MinUI não tem licença); pastas com os códigos curtos da seção 3; saves com os nomes do RetroArch (`.srm`); desligamento de emergência com 10 % de bateria ou depois de 24 h de suspensão; interface em português com textos em arquivo separado.
+Decididas na Fase 1 (ver `docs/fase1.md`): frontend escrito do zero (o MinUI não tem licença); pastas com os códigos curtos da seção 3; saves com os nomes do RetroArch (`.srm`); desligamento de emergência com 10 % de bateria ou depois de 24 h de suspensão; interface em português com textos em arquivo separado. Fase 2: uma `.img` por aparelho, sempre (sem detecção de hardware no boot); o mesmo build gera todas.

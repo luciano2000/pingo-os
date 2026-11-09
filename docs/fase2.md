@@ -97,7 +97,7 @@
 
 - Mesmo H700, memória e tela 640x480 do RG35XX-H. O device tree dele (do ROCKNIX) já era compilado; as diferenças estão nele: analógico direito invertido (`invert-absrx/ry`), vibração por PWM, luzes RGB dos analógicos (`led-rgb`, UART5) e o painel `anbernic,rg40xx-panel`. O driver de controle é o mesmo (rocknix-joypad).
 - **Um build, uma imagem por aparelho:** kernel, U-Boot e sistema são idênticos; o `post-image.sh` gera `pingo-os-<aparelho>.img` para cada `board/h700/<aparelho>/extlinux.conf` (só a linha `fdt` muda). Unidades com o painel "v2": trocar a linha `fdt` pelo `sun50i-h700-anbernic-rg40xx-h-v2-panel.dtb`.
-- Juntar as duas numa imagem só (escolhendo o device tree no boot) fica para depois de o RG40XX-H funcionar.
+- **Decisão: uma imagem por aparelho, sempre** (sem detecção de tela, processador etc. no boot: cada imagem fica enxuta, só com o que o aparelho dela usa).
 
 ### Checklist
 
