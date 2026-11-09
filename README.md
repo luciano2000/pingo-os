@@ -29,7 +29,8 @@ Gostou do projeto? Ajude a manter o desenvolvimento:
 | Aparelho | SoC | Estado |
 |---|---|---|
 | Anbernic RG35XX-H | Allwinner H700 | **Beta** |
-| Anbernic RG40XX-H / V | Allwinner H700 | Planejado (mesmo SoC) |
+| Anbernic RG40XX-H | Allwinner H700 | Em testes (`pingo-os-rg40xxh.img`) |
+| Anbernic RG40XX-V | Allwinner H700 | Planejado (mesmo SoC) |
 | TrimUI Brick | Allwinner A133P | Planejado |
 
 ## O que já faz
@@ -48,7 +49,7 @@ Consoles: Game Boy, Game Boy Color, Game Boy Advance, NES, Famicom Disk System, 
 
 ## Instalação
 
-1. Baixe o `pingo-os-rg35xxh.img.xz` na página de [releases](https://github.com/luciano2000/pingo-os/releases).
+1. Baixe a imagem do seu aparelho na página de [releases](https://github.com/luciano2000/pingo-os/releases): `pingo-os-rg35xxh.img.xz` (RG35XX-H) ou `pingo-os-rg40xxh.img.xz` (RG40XX-H).
 2. Grave no cartão do slot 1 (TF1) com o [balenaEtcher](https://etcher.balena.io) ou o [Raspberry Pi Imager](https://www.raspberrypi.com/software/) (os dois aceitam o `.xz` direto). **Tudo no cartão é apagado.**
 3. Ligue o aparelho. No primeiro boot, o Pingo pergunta se pode criar a partição de jogos (`ROMS`) no resto do cartão.
 4. Desligue, ponha o cartão no PC e copie os jogos para `Roms/<CONSOLE>/` (as pastas já estão criadas: `GB`, `SNES`, `MD`, `PS`, `ARCADE`...). As BIOS vão em `Bios/` (veja [docs/bios.md](docs/bios.md)).
@@ -67,7 +68,7 @@ Requisitos: Linux, Docker e uns 30 GB livres. O build roda dentro de um contêin
 scripts/build.sh            # RG35XX-H, imagem completa
 ```
 
-A imagem sai em `output/rg35xxh/images/pingo-os-rg35xxh.img` (e `.img.xz`). Grave com o balenaEtcher, o Raspberry Pi Imager ou:
+As imagens saem em `output/rg35xxh/images/`: `pingo-os-rg35xxh.img` e `pingo-os-rg40xxh.img` (e `.img.xz`). Um build só gera as duas: o sistema é o mesmo, muda o device tree que a partição de boot carrega (`external/board/h700/<aparelho>/extlinux.conf`). Grave com o balenaEtcher, o Raspberry Pi Imager ou:
 
 ```sh
 sudo dd if=output/rg35xxh/images/pingo-os-rg35xxh.img of=/dev/sdX bs=4M conv=fsync status=progress

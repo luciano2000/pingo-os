@@ -92,3 +92,17 @@
 - [x] Abrir o PortMaster (interface dele aparece e responde aos botões)
 - [x] Instalar ports gratuitos e jogar: Cave Story (nxengine-evo) e Ticoban com o direcional e Celeste Classic
 - [ ] Sair do port e voltar ao launcher
+
+## RG40XX-H
+
+- Mesmo H700, memória e tela 640x480 do RG35XX-H. O device tree dele (do ROCKNIX) já era compilado; as diferenças estão nele: analógico direito invertido (`invert-absrx/ry`), vibração por PWM, luzes RGB dos analógicos (`led-rgb`, UART5) e o painel `anbernic,rg40xx-panel`. O driver de controle é o mesmo (rocknix-joypad).
+- **Um build, uma imagem por aparelho:** kernel, U-Boot e sistema são idênticos; o `post-image.sh` gera `pingo-os-<aparelho>.img` para cada `board/h700/<aparelho>/extlinux.conf` (só a linha `fdt` muda). Unidades com o painel "v2": trocar a linha `fdt` pelo `sun50i-h700-anbernic-rg40xx-h-v2-panel.dtb`.
+- Juntar as duas numa imagem só (escolhendo o device tree no boot) fica para depois de o RG40XX-H funcionar.
+
+### Checklist
+
+- [ ] Boot com imagem na tela (ou trocar para o device tree do painel v2)
+- [ ] Botões, analógicos (o direito no sentido certo), volume, power
+- [ ] Assistente do primeiro boot, jogos, som, suspender
+- [ ] Wi-Fi, SD2
+- [ ] Luzes RGB (o que fazer com elas: apagar, cor fixa?)
