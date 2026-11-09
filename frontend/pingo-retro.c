@@ -327,6 +327,25 @@ static int screen_preset;
 static bool grid_on, ghost_on;
 static bool scanlines_on; /* todos os consoles */
 
+/* Volume do jogo (reforço por software, em dB): o FBNeo reproduz a mixagem
+ * das placas, uns 5-6 dB abaixo dos consoles (medido: Raiden x Shadow
+ * Dancer). Padrão +6 dB no Arcade e no Neo Geo, 0 nos outros. */
+static const int game_vol_db[] = { 0, 3, 6, 9 };
+#define GAME_VOL_N ((int)(sizeof(game_vol_db) / sizeof(*game_vol_db)))
+static int game_vol = 0;         /* índice em game_vol_db */
+static float game_gain = 1.0f;
+
+static void game_vol_apply(void)
+{
+	game_gain = powf(10.0f, game_vol_db[game_vol] / 20.0f);
+}
+
+static void game_vol_default(void)
+{
+	game_vol = (!strcmp(console_code, "ARCADE") || !strcmp(console_code, "NEOGEO")) ? 2 : 0;
+	game_vol_apply();
+}
+
 static void screen_init(void)
 {
 	scr = NULL;
@@ -363,6 +382,14 @@ static void var_set_value(const char *key, const char *value)
 		for (int i = 0; scr && i < scr->n; i++)
 			if (!strcmp(scr->names[i], value))
 				screen_preset = i;
+		return;
+	}
+	if (!strcmp(key, "pingo.volume")) {
+		int db = atoi(value);
+		for (int i = 0; i < GAME_VOL_N; i++)
+			if (game_vol_db[i] == db)
+				game_vol = i;
+		game_vol_apply();
 		return;
 	}
 	if (!strcmp(key, "pingo.scanlines")) {
@@ -497,6 +524,8 @@ static bool cfg_save(bool per_game)
 	char buf[16384];
 	size_t len = (size_t)snprintf(buf, sizeof(buf), "pingo.scale=%s\n",
 				      scale_mode == SCALE_INT ? "inteira" : "ajustada");
+	len += (size_t)snprintf(buf + len, sizeof(buf) - len, "pingo.volume=%d\n",
+				game_vol_db[game_vol]);
 	len += (size_t)snprintf(buf + len, sizeof(buf) - len, "pingo.scanlines=%s\n",
 				scanlines_on ? "sim" : "nao");
 	if (scr)
@@ -922,6 +951,19 @@ static int audio_peak;
 static double audio_sq_sum;
 static unsigned long audio_n;
 
+/* Ganho com limitador suave: abaixo de 80 % do máximo é só a multiplicação;
+ * acima, a curva arredonda até o máximo em vez de cortar (sem estalo). A
+ * tanhf só roda nas amostras que passam do joelho, que são raras. */
+static inline int16_t gain_sample(float x)
+{
+	x *= game_gain;
+	const float knee = 0.8f * 32767.0f, room = 32767.0f - knee;
+	float a = x < 0 ? -x : x;
+	if (a > knee)
+		a = knee + room * tanhf((a - knee) / room);
+	return (int16_t)(x < 0 ? -a : a);
+}
+
 static size_t audio_batch(const int16_t *data, size_t frames)
 {
 	static int16_t out[8192 * 2];
@@ -953,8 +995,8 @@ static size_t audio_batch(const int16_t *data, size_t frames)
 		const int16_t *cur = data + i * 2;
 		while (audio_pos < 1.0 && o < 8192) {
 			double t = audio_pos;
-			out[o * 2] = (int16_t)(in_prev[0] + (cur[0] - in_prev[0]) * t);
-			out[o * 2 + 1] = (int16_t)(in_prev[1] + (cur[1] - in_prev[1]) * t);
+			out[o * 2] = gain_sample((float)(in_prev[0] + (cur[0] - in_prev[0]) * t));
+			out[o * 2 + 1] = gain_sample((float)(in_prev[1] + (cur[1] - in_prev[1]) * t));
 			o++;
 			audio_pos += step;
 		}
@@ -1750,7 +1792,7 @@ static void draw_menu(int sel)
 }
 
 /* opções: escala, botões, opções do core e as duas formas de salvar */
-enum { OPT_SCALE, OPT_SCANLINES, OPT_SCREEN, OPT_GRID, OPT_GHOST, OPT_BUTTONS, OPT_DIPS, OPT_VAR,
+enum { OPT_SCALE, OPT_SCANLINES, OPT_VOLUME, OPT_SCREEN, OPT_GRID, OPT_GHOST, OPT_BUTTONS, OPT_DIPS, OPT_VAR,
        OPT_SAVE_GAME, OPT_SAVE_CONSOLE };
 static int opt_kind[MAX_VARS + 8], opt_arg[MAX_VARS + 8], opt_n;
 
@@ -1759,6 +1801,7 @@ static void options_build(void)
 	opt_n = 0;
 	opt_kind[opt_n++] = OPT_SCALE;
 	opt_kind[opt_n++] = OPT_SCANLINES;
+	opt_kind[opt_n++] = OPT_VOLUME;
 	if (scr) {
 		opt_kind[opt_n++] = OPT_SCREEN;
 		opt_kind[opt_n++] = OPT_GRID;
@@ -1801,6 +1844,17 @@ static void draw_options(int sel, int top_item)
 			label = S_O_SCALE;
 			value = scale_mode == SCALE_INT ? S_O_SCALE_INT : S_O_SCALE_FIT;
 			break;
+		case OPT_VOLUME: {
+			static char vb[24];
+			label = S_O_GAME_VOL;
+			if (game_vol_db[game_vol] == 0)
+				value = S_O_GAME_VOL_NORMAL;
+			else {
+				snprintf(vb, sizeof(vb), "+%d dB", game_vol_db[game_vol]);
+				value = vb;
+			}
+			break;
+		}
 		case OPT_SCANLINES:
 			label = S_O_SCANLINES;
 			value = scanlines_on ? S_O_ON_FP : S_O_OFF_FP;
@@ -1871,6 +1925,9 @@ static void option_change(int i, int d)
 		scale_mode = scale_mode == SCALE_INT ? SCALE_FIT : SCALE_INT;
 		if (scale_mode == SCALE_FIT)
 			grid_on = false; /* a grade só fica certa na escala inteira */
+	} else if (opt_kind[i] == OPT_VOLUME) {
+		game_vol = (game_vol + d + GAME_VOL_N) % GAME_VOL_N;
+		game_vol_apply();
 	} else if (opt_kind[i] == OPT_SCANLINES) {
 		scanlines_on = !scanlines_on;
 	} else if (opt_kind[i] == OPT_SCREEN) {
@@ -2640,6 +2697,7 @@ int main(int argc, char **argv)
 	mkdir_p(save_dir);
 	binds_default();
 	screen_init();
+	game_vol_default();
 	cfg_load_all(); /* escala e botões (as opções do core chegam no SET_VARIABLES) */
 
 	{ /* ".../gambatte_libretro.so" -> "gambatte" */

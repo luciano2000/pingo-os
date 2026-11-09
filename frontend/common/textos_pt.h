@@ -216,3 +216,5 @@ STR(S_PM_INSTALL_INFO, "Baixa a versão oficial mais recente (precisa do Wi-Fi)"
 STR(S_PM_WHERE, "Instalar no")
 STR(S_PM_WHERE_INFO, "Cartão do PortMaster e dos ports (trocar não move os já instalados)")
 STR(S_PM_NO_SD2, "O SD2 não está no aparelho")
+STR(S_O_GAME_VOL, "Volume do jogo")
+STR(S_O_GAME_VOL_NORMAL, "Normal")
