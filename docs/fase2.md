@@ -107,9 +107,10 @@
 - [ ] Wi-Fi, SD2
 - [ ] Luzes RGB (o que fazer com elas: apagar, cor fixa?)
 
-## Luzes (RG40XX-H/V): plano
+## Luzes (RG40XX-H/V)
 
 - **Hardware:** um microcontrolador na `/dev/ttyS2` (UART5, 115200 8N1). Pacote: modo (1), brilho (0-255), as cores RGB dos LEDs (o ROCKNIX manda 16), soma de verificação (soma dos bytes & 0xFF); ~50 bytes, ~4 ms. `rgb:kbd_backlight` (gpio) só liga a energia. Referência: `quirks/devices/Anbernic RG40XX V/bin/analog_sticks_ledcontrol` do ROCKNIX.
 - **App:** MENU no Início → Luzes (só nos aparelhos com LEDs). Modos: Desligado, Cor fixa (presets com nome + matiz livre, a mesma cor nos dois analógicos ou uma para cada), Respirar, Arco-íris, Bateria (verde/amarelo/laranja/vermelho), Ambilight. Brilho 0-100 %. Apaga com a tela e na suspensão.
 - **Ambilight:** o `pingo-retro` reduz o quadro a ~16x12, ~15 vezes por segundo, e calcula a cor de cada metade (esquerda → analógico esquerdo, direita → direito). Cor predominante, não média: peso maior para as cores saturadas; tela escura/cinza = luz fraca e neutra. O serviço `pingo-leds` suaviza as transições, roda os efeitos e fala com a serial. Fora do jogo, a cor fixa.
 - **Etapas:** (1) protocolo + teste no aparelho (quantos LEDs por analógico, ordem, lados); (2) cor fixa, presets, brilho, tela; (3) efeitos e Bateria; (4) Ambilight.
+- **Travamento do microcontrolador (resolvido, 2026-11-09):** com a Ambilight, as luzes congelavam (ou apagavam) no começo do jogo e só voltavam desligando o aparelho; nem cortar a energia pelo `rgb:kbd_backlight` destravava. O chip responde `XXH_002` a cada pacote aceito, o que permitiu ver o momento exato: o serviço mandava rajadas (um pacote a cada ~5 ms), porque cada cor do jogo acordava o laço e disparava um envio. Parado no menu, o chip aguenta as rajadas; com o jogo rodando, não. Agora: relógio fixo, no máximo um pacote a cada 40 ms; a energia das luzes nunca é desligada (apagar = cor preta); 4 pacotes sem resposta e só vai um pacote de teste a cada meio segundo. Resumo em `/run/pingo/leds.state`.

@@ -7,7 +7,9 @@
  * LEDs 0-7 = analógico direito, 8-15 = esquerdo (conferido no aparelho), no
  * sentido anti-horário, um a cada 45°: o 0 do direito fica às 3h e o 0 do
  * esquerdo (LED 8) às 12h.
- * A luz "rgb:kbd_backlight" só liga a energia.
+ * A cada pacote aceito ele responde "XXH_002". A luz "rgb:kbd_backlight"
+ * liga a energia (e fica sempre ligada: ver power()).
+ * Resumo em /run/pingo/leds.state (pacotes, respostas, perdas), a cada 5 s.
  *
  * Configuração: /mnt/sd1/Config/luzes.cfg (escrita pela tela Luzes):
  *   modo=fixo|respirar|arcoiris|bateria|ambilight|desligado
@@ -40,6 +42,10 @@
 #define FIFO     "/run/pingo/leds"
 #define BAT      "/sys/class/power_supply/battery/capacity"
 #define NLEDS    16
+/* Intervalo entre pacotes. Rajadas (um pacote a cada 5 ms, quando cada cor
+ * do jogo disparava um envio) travavam o microcontrolador até o aparelho ser
+ * desligado. 40 ms = 25 por segundo, com folga. */
+#define TICK_MS  40
 
 enum { M_OFF, M_FIXED, M_BREATHE, M_RAINBOW, M_BATTERY, M_AMBI };
 static const char *mode_names[] = { "desligado", "fixo", "respirar", "arcoiris", "bateria",
@@ -52,6 +58,7 @@ struct rgb {
 static int mode = M_FIXED, bright = 60; /* brilho em % */
 static struct rgb left = { 1, 0.45f, 0 }, right = { 1, 0.45f, 0 }; /* laranja do Pingo */
 static bool screen_off, preview, ambi_active;
+static unsigned n_sent, n_rx; /* pacotes enviados, bytes de resposta */
 static struct rgb pv_left, pv_right, ambi_l, ambi_r, cur_l, cur_r;
 static int pv_bright;
 static int tty = -1;
@@ -96,10 +103,13 @@ static void load_cfg(void)
 
 static int force_frames; /* depois de religar a energia: manda sempre */
 
+/* Energia das luzes: só liga, nunca desliga. O pino (rgb:kbd_backlight) não
+ * corta a energia do microcontrolador por inteiro, e a serial continua
+ * ligada nele: desligado assim, ele ficava meio alimentado e travava até o
+ * aparelho ser desligado de verdade. Para apagar, vai a cor preta. */
 static void power(bool on)
 {
-	if (on)
-		force_frames = 30; /* ~1 s mandando sempre, enquanto o microcontrolador liga */
+	force_frames = 30; /* ~1 s mandando sempre */
 	int fd = open(POWER, O_WRONLY);
 	if (fd >= 0) {
 		if (write(fd, on ? "1" : "0", 1) < 0)
@@ -153,10 +163,40 @@ static long ms_since(const struct timespec *a)
 }
 
 /* Manda uma cor por LED com o brilho dado (0-100) */
+/* O microcontrolador responde "XXH_002" a cada pacote aceito. Quando ele
+ * reinicia (queda de energia no jogo, com a bateria fraca), as respostas
+ * param, e uma enxurrada de pacotes nessa hora o deixava preso
+ * (provavelmente no modo de gravação do próprio chip) até o aparelho ser
+ * desligado. Então: 4 pacotes sem resposta, e só vai um pacote de teste a
+ * cada meio segundo (o ritmo com que ele sempre se recuperou), até ele
+ * responder de novo. Um chip que nunca respondeu (outro firmware) recebe
+ * normalmente. */
+static int pending; /* pacotes sem resposta */
+static unsigned n_silences;
+
+static bool chip_lost(void)
+{
+	return n_rx && pending >= 4;
+}
+
+static struct timespec t_start;
+
+static void chip_answer(int lines)
+{
+	if (chip_lost() && lines)
+		force_frames = 10; /* voltou: manda já, sem esperar mudança */
+	pending = 0;
+}
+
 static void send_leds(const struct rgb *c, int pct)
 {
 	static unsigned char last[2 + NLEDS * 3];
 	static bool sent;
+	if (sent && ms_since(&last_sent) < TICK_MS - 5)
+		return; /* nunca em rajada */
+	bool lost = chip_lost();
+	if (lost && ms_since(&last_sent) < 500)
+		return; /* chip sem responder: só um teste a cada meio segundo */
 	unsigned char pkt[2 + NLEDS * 3 + 1];
 	pkt[0] = 1;
 	pkt[1] = (unsigned char)(pct * 255 / 100);
@@ -165,7 +205,9 @@ static void send_leds(const struct rgb *c, int pct)
 		pkt[3 + i * 3] = to8(c[i].g);
 		pkt[4 + i * 3] = to8(c[i].b);
 	}
-	if (force_frames > 0)
+	if (lost)
+		; /* teste: vai mesmo sem mudança */
+	else if (force_frames > 0)
 		force_frames--;
 	else if (sent && !memcmp(last, pkt, sizeof(last)) && ms_since(&last_sent) < 500)
 		return; /* nada mudou há pouco: a serial fica quieta */
@@ -178,6 +220,11 @@ static void send_leds(const struct rgb *c, int pct)
 	pkt[sizeof(pkt) - 1] = (unsigned char)(sum & 0xFF);
 	if (write(tty, pkt, sizeof(pkt)) < 0)
 		perror("pingo-leds: serial");
+	n_sent++;
+	if (pending == 3)
+		n_silences++; /* este é o quarto sem resposta */
+	if (pending < 1000)
+		pending++;
 }
 
 /* As duas cores: 0-7 direita, 8-15 esquerda */
@@ -236,12 +283,10 @@ static void command(char *line)
 	} else if (!strcmp(line, "off")) {
 		/* na hora, sem a transição: a suspensão vem logo em seguida */
 		screen_off = true;
-		cur_l = cur_r = (struct rgb){ 0, 0, 0 };
-		send(cur_l, cur_r, 0);
-		power(false);
+		cur_l = cur_r = (struct rgb){ 0, 0, 0 }; /* o próximo pacote (até 40 ms) já vai preto */
 	} else if (!strcmp(line, "on")) {
 		screen_off = false;
-		power(true);
+		force_frames = 30;
 	} else if (sscanf(line, "ambi %15s %15s", a, b) == 2) {
 		ambi_l = hex(a);
 		ambi_r = hex(b);
@@ -254,6 +299,18 @@ static void command(char *line)
 		pv_bright = br;
 		preview = true;
 	}
+}
+
+/* Resumo para diagnóstico (/run/pingo/leds.state, a cada 5 s, na memória) */
+static void dump_state(void)
+{
+	FILE *f = fopen("/run/pingo/leds.state.tmp", "w");
+	if (!f)
+		return;
+	fprintf(f, "modo=%s\npacotes=%u\nrespostas=%u\nchip_sem_resposta=%d\nchip_perdas=%u\n",
+		mode_names[mode], n_sent, n_rx / 9, pending, n_silences);
+	fclose(f);
+	rename("/run/pingo/leds.state.tmp", "/run/pingo/leds.state");
 }
 
 static void on_term(int s)
@@ -285,11 +342,31 @@ int main(void)
 	size_t len = 0;
 	struct timespec t0;
 	clock_gettime(CLOCK_MONOTONIC, &t0);
+	t_start = t0;
 	int last_bat = -1, bat_tick = 0;
 
+	long next_tick = 0;
 	while (!quit) {
-		struct pollfd p = { fifo, POLLIN, 0 };
-		if (poll(&p, 1, 33) > 0) { /* ~30 atualizações por segundo */
+		struct pollfd pp[2] = { { fifo, POLLIN, 0 }, { tty, POLLIN, 0 } };
+		/* Relógio fixo: um pacote a cada TICK_MS, no máximo. Comandos e
+		 * respostas do chip só acordam o laço para serem lidos. */
+		long now_ms = ms_since(&t_start);
+		long wait = next_tick - now_ms;
+		int pr = poll(pp, 2, wait < 0 ? 0 : wait > TICK_MS ? TICK_MS : (int)wait);
+		if (pr > 0 && (pp[1].revents & POLLIN)) {
+			/* "XXH_002" do microcontrolador: a resposta ao último pacote */
+			char rb[256];
+			ssize_t rn = read(tty, rb, sizeof(rb));
+			if (rn > 0) {
+				int lines = 0;
+				for (ssize_t i = 0; i < rn; i++)
+					lines += rb[i] == '\n';
+				if (lines)
+					chip_answer(lines);
+				n_rx += (unsigned)rn;
+			}
+		}
+		if (pr > 0 && (pp[0].revents & POLLIN)) {
 			ssize_t n = read(fifo, buf + len, sizeof(buf) - 1 - len);
 			if (n > 0) {
 				len += (size_t)n;
@@ -305,8 +382,17 @@ int main(void)
 					len = 0; /* linha comprida demais: descarta */
 			}
 		}
+		now_ms = ms_since(&t_start);
+		if (now_ms < next_tick)
+			continue;
+		next_tick = now_ms + TICK_MS;
 		struct timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
+		static time_t last_dump;
+		if (now.tv_sec - last_dump >= 5) {
+			last_dump = now.tv_sec;
+			dump_state();
+		}
 		float t = (now.tv_sec - t0.tv_sec) + (now.tv_nsec - t0.tv_nsec) / 1e9f;
 
 		struct rgb want_l = left, want_r = right;
@@ -348,8 +434,8 @@ int main(void)
 		cur_r = mix(cur_r, want_r, k);
 		send(cur_l, cur_r, pct);
 	}
+	usleep(TICK_MS * 1000); /* o intervalo vale também para o último pacote */
 	send((struct rgb){ 0, 0, 0 }, (struct rgb){ 0, 0, 0 }, 0);
-	power(false);
 	unlink(FIFO);
 	return 0;
 }
