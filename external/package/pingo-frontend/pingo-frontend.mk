@@ -7,6 +7,11 @@
 PINGO_FRONTEND_VERSION = 0.2
 PINGO_FRONTEND_SITE = $(BR2_EXTERNAL_PINGO_PATH)/../frontend
 PINGO_FRONTEND_SITE_METHOD = local
+# Binários compilados no PC (make para conferir o código) não podem entrar:
+# mais novos que o código, o make do build os aceitaria como prontos e a
+# imagem levaria um programa x86-64
+PINGO_FRONTEND_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS = \
+	--exclude=/pingo-retro --exclude=/pingo-launcher --exclude='*.o'
 PINGO_FRONTEND_LICENSE = GPL-2.0, MIT (libretro.h)
 PINGO_FRONTEND_DEPENDENCIES = sdl2 sdl2_ttf font-inter alsa-lib libzip host-pkgconf \
 	rcheevos libcurl

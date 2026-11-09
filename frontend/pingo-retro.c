@@ -917,10 +917,23 @@ static double audio_pos;             /* posição entre a amostra anterior e a a
 static int16_t in_prev[2];
 static Uint32 audio_target;          /* bytes na fila que queremos manter */
 
+/* Nível do som que o core entrega (para o log: pico e média RMS) */
+static int audio_peak;
+static double audio_sq_sum;
+static unsigned long audio_n;
+
 static size_t audio_batch(const int16_t *data, size_t frames)
 {
 	static int16_t out[8192 * 2];
 	size_t o = 0;
+
+	for (size_t i = 0; i < frames * 2; i++) {
+		int v = data[i] < 0 ? -data[i] : data[i];
+		if (v > audio_peak)
+			audio_peak = v;
+		audio_sq_sum += (double)data[i] * data[i];
+	}
+	audio_n += frames * 2;
 
 	if (!audio_dev)
 		return frames;
@@ -2822,8 +2835,14 @@ int main(int argc, char **argv)
 			}
 		}
 		if (now - t0 >= 10000) {
-			fprintf(stderr, "pingo-retro: %.1f fps, som na fila %u bytes\n",
-				frames * 1000.0 / (now - t0), audio_dev ? SDL_GetQueuedAudioSize(audio_dev) : 0);
+			/* nível em % do máximo (100 % = 32767) */
+			double rms = audio_n ? sqrt(audio_sq_sum / audio_n) : 0;
+			fprintf(stderr, "pingo-retro: %.1f fps, som na fila %u bytes, pico %d%%, média %.1f%%\n",
+				frames * 1000.0 / (now - t0), audio_dev ? SDL_GetQueuedAudioSize(audio_dev) : 0,
+				audio_peak * 100 / 32767, rms * 100 / 32767);
+			audio_peak = 0;
+			audio_sq_sum = 0;
+			audio_n = 0;
 			t0 = now;
 			frames = 0;
 		}
