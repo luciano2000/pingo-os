@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/img/logo.png" width="480" alt="Pingo: lightweight linux for portable emulation">
+</p>
+
 # Pingo OS by Retrogamer Brasil
 
 Uma distro Linux mínima para consoles portáteis retrô. Grave a `.img` no cartão SD, ligue o aparelho e jogue.
