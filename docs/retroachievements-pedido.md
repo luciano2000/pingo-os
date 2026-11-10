@@ -8,22 +8,22 @@ Texto para enviar à equipe do RetroAchievements (em inglês). Antes de mandar, 
 
 Hi RetroAchievements team,
 
-I'm the developer of **Pingo OS**, a free and open-source (GPL-2.0) Linux distribution for retro handhelds, currently targeting the Anbernic RG35XX-H (Allwinner H700). I'd like to request that our frontend be recognized for **hardcore** mode.
+I'm the developer of **Pingo OS**, a free and open-source (GPL-2.0) Linux distribution for retro handhelds, currently targeting the Anbernic RG35XX-H and RG40XX-H (both Allwinner H700, one image per device). I'd like to request that our frontend be recognized for **hardcore** mode.
 
 **What it is**
 
 - Source code: https://github.com/luciano2000/pingo-os (RetroAchievements code in `frontend/ra.c`)
-- Public beta: https://github.com/luciano2000/pingo-os/releases/tag/v0.1.0-beta
+- Public beta: https://github.com/luciano2000/pingo-os/releases/tag/v0.3.0-beta
 - The integrating client is **pingo-retro**, our own minimal libretro frontend (written from scratch in C, SDL2/KMS). It loads standard libretro cores; it is not a RetroArch fork.
 - RetroAchievements is integrated with the official **rcheevos 12.5.0** library using **rc_client** (identify-and-load by hash) and **rc_libretro** (memory maps from `RETRO_ENVIRONMENT_SET_MEMORY_MAPS`, falling back to `retro_get_memory_data`).
 
 **User-Agent**
 
 ```
-PingoOS/0.1.0-beta (Linux) <core library_name>/<core library_version> rcheevos/12.5
+PingoOS/<version> (Linux) <core library_name>/<core library_version> rcheevos/12.5
 ```
 
-For example: `PingoOS/0.1.0-beta (Linux) Snes9x/1.62.3 rcheevos/12.5`. The core name and version come from `retro_get_system_info`, the same way RetroArch reports them.
+For example: `PingoOS/0.3.0-beta (Linux) Snes9x/1.62.3 rcheevos/12.5`. The OS version comes from `/etc/os-release` (`VERSION_ID`, without the leading "v"); the core name and version come from `retro_get_system_info`, the same way RetroArch reports them.
 
 **Hardcore enforcement**
 
@@ -39,7 +39,7 @@ For example: `PingoOS/0.1.0-beta (Linux) Snes9x/1.62.3 rcheevos/12.5`. The core 
 
 **Status**
 
-Login (token stored, never the password), game identification and softcore play are working; for example, Super Mario World is identified and shows the user's progress. In hardcore, the server currently returns the "Unknown Emulator" warning, which is why I'm writing.
+Login (token stored, never the password), game identification and softcore play are working: games are identified by hash (e.g. Super Mario World shows the user's progress), unlocks are submitted and shown on screen with their badges (e.g. Mario Kart), and the in-game menu lists the achievements with their status. In hardcore, the server currently returns the "Unknown Emulator" warning, which is why I'm writing.
 
 Known limitation: CHD disc images are not hashed yet (we only use the default rcheevos cdreader for CUE/BIN/ISO).
 

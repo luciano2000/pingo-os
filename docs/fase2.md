@@ -52,7 +52,7 @@
 - **Menu do jogo → Conquistas**: em ordem de pontos (mais fáceis primeiro), imagem pequena (escurecida nas bloqueadas), ✓ e pontos; descrição da selecionada numa caixa de diálogo embaixo (fonte do nome, até 3 linhas); ◀ ▶ passam página.
 - **Hardcore:** Carregar (save state) e o retorno automático ao jogo ficam desligados. As opções de core proibidas pelo rcheevos para aquele core e console (`rc_libretro_get_disallowed_settings_for_system`: região PAL, camadas desligadas no Snes9x, trapaças no Genesis Plus GX...) voltam ao primeiro valor permitido e são puladas no menu de opções; core não permitido para o console desliga o hardcore na sessão, com aviso. Por isso o RetroAchievements começa antes de carregar o jogo.
 - **User agent:** `PingoOS/<versão> (Linux) <Core>/<versão do core> rcheevos/12.5`. O "Warning: Unknown Emulator" (conquista falsa com id ≥ 101000001) é o servidor avisando que o Pingo OS ainda não está aprovado para o hardcore: aparece como aviso e fica fora da lista. Pedido de aprovação: `docs/retroachievements-pedido.md`.
-- **Limites:** jogos em `.chd` (PS, Sega CD, PC Engine CD) não são identificados ainda (o leitor de CD do rcheevos só lê `.cue`/`.bin`/`.iso`); falta o libchdr. Sem imagens das conquistas (só texto).
+- **Limites:** jogos em `.chd` (PS, Sega CD, PC Engine CD) não são identificados ainda (o leitor de CD do rcheevos só lê `.cue`/`.bin`/`.iso`); falta o libchdr.
 
 ### Checklist
 
