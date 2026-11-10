@@ -150,6 +150,7 @@ DT_TIME=Time
 DT_ADJUST=adjust
 DT_SAVED=Date and time saved
 LANGUAGE=Language
+BOOT_SOUND=Startup sound
 POWER_OFF_ITEM=Power off
 POWER_OFF_ASK=Power off the device?
 YES=yes

@@ -32,3 +32,13 @@ mkdir -p "$TARGET_DIR/usr/share/pingo"
 python3 -I "$BR2_EXTERNAL_PINGO_PATH/../scripts/png2fb.py" \
 	"$BR2_EXTERNAL_PINGO_PATH/board/h700/splash/pingo.png" \
 	"$TARGET_DIR/usr/share/pingo/splash.raw"
+
+# Som ao ligar: fica fora do repositório (licença do Pixabay, ver
+# board/h700/som/LEIAME.md). Sem o arquivo, a imagem sai sem som.
+SOM="$BR2_EXTERNAL_PINGO_PATH/../.cache/som/ligar.wav"
+if [ -f "$SOM" ]; then
+	install -m 0644 "$SOM" "$TARGET_DIR/usr/share/pingo/ligar.wav"
+else
+	rm -f "$TARGET_DIR/usr/share/pingo/ligar.wav"
+	echo "post-build: sem $SOM, imagem sem som ao ligar" >&2
+fi

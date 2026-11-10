@@ -23,6 +23,8 @@ while true; do
 		{ read -r core; read -r rom; read -r console; read -r mode; } < /run/pingo/next
 		rm -f /run/pingo/next
 		load_tz # pode ter mudado no launcher
+		# o som ao ligar ainda tocando prenderia o áudio do jogo
+		start-stop-daemon -K -q -p /run/pingo-som.pid -x /usr/bin/aplay 2>/dev/null
 		echo "== $(date '+%F %T') $rom"
 		if [ "$core" = "port" ]; then
 			# port do PortMaster (ou o próprio): roda o script e volta ao launcher

@@ -164,6 +164,7 @@ STR(S_DT_SAVED, "Data e hora gravadas")
 
 /* menu do Início */
 STR(S_LANGUAGE, "Idioma")
+STR(S_BOOT_SOUND, "Som ao ligar")
 STR(S_POWER_OFF_ITEM, "Desligar")
 STR(S_POWER_OFF_ASK, "Desligar o aparelho?")
 STR(S_YES, "sim")

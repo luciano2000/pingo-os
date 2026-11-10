@@ -2674,9 +2674,36 @@ static void language_changed(void)
 	dirty = true;
 }
 
-/* MENU no Início: Wi-Fi, Data e hora, Idioma, RetroAchievements, (cartão novo no slot 2:
- * prepará-lo) e Desligar, sempre o último */
-enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_RA, HM_PORTMASTER, HM_LEDS, HM_SD2, HM_POWEROFF };
+/* Som ao ligar (S07pingo-som): ligado se o arquivo não existe; "0" desliga.
+ * Só aparece no menu se a imagem tem o som. */
+#define BOOT_SOUND_WAV  "/usr/share/pingo/ligar.wav"
+#define BOOT_SOUND_FILE "/mnt/sd1/Config/som-ao-ligar.txt"
+
+static bool boot_sound_on(void)
+{
+	FILE *f = fopen(BOOT_SOUND_FILE, "r");
+	int c = f ? fgetc(f) : EOF;
+	if (f)
+		fclose(f);
+	return c != '0';
+}
+
+static void boot_sound_set(bool on)
+{
+	FILE *f = fopen(BOOT_SOUND_FILE ".tmp", "w");
+	if (!f)
+		return;
+	fputs(on ? "1\n" : "0\n", f);
+	fflush(f);
+	fsync(fileno(f));
+	fclose(f);
+	rename(BOOT_SOUND_FILE ".tmp", BOOT_SOUND_FILE);
+}
+
+/* MENU no Início: Wi-Fi, Data e hora, Idioma, Som ao ligar, RetroAchievements,
+ * (cartão novo no slot 2: prepará-lo) e Desligar, sempre o último */
+enum { HM_WIFI, HM_DATETIME, HM_LANGUAGE, HM_SOUND, HM_RA, HM_PORTMASTER, HM_LEDS, HM_SD2,
+       HM_POWEROFF };
 
 static bool home_menu(void)
 {
@@ -2686,11 +2713,14 @@ static bool home_menu(void)
 	for (int i = 0; i < nlangs; i++)
 		if (!strcmp(langs[i].code, lang_current()))
 			cur_lang = i;
+	bool has_sound = access(BOOT_SOUND_WAV, F_OK) == 0, sound = boot_sound_on();
 	for (;;) {
-		int items[8], n = 0;
+		int items[10], n = 0;
 		items[n++] = HM_WIFI;
 		items[n++] = HM_DATETIME;
 		items[n++] = HM_LANGUAGE;
+		if (has_sound)
+			items[n++] = HM_SOUND;
 		items[n++] = HM_RA;
 		items[n++] = HM_PORTMASTER;
 		if (leds_available()) /* só nos aparelhos com as luzes */
@@ -2709,14 +2739,18 @@ static bool home_menu(void)
 				ui_round_rect(PAD_X, y, UI_W - 2 * PAD_X, ROW_H, ROW_RADIUS, COL_SEL_BG);
 			const char *label = items[i] == HM_WIFI ? S_WIFI : items[i] == HM_DATETIME ? S_DT_TITLE
 					  : items[i] == HM_LANGUAGE ? S_LANGUAGE
+					  : items[i] == HM_SOUND ? S_BOOT_SOUND
 					  : items[i] == HM_RA ? S_RA
 					  : items[i] == HM_PORTMASTER ? "PortMaster"
 					  : items[i] == HM_LEDS ? S_LEDS
 					  : items[i] == HM_SD2 ? S_PREPARE_SD2 : S_POWER_OFF_ITEM;
 			int vw = 0;
-			if (items[i] == HM_LANGUAGE)
-				vw = ui_text(F_COUNT, langs[cur_lang].name, UI_W - PAD_X - ROW_PAD,
-					     y + ROW_H / 2, s ? COL_SEL_FG : COL_DIM, 1, 300) + 16;
+			if (items[i] == HM_LANGUAGE || items[i] == HM_SOUND)
+				vw = ui_text(F_COUNT,
+					     items[i] == HM_LANGUAGE ? langs[cur_lang].name
+					     : sound ? S_O_ON : S_O_OFF,
+					     UI_W - PAD_X - ROW_PAD, y + ROW_H / 2,
+					     s ? COL_SEL_FG : COL_DIM, 1, 300) + 16;
 			ui_text(s ? F_ITEM_SEL : F_ITEM, label, PAD_X + ROW_PAD, y + ROW_H / 2,
 				s ? COL_SEL_FG : COL_TEXT, 0, UI_W - 2 * PAD_X - 2 * ROW_PAD - vw);
 			if ((items[i] == HM_WIFI || items[i] == HM_DATETIME || items[i] == HM_RA ||
@@ -2725,7 +2759,7 @@ static bool home_menu(void)
 		}
 		int right = UI_W - PAD_X;
 		right -= draw_hint(right, "B", S_BACK) + 22;
-		if (items[sel] == HM_LANGUAGE)
+		if (items[sel] == HM_LANGUAGE || items[sel] == HM_SOUND)
 			draw_hint(right, "◀ ▶", S_HINT_CHANGE);
 		else
 			draw_hint(right, "A", S_CONFIRM);
@@ -2742,6 +2776,9 @@ static bool home_menu(void)
 			cur_lang = (cur_lang + d + nlangs) % nlangs;
 			lang_set(langs[cur_lang].code);
 			language_changed();
+		} else if (it == HM_SOUND && d) {
+			sound = !sound;
+			boot_sound_set(sound);
 		} else if (k == BTN_EAST) {
 			if (it == HM_WIFI) {
 				wifi_screen();
