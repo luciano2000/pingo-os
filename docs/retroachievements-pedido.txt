@@ -36,7 +36,7 @@ STATUS
 
 Login (token stored, never the password), game identification and softcore play are working: games are identified by hash (e.g. Super Mario World shows the user's progress), unlocks are submitted and shown on screen with their badges (e.g. Mario Kart), and the in-game menu lists the achievements with their status. In hardcore, the server currently returns the "Unknown Emulator" warning, which is why I'm writing.
 
-Known limitation: CHD disc images are not hashed yet (we only use the default rcheevos cdreader for CUE/BIN/ISO).
+CHD disc images are hashed through a custom rc_hash_cdreader backed by libchdr; other formats use the default rcheevos cdreader.
 
 I'm happy to change anything you need, test builds, or follow any integration guideline you point me to.
 

@@ -1,0 +1,8 @@
+config BR2_PACKAGE_LIBCHDR
+	bool "libchdr"
+	help
+	  Leitura de imagens de disco CHD (MAME), com o zlib, o LZMA e o
+	  zstd que vêm junto (BSD-3-Clause). Biblioteca estática para o
+	  pingo-retro identificar jogos .chd no RetroAchievements.
+
+	  https://github.com/rtissera/libchdr

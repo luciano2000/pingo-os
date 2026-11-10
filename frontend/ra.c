@@ -24,6 +24,7 @@
 #include "rc_consoles.h"
 #include "rc_libretro.h"
 
+#include "chd_hash.h"
 #include "textos.h"
 
 #define CA_FILE "/etc/ssl/certs/ca-certificates.crt"
@@ -404,6 +405,10 @@ static void make_client(void)
 	client = rc_client_create(read_memory, server_call);
 	rc_client_enable_logging(client, RC_CLIENT_LOG_LEVEL_WARN, log_msg);
 	rc_client_set_event_handler(client, on_event);
+	/* .chd: o leitor de CD do rcheevos só entende .cue/.bin/.iso */
+	static rc_hash_callbacks_t hash_cb;
+	chd_hash_cdreader(&hash_cb.cdreader);
+	rc_client_set_hash_callbacks(client, &hash_cb);
 	/* "PingoOS/0.1.0-beta (Linux) rcheevos/12.5": a versão vem do sistema */
 	char clause[64] = "", ver[48] = "dev", line[128];
 	rc_client_get_user_agent_clause(client, clause, sizeof(clause));

@@ -14,14 +14,14 @@ PINGO_FRONTEND_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS = \
 	--exclude=/pingo-retro --exclude=/pingo-launcher --exclude=/pingo-leds --exclude='*.o'
 PINGO_FRONTEND_LICENSE = GPL-2.0, MIT (libretro.h)
 PINGO_FRONTEND_DEPENDENCIES = sdl2 sdl2_ttf font-inter alsa-lib libzip host-pkgconf \
-	rcheevos libcurl
+	rcheevos libchdr libcurl
 
 define PINGO_FRONTEND_BUILD_CMDS
 	$(TARGET_MAKE_ENV) $(MAKE) -C $(@D) \
 		CC="$(TARGET_CC)" CFLAGS="$(TARGET_CFLAGS)" LDFLAGS="$(TARGET_LDFLAGS)" \
 		PKG_CONFIG="$(PKG_CONFIG_HOST_BINARY)" \
 		RC_CFLAGS="-DPINGO_RA -DRC_CLIENT_SUPPORTS_HASH -DRC_STATIC -I$(STAGING_DIR)/usr/include/rcheevos" \
-		RC_LIBS="-lrcheevos -lpthread"
+		RC_LIBS="-lrcheevos -lchdr -lpthread"
 endef
 
 define PINGO_FRONTEND_INSTALL_TARGET_CMDS
