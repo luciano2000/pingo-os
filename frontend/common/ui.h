@@ -33,8 +33,8 @@
 enum font_id {
 	F_BAR,       /* 15 px, 500 */
 	F_BAR_BOLD,  /* 15 px, 600 */
-	F_ITEM,      /* 23 px, 500 */
-	F_ITEM_SEL,  /* 23 px, 600 */
+	F_ITEM,      /* 24 px, Quicksand 600 */
+	F_ITEM_SEL,  /* 24 px, Quicksand 700 */
 	F_COUNT,     /* 16 px, 500 */
 	F_SMALL,     /* 14 px, 500 */
 	F_TITLE,     /* 23 px, 600 (mensagens) */

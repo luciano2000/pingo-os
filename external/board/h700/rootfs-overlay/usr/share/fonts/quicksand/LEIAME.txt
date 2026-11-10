@@ -1,0 +1,4 @@
+Quicksand (fonte variável, pesos 300-700), de Andrew Paglinawan, do
+repositório google/fonts (ofl/quicksand, commit c4d10b2a6e42).
+Licença SIL Open Font License 1.1 (OFL.txt).
+O launcher usa as instâncias SemiBold e Bold (TTF_OpenFontIndex).

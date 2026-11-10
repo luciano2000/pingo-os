@@ -389,11 +389,14 @@ static bool attached; /* renderer de outro programa: não destruir */
 
 static bool load_assets(void)
 {
-	static const struct { const char *file; int size; } spec[F_COUNT_N] = {
+	/* Listas em Quicksand (fonte variável: index = instância << 16, na ordem
+	 * do arquivo: 1 Light, 2 Regular, 3 Medium, 4 SemiBold, 5 Bold). O resto
+	 * em Inter, que lê melhor nos tamanhos pequenos. */
+	static const struct { const char *file; int size; long index; } spec[F_COUNT_N] = {
 		[F_BAR]      = { "Inter-Medium.ttf",   15 },
 		[F_BAR_BOLD] = { "Inter-SemiBold.ttf", 15 },
-		[F_ITEM]     = { "Inter-Medium.ttf",   23 },
-		[F_ITEM_SEL] = { "Inter-SemiBold.ttf", 23 },
+		[F_ITEM]     = { "../quicksand/Quicksand.ttf", 24, 4L << 16 },
+		[F_ITEM_SEL] = { "../quicksand/Quicksand.ttf", 24, 5L << 16 },
 		[F_COUNT]    = { "Inter-Medium.ttf",   16 },
 		[F_SMALL]    = { "Inter-Medium.ttf",   14 },
 		[F_TITLE]    = { "Inter-SemiBold.ttf", 23 },
@@ -412,7 +415,7 @@ static bool load_assets(void)
 	for (int i = 0; i < F_COUNT_N; i++) {
 		char path[512];
 		snprintf(path, sizeof(path), "%s/%s", font_dir, spec[i].file);
-		fonts[i] = TTF_OpenFont(path, spec[i].size);
+		fonts[i] = TTF_OpenFontIndex(path, spec[i].size, spec[i].index);
 		if (!fonts[i]) {
 			fprintf(stderr, "pingo-launcher: fonte %s: %s\n", path, TTF_GetError());
 			return false;

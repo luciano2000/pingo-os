@@ -212,7 +212,7 @@ Mockup: https://claude.ai/artifact/Vz7H1VQirbdDkg7MoUSr6c
 | Texto secundário | `#8C8C8C` (contagem de jogos, dicas de botões, status) |
 | Seleção | barra `#E8E8E8` com texto `#000000` e cantos arredondados (10 px) |
 | Cor de destaque | no máximo uma, só para alertas (bateria baixa) |
-| Fonte | Inter (livre), pesos 400/500/600 |
+| Fonte | Listas em Quicksand SemiBold (selecionado em Bold); o resto em Inter 400/500/600 (livres, OFL) |
 | Resolução de referência | 640x480; itens de lista com 44 px de altura e texto de 23 px |
 
 ### Telas
