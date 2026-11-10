@@ -103,6 +103,7 @@ external/              árvore BR2_EXTERNAL do Buildroot
 - [Quicksand](https://github.com/andrew-paglinawan/QuicksandFamily) (OFL-1.1): fonte das listas.
 - [Inter](https://rsms.me/inter/) (OFL-1.1): fonte do resto da interface (barras, textos e dicas).
 - [libretro](https://www.libretro.com): API dos cores (`libretro.h`, MIT).
+- [libchdr](https://github.com/rtissera/libchdr) (BSD-3-Clause): jogos em `.chd` no RetroAchievements.
 - [rcheevos](https://github.com/RetroAchievements/rcheevos) (MIT): RetroAchievements; [stb_image](https://github.com/nothings/stb) (domínio público/MIT): imagens das conquistas; [libcurl](https://curl.se) e [Mbed TLS](https://www.trustedfirmware.org/projects/mbed-tls/).
 - Matrizes de cor GBA/SP 101: Pokefan531 e hunterk ([slang-shaders](https://github.com/libretro/slang-shaders), domínio público).
 
