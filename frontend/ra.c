@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "rc_client.h"
@@ -67,6 +68,28 @@ static pthread_t worker;
 static bool worker_on, sync_mode;
 static char user_agent[128];
 
+/* Saindo do jogo (ra_stop): as imagens que faltam são descartadas e o resto
+ * tem pouco tempo, para a saída não esperar uma internet que caiu */
+#define STOP_GRACE 6.0
+static volatile bool stopping;
+static double stop_at;
+
+static double now_s(void)
+{
+	struct timespec t;
+	clock_gettime(CLOCK_MONOTONIC, &t);
+	return t.tv_sec + t.tv_nsec / 1e9;
+}
+
+static int on_progress(void *ud, curl_off_t dt, curl_off_t dn, curl_off_t ut, curl_off_t un)
+{
+	(void)dt, (void)dn, (void)ut, (void)un;
+	struct job *j = ud;
+	if (!stopping)
+		return 0;
+	return j->save_to || now_s() - stop_at > STOP_GRACE; /* != 0 interrompe */
+}
+
 static size_t on_data(char *p, size_t sz, size_t n, void *ud)
 {
 	struct job *j = ud;
@@ -92,9 +115,12 @@ static void http(struct job *j)
 	curl_easy_setopt(c, CURLOPT_USERAGENT, user_agent);
 	const char *ca = getenv("PINGO_CA_FILE"); /* para testar sem regravar o sistema */
 	curl_easy_setopt(c, CURLOPT_CAINFO, ca && *ca ? ca : CA_FILE);
-	curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 10L);
-	curl_easy_setopt(c, CURLOPT_TIMEOUT, 30L);
+	curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, stopping ? 3L : 10L);
+	curl_easy_setopt(c, CURLOPT_TIMEOUT, stopping ? 5L : 30L);
 	curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
+	curl_easy_setopt(c, CURLOPT_NOPROGRESS, 0L);
+	curl_easy_setopt(c, CURLOPT_XFERINFOFUNCTION, on_progress);
+	curl_easy_setopt(c, CURLOPT_XFERINFODATA, j);
 	curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, on_data);
 	curl_easy_setopt(c, CURLOPT_WRITEDATA, j);
 	if (j->post) {
@@ -110,7 +136,7 @@ static void http(struct job *j)
 	if (rc == CURLE_OK)
 		curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &j->status);
 	else
-		fprintf(stderr, "ra: %s\n", curl_easy_strerror(rc));
+		fprintf(stderr, "ra: curl %d (%s) %s\n", (int)rc, curl_easy_strerror(rc), j->save_to ? "imagem" : "");
 	curl_slist_free_all(h);
 	curl_easy_cleanup(c);
 }
@@ -130,7 +156,10 @@ static void *worker_main(void *arg)
 		pending = j->next;
 		pthread_mutex_unlock(&q_lock);
 
-		http(j);
+		if (stopping && now_s() - stop_at > STOP_GRACE)
+			j->status = RC_API_SERVER_RESPONSE_RETRYABLE_CLIENT_ERROR; /* sem tempo */
+		else
+			http(j);
 
 		if (j->save_to) { /* imagem: grava e pronto */
 			if (j->status == 200 && j->len > 0) {
@@ -197,6 +226,20 @@ static void server_call(const rc_api_request_t *req, rc_client_server_callback_t
 	pthread_mutex_unlock(&q_lock);
 }
 
+/* Login sem internet (logo depois de acordar, o Wi-Fi ainda está voltando):
+ * tenta de novo a cada LOGIN_RETRY_S, e o jogo é carregado depois */
+#define LOGIN_RETRY_S 5.0
+#define LOGIN_TRIES   12
+static int login_tries;
+static double login_retry_at; /* 0: nada marcado */
+static bool login_pending, load_after_login;
+static const char *load_path;
+static const void *load_data;
+static size_t load_size;
+
+static void on_game(int result, const char *err, rc_client_t *cl, void *ud);
+static void on_login(int result, const char *err, rc_client_t *cl, void *ud);
+
 void ra_pump(void)
 {
 	if (!client)
@@ -209,6 +252,11 @@ void ra_pump(void)
 		struct job *n = list->next;
 		job_finish(list);
 		list = n;
+	}
+	if (login_retry_at > 0 && now_s() >= login_retry_at) {
+		login_retry_at = 0;
+		fprintf(stderr, "ra: tentando entrar de novo\n");
+		rc_client_begin_login_with_token(client, user, token, on_login, NULL);
 	}
 }
 
@@ -436,10 +484,26 @@ static void on_login(int result, const char *err, rc_client_t *cl, void *ud)
 {
 	(void)cl;
 	(void)ud;
-	if (result != RC_OK) {
-		fprintf(stderr, "ra: login falhou: %s\n", err ? err : "?");
-		say(S_RA_LOGIN_FAILED, err);
+	login_tries++;
+	if (result == RC_OK) {
+		login_pending = false;
+		if (load_after_login) {
+			load_after_login = false;
+			rc_client_begin_identify_and_load_game(client, console_id, load_path, load_data,
+							       load_size, on_game, NULL);
+		}
+		return;
 	}
+	fprintf(stderr, "ra: login falhou (%d, tentativa %d): %s\n", result, login_tries,
+		err ? err : "?");
+	bool account = result == RC_INVALID_CREDENTIALS || result == RC_ACCESS_DENIED ||
+		       result == RC_EXPIRED_TOKEN;
+	if (!account && login_tries < LOGIN_TRIES) {
+		login_retry_at = now_s() + LOGIN_RETRY_S;
+		return;
+	}
+	login_pending = load_after_login = false;
+	say(S_RA_LOGIN_FAILED, err);
 }
 
 /* nome e versão do core sem espaços ("FinalBurn Neo" -> "FinalBurn_Neo") */
@@ -477,6 +541,7 @@ bool ra_start(const char *console_code, const char *core_name, const char *core_
 		client = NULL;
 		return false;
 	}
+	login_pending = true;
 	rc_client_begin_login_with_token(client, user, token, on_login, NULL);
 	return true;
 }
@@ -495,6 +560,10 @@ static void on_game(int result, const char *err, rc_client_t *cl, void *ud)
 	if (result == RC_NO_GAME_LOADED) {
 		fprintf(stderr, "ra: jogo não reconhecido\n");
 		say(S_RA_UNKNOWN, NULL);
+		return;
+	}
+	if (result == RC_LOGIN_REQUIRED && login_pending) {
+		load_after_login = true; /* carrega quando o login der certo */
 		return;
 	}
 	if (result != RC_OK) {
@@ -523,6 +592,9 @@ void ra_load_game(const char *path, const void *data, size_t size, void *(*get_m
 	core_size = get_size;
 	if (!rc_libretro_memory_init(&regions, have_mmap ? &mmap_copy : NULL, core_info, console_id))
 		fprintf(stderr, "ra: memória do core não encontrada\n");
+	load_path = path;
+	load_data = data;
+	load_size = size;
 	rc_client_begin_identify_and_load_game(client, console_id, path, data, size, on_game, NULL);
 }
 
@@ -602,6 +674,19 @@ void ra_stop(void)
 		return;
 	rc_client_unload_game(client);
 	pthread_mutex_lock(&q_lock);
+	stop_at = now_s();
+	stopping = true;
+	for (struct job **t = &pending; *t;) { /* imagens que faltam: ficam para a próxima */
+		struct job *j = *t;
+		if (!j->save_to) {
+			t = &j->next;
+			continue;
+		}
+		*t = j->next;
+		free(j->url);
+		free(j->save_to);
+		free(j);
+	}
 	worker_on = false;
 	pthread_cond_signal(&q_cond);
 	pthread_mutex_unlock(&q_lock);
