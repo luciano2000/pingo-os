@@ -1153,6 +1153,38 @@ static void audio_pause(bool pause)
 static int pad_fd = -1, vol_fd = -1, power_fd = -1;
 static bool pad_state[16];
 
+/* Analógicos (RETRO_DEVICE_ANALOG): [esquerdo/direito][x/y], -32767..32767.
+ * O driver (rocknix-joypad) entrega -1800..1800 e já desinverte os eixos
+ * de cada aparelho pelo device tree. */
+static int16_t stick[2][2];
+static int abs_min[ABS_RY + 1], abs_max[ABS_RY + 1];
+
+static void stick_ranges(void)
+{
+	for (int code = ABS_X; code <= ABS_RY; code++) {
+		struct input_absinfo ai;
+		abs_min[code] = -1800;
+		abs_max[code] = 1800;
+		if (pad_fd >= 0 && ioctl(pad_fd, EVIOCGABS(code), &ai) >= 0 && ai.maximum > ai.minimum) {
+			abs_min[code] = ai.minimum;
+			abs_max[code] = ai.maximum;
+		}
+	}
+}
+
+/* Valor bruto -> -32767..32767, com zona morta de ~8 % (os sticks destes
+ * aparelhos não voltam exatamente ao centro) */
+static int16_t stick_scale(int code, int v)
+{
+	const int dead = 2600;
+	int mid = (abs_min[code] + abs_max[code]) / 2, half = (abs_max[code] - abs_min[code]) / 2;
+	long x = (long)(v - mid) * 32767 / (half ? half : 1);
+	if (x > -dead && x < dead)
+		return 0;
+	x = x > 0 ? (x - dead) * 32767 / (32767 - dead) : (x + dead) * 32767 / (32767 - dead);
+	return (int16_t)(x > 32767 ? 32767 : x < -32767 ? -32767 : x);
+}
+
 
 /* Nomes das funções vindos do core (SET_INPUT_DESCRIPTORS), porta 0 */
 static char *desc_name[16];
@@ -1305,6 +1337,11 @@ static void poll_devices(void)
 		if (ev.type == EV_KEY)
 			osd_key(ev.code, ev.value);
 	while (pad_fd >= 0 && read(pad_fd, &ev, sizeof(ev)) == sizeof(ev)) {
+		if (ev.type == EV_ABS && ev.code <= ABS_RY && ev.code != ABS_Z) {
+			int side = ev.code >= ABS_RX, axis = ev.code == ABS_Y || ev.code == ABS_RY;
+			stick[side][axis] = stick_scale(ev.code, ev.value);
+			continue;
+		}
 		if (ev.type != EV_KEY)
 			continue;
 		if (osd_key(ev.code, ev.value))
@@ -1363,8 +1400,14 @@ static bool is_fds;
 
 static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id)
 {
-	(void)index;
-	if (port != 0 || device != RETRO_DEVICE_JOYPAD)
+	if (port != 0)
+		return 0;
+	if (device == RETRO_DEVICE_ANALOG) {
+		if (index <= RETRO_DEVICE_INDEX_ANALOG_RIGHT && id <= RETRO_DEVICE_ID_ANALOG_Y)
+			return stick[index][id];
+		return 0;
+	}
+	if (device != RETRO_DEVICE_JOYPAD)
 		return 0;
 	if (id == RETRO_DEVICE_ID_JOYPAD_MASK) {
 		int16_t mask = 0;
@@ -2903,6 +2946,14 @@ int main(int argc, char **argv)
 		fprintf(stderr, "pingo-retro: o core recusou a ROM\n");
 		return 1;
 	}
+	/* PlayStation: controle DualShock. Começa no modo digital e o jogo que
+	 * conhece o DualShock liga o analógico sozinho (L1+R1+Select alterna) */
+	if (!strcmp(sysinfo.library_name, "PCSX-ReARMed")) {
+		void (*set_port)(unsigned, unsigned);
+		*(void **)&set_port = dlsym(core.handle, "retro_set_controller_port_device");
+		if (set_port)
+			set_port(0, RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1));
+	}
 	if (ra_on)
 		ra_load_game(game.path, game.data, game.size, core.get_memory_data, core.get_memory_size);
 	core.get_system_av_info(&av);
@@ -2931,6 +2982,7 @@ int main(int argc, char **argv)
 	}
 
 	pad_fd = open_input(GAMEPAD_NAME);
+	stick_ranges();
 	vol_fd = open_input("gpio-keys-volume");
 	power_fd = open_input("axp20x-pek");
 	osd_init();

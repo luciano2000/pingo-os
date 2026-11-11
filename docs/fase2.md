@@ -93,6 +93,18 @@
 - [x] Instalar ports gratuitos e jogar: Cave Story (nxengine-evo) e Ticoban com o direcional e Celeste Classic
 - [ ] Sair do port e voltar ao launcher
 
+## Analógicos nos jogos
+
+- **O que faltava:** na Fase 0 os analógicos foram conferidos só no Linux (`evtest`); o `pingo-retro` lia apenas botões e direcional, e nenhum jogo recebia os sticks. Passou despercebido porque quase tudo testado era digital.
+- **`pingo-retro`:** lê `ABS_X/Y/RX/RY` do "H700 Gamepad" (faixa pelo `EVIOCGABS`, -1800..1800 nos dois aparelhos), converte para -32767..32767 com zona morta de ~8 % e responde `RETRO_DEVICE_ANALOG` na porta 1. O driver já desinverte os eixos de cada aparelho pelo device tree.
+- **PlayStation:** a porta 1 vira DualShock (`retro_set_controller_port_device`). No console de verdade o modo analógico só liga pelo botão Analog (Crash Bandicoot 2) ou pelo próprio jogo (Gran Turismo). Patch no PCSX ReARMed (`0001-dualshock-sempre-analogico.patch`): opção `pcsx_rearmed_dualshock_analog`, que mantém o modo analógico; no menu do jogo, Opções → **Analógico** (padrão Ligado no Pingo). Ligada, o atalho L1+R1+Select deixa de alternar o modo. Jogo antigo que não aceite o controle: desligar e "Salvar para este jogo".
+
+### Checklist
+
+- [x] Crash Bandicoot 2 e Gran Turismo com analógico (RG40XX-H)
+- [ ] Analógico Desligado no menu: o stick para de responder
+- [ ] RG35XX-H
+
 ## RG40XX-H
 
 - Mesmo H700, memória e tela 640x480 do RG35XX-H. O device tree dele (do ROCKNIX) já era compilado; as diferenças estão nele: analógico direito invertido (`invert-absrx/ry`), vibração por PWM, luzes RGB dos analógicos (`led-rgb`, UART5) e o painel `anbernic,rg40xx-panel`. O driver de controle é o mesmo (rocknix-joypad).
