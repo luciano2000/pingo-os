@@ -105,7 +105,7 @@
 
 - [x] Crash Bandicoot 2 e Gran Turismo com analógico (RG40XX-H)
 - [ ] Analógico Desligado no menu: o stick para de responder
-- [ ] RG35XX-H
+- [x] RG35XX-H (v0.3.3-beta)
 
 ## RG40XX-H
 
