@@ -37,6 +37,7 @@
 
 #include "imagem.h"
 #include "controle2.h"
+#include "fbcopy.h"
 
 #define DATA        "/mnt/sd1"
 #define ROMS        DATA "/Roms"
@@ -599,11 +600,14 @@ static bool video_init(void)
 	return true;
 }
 
+/* Mensagem no centro; fica também no fb0, que é o que aparece entre um
+ * programa e outro (galeria -> jogo, desligando) */
 static void message_screen(const char *msg)
 {
 	SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
 	SDL_RenderClear(ren);
 	text(F_BIG, msg, W / 2, H / 2, COL_TEXT, 2, 0);
+	fb_copy_from(ren);
 	SDL_RenderPresent(ren);
 }
 
@@ -1260,6 +1264,7 @@ int main(int argc, char **argv)
 				}
 			} else if (a == A_OK && nview) {
 				rc = launch();
+				message_screen("Carregando…");
 				break;
 			}
 		}

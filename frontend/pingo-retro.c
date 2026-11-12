@@ -3515,8 +3515,18 @@ int main(int argc, char **argv)
 	core.deinit();
 	if (audio_dev)
 		SDL_CloseAudioDevice(audio_dev);
-	/* Entre o jogo e o launcher aparece o fb0: preto, não o logo do boot */
-	fb_clear();
+	/* Entre o jogo e o launcher aparece o fb0: preto, não o logo do boot.
+	 * No Arcade, "Carregando…" até a galeria voltar */
+	if (pad_fd < 0 && n_key_fds > 0 && !power_off_requested) {
+		ui_logical(false);
+		SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+		SDL_RenderClear(renderer);
+		ui_logical(true);
+		ui_text(F_BIG, "Carregando…", UI_W / 2, UI_H / 2, COL_TEXT, 2, 0);
+		fb_copy_from(renderer);
+	} else {
+		fb_clear();
+	}
 	for (int s = 0; s < SLOTS; s++)
 		if (slot_preview[s])
 			SDL_DestroyTexture(slot_preview[s]);

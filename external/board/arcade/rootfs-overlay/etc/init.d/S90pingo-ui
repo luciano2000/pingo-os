@@ -3,6 +3,11 @@
 # Log no cartão (sobrevive a desligamentos), com rotação simples.
 case "$1" in
 	start)
+		# Sem o console de texto na tela: entre a galeria e o jogo fica o
+		# que eles deixam no fb0 ("Carregando…"), não o terminal
+		for v in /sys/class/vtconsole/vtcon*; do
+			grep -q "frame buffer" "$v/name" && echo 0 > "$v/bind"
+		done
 		mkdir -p /run/pingo
 		LOG=/run/pingo/ui.log
 		if mountpoint -q /mnt/sd1; then

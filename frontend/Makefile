@@ -36,8 +36,8 @@ pingo-launcher: $(LAUNCHER_SRC) $(LAUNCHER_HDR) $(COMMON_SRC) $(COMMON_HDR)
 		$(TTF_LIBS) $(SDL_LIBS) $(ALSA_LIBS) -lm
 
 # Galeria do Pingo Arcade (bartop): só SDL2, SDL2_ttf e o leitor de PNG
-pingo-arcade: arcade/main.c common/imagem.c common/imagem.h common/controle2.c common/controle2.h include/stb_image.h
-	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(LDFLAGS) -o $@ arcade/main.c common/imagem.c common/controle2.c \
+pingo-arcade: arcade/main.c common/imagem.c common/imagem.h common/controle2.c common/controle2.h common/fbcopy.c common/fbcopy.h include/stb_image.h
+	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(LDFLAGS) -o $@ arcade/main.c common/imagem.c common/controle2.c common/fbcopy.c \
 		$(TTF_LIBS) $(SDL_LIBS) -lm
 
 pingo-leds: pingo-leds.c
