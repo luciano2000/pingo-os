@@ -2556,14 +2556,37 @@ static void run_buttons_port(void)
 	}
 }
 
+/* Nome do controle 1 no Arcade: "gabinete=" em Config/arcade.cfg (o nome
+ * do bartop); sem ele, "painel" */
+static const char *cabinet_name(void)
+{
+	static char name[64];
+	if (name[0])
+		return name;
+	snprintf(name, sizeof(name), "painel");
+	FILE *f = fopen(DATA_ROOT "/Config/arcade.cfg", "r");
+	char line[128];
+	if (!f)
+		return name;
+	while (fgets(line, sizeof(line), f))
+		if (!strncmp(line, "gabinete=", 9)) {
+			line[strcspn(line, "\r\n")] = 0;
+			if (line[9])
+				snprintf(name, sizeof(name), "%s", line + 9);
+		}
+	fclose(f);
+	return name;
+}
+
 /* Botões: com um controle 2 ligado, primeiro escolhe qual controle */
 static void draw_buttons_choice(int sel)
 {
 	draw_dimmed_game();
 	draw_bar(S_O_BUTTONS);
-	char p2label[160];
+	char p1label[96], p2label[160];
+	snprintf(p1label, sizeof(p1label), "Controle 1 (%s)", cabinet_name());
 	snprintf(p2label, sizeof(p2label), "Controle 2 (%s)", p2.name);
-	draw_list_row(0, sel == 0, "Controle 1 (painel)", NULL);
+	draw_list_row(0, sel == 0, p1label, NULL);
 	draw_list_row(1, sel == 1, p2label, NULL);
 	draw_toast_or(NULL);
 	int right = UI_W - PAD_X;

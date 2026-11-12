@@ -296,6 +296,7 @@ static void build_view(void)
 #define FAVS  DATA "/Config/arcade-favoritos.txt"
 #define PLAYS DATA "/Config/arcade-jogados.txt"
 static char last_zip[32];
+static char cabinet[64]; /* nome do bartop (o pingo-retro mostra no Controle 1) */
 
 static void cfg_load(void)
 {
@@ -310,6 +311,8 @@ static void cfg_load(void)
 						cur_list = l;
 			} else if (!strncmp(line, "ultimo=", 7)) {
 				snprintf(last_zip, sizeof(last_zip), "%s", line + 7);
+			} else if (!strncmp(line, "gabinete=", 9)) {
+				snprintf(cabinet, sizeof(cabinet), "%s", line + 9);
 			}
 		}
 		fclose(f);
@@ -354,6 +357,8 @@ static const char *save_zip;
 static void cfg_body(FILE *f)
 {
 	fprintf(f, "lista=%s\nultimo=%s\n", lists[cur_list].key, save_zip ? save_zip : "");
+	if (cabinet[0])
+		fprintf(f, "gabinete=%s\n", cabinet);
 }
 static void favs_body(FILE *f)
 {
