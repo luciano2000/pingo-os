@@ -43,6 +43,7 @@
 
 #include "fbcopy.h"
 #include "imagem.h"
+#include "controle2.h"
 #include "libretro.h"
 #include "osd.h"
 #include "luzes.h"
@@ -211,6 +212,9 @@ static void clean_label(const char *base, char *out, size_t n)
 /* Remapeamento: bind[f] = botão do aparelho (código evdev) que aciona a
  * função f do core (RETRO_DEVICE_ID_JOYPAD_*). Padrão: o layout libretro. */
 static int bind[16];
+/* Controle 2: bind2[f] = função do controle 2 (C2_*, numeração do painel) */
+static int bind2[16];
+static int bind2_default(int f);
 static int button_by_name(const char *name);
 static const char *button_name(int code);
 static int default_bind(int f);
@@ -409,6 +413,13 @@ static void var_set_value(const char *key, const char *value)
 		*(key[6] == 'g' ? &grid_on : &ghost_on) = !strcmp(value, "sim");
 		return;
 	}
+	if (!strncmp(key, "pingo.bind2.", 12)) {
+		int f = atoi(key + 12);
+		for (int c = 0; c < C2_N && f >= 0 && f < 16; c++)
+			if (!strcmp(value, c2_keys[c]))
+				bind2[f] = c;
+		return;
+	}
 	if (!strncmp(key, "pingo.bind.", 11)) {
 		int f = atoi(key + 11), code = button_by_name(value);
 		if (f >= 0 && f < 16 && code >= 0)
@@ -551,6 +562,10 @@ static bool cfg_save(bool per_game)
 			len += (size_t)snprintf(buf + len, sizeof(buf) - len, "pingo.bind.%d=%s\n", f,
 						button_name(bind[f]));
 	}
+	for (int f = 0; f < 16 && len < sizeof(buf); f++)
+		if (bind2[f] != bind2_default(f) && bind2[f] >= 0)
+			len += (size_t)snprintf(buf + len, sizeof(buf) - len, "pingo.bind2.%d=%s\n", f,
+						c2_keys[bind2[f]]);
 	/* só as opções do menu: as ocultas seguem o padrão do core */
 	for (int k = 0; k < nshown && len < sizeof(buf); k++) {
 		struct var *v = &vars[shown[k]];
@@ -1211,6 +1226,9 @@ static Uint32 power_down_at;
 
 /* teclas apertadas neste quadro, para o menu */
 static int pressed[16], npressed;
+/* os mesmos apertos com o código de jogo (o remapeamento grava este: no
+ * painel, as teclas mudam de função entre menu e jogo) */
+static int pressed_game[16];
 
 static int open_input(const char *want)
 {
@@ -1418,8 +1436,10 @@ static int default_bind(int f)
 
 static void binds_default(void)
 {
-	for (int f = 0; f < 16; f++)
+	for (int f = 0; f < 16; f++) {
 		bind[f] = -1;
+		bind2[f] = bind2_default(f);
+	}
 	for (int i = 0; i < N_PHYSICAL; i++) {
 		int f = map_key(physical_buttons[i]);
 		if (f >= 0)
@@ -1461,6 +1481,58 @@ static int button_by_name(const char *name)
 
 static void pad_event(const struct input_event *e);
 
+/* ---- controle 2 (USB) ---------------------------------------------------- *
+ * Qualquer gamepad/joystick que não seja o painel. Os botões têm a mesma
+ * numeração do painel (key_to_pad): 1 2 3 = Y X L, 4 = R, 5 6 = B A. */
+static struct c2_dev p2 = { .fd = -1 };
+static bool pad2_state[16];
+static Uint32 p2_next_scan;
+
+static const int p2_id[C2_N] = {
+		[C2_UP] = RETRO_DEVICE_ID_JOYPAD_UP, [C2_DOWN] = RETRO_DEVICE_ID_JOYPAD_DOWN,
+		[C2_LEFT] = RETRO_DEVICE_ID_JOYPAD_LEFT, [C2_RIGHT] = RETRO_DEVICE_ID_JOYPAD_RIGHT,
+		[C2_B1] = RETRO_DEVICE_ID_JOYPAD_Y, [C2_B2] = RETRO_DEVICE_ID_JOYPAD_X,
+		[C2_B3] = RETRO_DEVICE_ID_JOYPAD_L, [C2_B4] = RETRO_DEVICE_ID_JOYPAD_R,
+		[C2_B5] = RETRO_DEVICE_ID_JOYPAD_B, [C2_B6] = RETRO_DEVICE_ID_JOYPAD_A,
+		[C2_START] = RETRO_DEVICE_ID_JOYPAD_START, [C2_COIN] = RETRO_DEVICE_ID_JOYPAD_SELECT,
+};
+static int p2_last = -1; /* último aperto, para o remapeamento */
+
+static int bind2_default(int f)
+{
+	for (int c = 0; c < C2_N; c++)
+		if (p2_id[c] == f)
+			return c;
+	return -1;
+}
+
+static void p2_event(int func, bool down)
+{
+	if (down)
+		p2_last = func;
+	for (int f = 0; f < 16; f++)
+		if (bind2[f] == func)
+			pad2_state[f] = down;
+}
+
+static void p2_poll(void)
+{
+	if (p2.fd < 0) {
+		/* procura um controle de vez em quando (plugado com o jogo aberto) */
+		if (SDL_GetTicks() < p2_next_scan)
+			return;
+		p2_next_scan = SDL_GetTicks() + 2000;
+		if (c2_open(&p2))
+			fprintf(stderr, "pingo-retro: controle 2: %s (%04x:%04x, mapa %s)\n", p2.name,
+				p2.vid, p2.pid, p2.saved ? "salvo" : "padrão");
+		return;
+	}
+	if (!c2_poll(&p2, p2_event)) {
+		fprintf(stderr, "pingo-retro: controle 2 desconectado\n");
+		memset(pad2_state, 0, sizeof(pad2_state));
+	}
+}
+
 /* Lê todos os dispositivos (uma vez por quadro, no jogo e no menu) */
 static void poll_devices(void)
 {
@@ -1491,6 +1563,7 @@ static void poll_devices(void)
 			osd_key(ev.code, ev.value);
 	while (pad_fd >= 0 && read(pad_fd, &ev, sizeof(ev)) == sizeof(ev))
 		pad_event(&ev);
+	p2_poll();
 	for (int k = 0; k < n_key_fds; k++)
 		while (read(key_fds[k], &ev, sizeof(ev)) == sizeof(ev)) {
 			if (ev.type != EV_KEY)
@@ -1511,8 +1584,10 @@ static void poll_devices(void)
 				pad_event(&m);
 				continue;
 			}
-			if (ev.value == 1 && npressed < 16)
+			if (ev.value == 1 && npressed < 16) {
+				pressed_game[npressed] = game_code;
 				pressed[npressed++] = menu_code;
+			}
 			for (int f = 0; f < 16; f++)
 				if (bind[f] == game_code)
 					pad_state[f] = ev.value != 0;
@@ -1539,8 +1614,10 @@ static void pad_event(const struct input_event *e)
 				menu_requested = true;
 			return;
 		}
-		if (ev.value == 1 && npressed < 16)
+		if (ev.value == 1 && npressed < 16) {
+			pressed_game[npressed] = ev.code;
 			pressed[npressed++] = ev.code;
+		}
 		/* um botão pode acionar uma função (remapeamento) */
 		for (int f = 0; f < 16; f++)
 			if (bind[f] == (int)ev.code)
@@ -1587,6 +1664,16 @@ static bool is_fds;
 
 static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id)
 {
+	if (port == 1 && device == RETRO_DEVICE_JOYPAD) { /* controle 2 (USB) */
+		if (id == RETRO_DEVICE_ID_JOYPAD_MASK) {
+			int16_t mask = 0;
+			for (unsigned i = 0; i < 16; i++)
+				if (pad2_state[i])
+					mask |= (int16_t)(1 << i);
+			return mask;
+		}
+		return id < 16 && pad2_state[id];
+	}
 	if (port != 0)
 		return 0;
 	if (device == RETRO_DEVICE_ANALOG) {
@@ -2351,16 +2438,43 @@ static const char *func_name(int f)
 	return desc_name[f] ? desc_name[f] : def[f];
 }
 
+/* Nome do botão para a tela: no painel do Arcade, a numeração dos bornes */
+static const char *button_label(int code)
+{
+	if (pad_fd < 0 && n_key_fds > 0)
+		switch (code) {
+		case BTN_NORTH:  return "1";
+		case BTN_WEST:   return "2";
+		case BTN_TL:     return "3";
+		case BTN_TR:     return "4";
+		case BTN_SOUTH:  return "5";
+		case BTN_EAST:   return "6";
+		case BTN_START:  return "1P";
+		case BTN_SELECT: return "Ficha";
+		}
+	return button_name(code);
+}
+
+static const char *c2_short(int c)
+{
+	static const char *n[C2_N] = { "↑", "↓", "←", "→", "1", "2", "3", "4", "5", "6",
+				       "Start", "Ficha" };
+	return c >= 0 && c < C2_N ? n[c] : "—";
+}
+
+static int buttons_port; /* 0: painel/controle do aparelho; 1: controle 2 */
+
 static void draw_buttons(int sel, int top_item, bool waiting)
 {
 	draw_dimmed_game();
-	draw_bar(S_O_BUTTONS);
+	draw_bar(buttons_port ? p2.name : S_O_BUTTONS);
 	int n = nbfunc + 1;
 	for (int r = 0; r < ROWS && top_item + r < n; r++) {
 		int i = top_item + r;
 		if (i < nbfunc) {
 			int f = bfunc[i];
-			const char *v = (waiting && i == sel) ? S_PRESS_BUTTON : button_name(bind[f]);
+			const char *v = (waiting && i == sel) ? S_PRESS_BUTTON
+				      : buttons_port ? c2_short(bind2[f]) : button_label(bind[f]);
 			draw_list_row(r, i == sel, func_name(f), v);
 		} else {
 			draw_list_row(r, i == sel, S_O_BUTTONS_RESET, NULL);
@@ -2379,7 +2493,7 @@ static void draw_buttons(int sel, int top_item, bool waiting)
 
 /* A numa função: espera o botão do aparelho; se ele já era de outra
  * função, as duas trocam (nenhuma fica sem botão) */
-static void run_buttons(void)
+static void run_buttons_port(void)
 {
 	int sel = 0, top = 0;
 	bool waiting = false;
@@ -2389,9 +2503,21 @@ static void run_buttons(void)
 		if (quit_requested)
 			return;
 		int n = nbfunc + 1;
-		if (waiting) {
+		if (waiting && buttons_port) {
+			if (p2.fd < 0) { /* tirou o controle */
+				waiting = false;
+			} else if (p2_last >= 0) {
+				int f = bfunc[sel], old = bind2[f], c = p2_last;
+				for (int g = 0; g < 16; g++)
+					if (g != f && bind2[g] == c)
+						bind2[g] = old;
+				bind2[f] = c;
+				waiting = false;
+			}
+			memset(pad2_state, 0, sizeof(pad2_state));
+		} else if (waiting) {
 			for (int k = 0; k < npressed; k++) {
-				int code = pressed[k];
+				int code = pressed_game[k];
 				if (!strcmp(button_name(code), "—")) /* não é botão do controle */
 					continue;
 				int f = bfunc[sel], old = bind[f];
@@ -2412,6 +2538,7 @@ static void run_buttons(void)
 				if (sel < nbfunc) {
 					waiting = true;
 					npressed = 0;
+					p2_last = -1;
 				} else {
 					binds_default();
 					show_toast(S_O_BUTTONS_RESTORED);
@@ -2426,6 +2553,56 @@ static void run_buttons(void)
 		if (sel >= top + ROWS)
 			top = sel - ROWS + 1;
 		draw_buttons(sel, top, waiting);
+	}
+}
+
+/* Botões: com um controle 2 ligado, primeiro escolhe qual controle */
+static void draw_buttons_choice(int sel)
+{
+	draw_dimmed_game();
+	draw_bar(S_O_BUTTONS);
+	char p2label[160];
+	snprintf(p2label, sizeof(p2label), "Controle 2 (%s)", p2.name);
+	draw_list_row(0, sel == 0, "Controle 1 (painel)", NULL);
+	draw_list_row(1, sel == 1, p2label, NULL);
+	draw_toast_or(NULL);
+	int right = UI_W - PAD_X;
+	right -= draw_hint(right, "B", S_BACK) + 22;
+	draw_hint(right, "A", S_CONFIRM);
+	osd_draw(renderer, screen_w, screen_h);
+	ui_screenshot_check(renderer);
+	SDL_RenderPresent(renderer);
+}
+
+static void run_buttons(void)
+{
+	int sel = 0;
+	if (p2.fd < 0) {
+		buttons_port = 0;
+		run_buttons_port();
+		return;
+	}
+	for (;;) {
+		poll_devices();
+		if (quit_requested)
+			return;
+		if (p2.fd < 0) { /* tirou o controle 2: só o 1 */
+			buttons_port = 0;
+			run_buttons_port();
+			return;
+		}
+		if (was_pressed(BTN_DPAD_UP) || was_pressed(BTN_DPAD_DOWN))
+			sel = !sel;
+		if (was_pressed(BTN_EAST)) {
+			buttons_port = sel;
+			run_buttons_port();
+			if (quit_requested)
+				return;
+		} else if (was_pressed(BTN_SOUTH) || menu_requested) {
+			menu_requested = false;
+			return;
+		}
+		draw_buttons_choice(sel);
 	}
 }
 

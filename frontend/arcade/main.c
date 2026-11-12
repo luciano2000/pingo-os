@@ -36,6 +36,7 @@
 #include <SDL2/SDL_ttf.h>
 
 #include "imagem.h"
+#include "controle2.h"
 
 #define DATA        "/mnt/sd1"
 #define ROMS        DATA "/Roms"
@@ -905,7 +906,7 @@ static void version(char *out, size_t n)
 	fclose(f);
 }
 
-enum { M_LIST, M_OFF, M_BACK, M_N };
+enum { M_LIST, M_PAD2, M_OFF, M_BACK, M_N };
 
 static int counts[N_LISTS];
 
@@ -940,7 +941,7 @@ static void draw_menu(int msel)
 	fill(0, 0, W, H, 0x000000, 215);
 	char lname[64];
 	snprintf(lname, sizeof(lname), "Lista: %s", lists[cur_list].name);
-	const char *items[M_N] = { lname, "Desligar", "Voltar" };
+	const char *items[M_N] = { lname, "Controle 2", "Desligar", "Voltar" };
 	int x = PX(LIST_X), y0 = PX(LIST_Y);
 	text(F_TITLE, "Menu", x, PX(56), COL_TEXT, 0, 0);
 	for (int i = 0; i < M_N; i++) {
@@ -958,6 +959,106 @@ static void draw_menu(int msel)
 	int hx = W - PX(48), hy = H - PX(44);
 	draw_hint(&hx, hy, COR_LARANJA, false, "voltar");
 	draw_hint(&hx, hy, COR_AMARELO, false, "confirmar");
+}
+
+/* ---- controle 2: mapear (menu → Controle 2) ---------------------------- */
+
+static struct c2_dev p2 = { .fd = -1 };
+static int p2_step;            /* função sendo pedida; C2_N = terminou */
+static Uint32 p2_ignore_until, p2_done_at;
+
+static void pad2_start(void)
+{
+	if (p2.fd < 0)
+		c2_open(&p2);
+	p2_step = 0;
+	p2_done_at = 0;
+	p2_ignore_until = SDL_GetTicks() + 300;
+}
+
+/* true quando o assistente terminou (ou não há controle e o usuário saiu) */
+static bool pad2_frame(int a)
+{
+	Uint32 now = SDL_GetTicks();
+	if (p2.fd < 0) {
+		if (now >= p2_ignore_until) { /* procura de novo (plugado agora) */
+			c2_open(&p2);
+			p2_ignore_until = now + 1000;
+		}
+		return a == A_BACK || a == A_MENU;
+	}
+	if (p2_step >= C2_N)
+		return now - p2_done_at > 1200;
+	if (a == A_MENU) { /* cancela: volta o mapa salvo */
+		c2_close(&p2);
+		return true;
+	}
+	struct c2_bind b;
+	bool got = c2_capture(&p2, &b);
+	if (p2.fd < 0)
+		return false; /* tirou da USB no meio */
+	if (now < p2_ignore_until)
+		return false;
+	if (a == A_BACK) { /* laranja do painel: pula esta função */
+		memset(&p2.map[p2_step], 0, sizeof(p2.map[p2_step]));
+		got = true;
+	} else if (got) {
+		/* o mesmo botão em duas funções: a anterior perde */
+		for (int i = 0; i < p2_step; i++)
+			if (p2.map[i].type == b.type && p2.map[i].code == b.code && p2.map[i].sign == b.sign)
+				memset(&p2.map[i], 0, sizeof(p2.map[i]));
+		p2.map[p2_step] = b;
+	}
+	if (got) {
+		p2_step++;
+		p2_ignore_until = now + 350;
+		if (p2_step >= C2_N) {
+			c2_save(&p2);
+			p2_done_at = now;
+		}
+	}
+	return false;
+}
+
+static void draw_pad2(void)
+{
+	draw_gallery();
+	fill(0, 0, W, H, 0x000000, 225);
+	int x = PX(LIST_X), y0 = PX(LIST_Y);
+	text(F_TITLE, "Controle 2", x, PX(56), COL_TEXT, 0, 0);
+	int hx = W - PX(48), hy = H - PX(44);
+	if (p2.fd < 0) {
+		text(F_TITLE, "Ligue um controle na USB", W / 2, H / 2 - PX(20), COL_TEXT, 2, 0);
+		text(F_INFO, "Ele vira o player 2 nos jogos", W / 2, H / 2 + PX(24), COL_DIM, 2, 0);
+		draw_hint(&hx, hy, COR_LARANJA, false, "voltar");
+		return;
+	}
+	text(F_INFO, p2.name, W - PX(48), PX(56), COL_DIM, 1, 0);
+	if (p2_step >= C2_N) {
+		text(F_TITLE, "Pronto: mapa salvo", W / 2, H / 2, COL_TEXT, 2, 0);
+		return;
+	}
+	/* a lista das funções, com o que já foi mapeado */
+	int row = PX(ROW_H) * 3 / 4, ltop = p2_step - 5 < 0 ? 0 : p2_step - 5;
+	if (ltop > C2_N - 12)
+		ltop = C2_N - 12 < 0 ? 0 : C2_N - 12;
+	for (int r = 0; r < 12 && ltop + r < C2_N; r++) {
+		int i = ltop + r, y = y0 + r * (row + PX(ROW_GAP));
+		bool s = i == p2_step;
+		char d[48];
+		if (s)
+			pill(x, y, PX(LIST_W) + PX(240), row, COL_SEL_BG);
+		text(F_INFO, c2_labels[i], x + PX(22), y + row / 2, s ? COL_SEL_FG : COL_TEXT, 0, 0);
+		if (s)
+			snprintf(d, sizeof(d), "aperte no controle…");
+		else if (i < p2_step)
+			c2_describe(&p2.map[i], d, sizeof(d));
+		else
+			d[0] = 0;
+		text(F_INFO, d, x + PX(LIST_W) + PX(218), y + row / 2, s ? 0x444444 : COL_DIM, 1, 0);
+	}
+	draw_hint(&hx, hy, COR_PRETO, true, "cancelar");
+	draw_hint(&hx, hy, COR_LARANJA, false, "pular");
 }
 
 /* ---- laço ---------------------------------------------------------------- */
@@ -1069,7 +1170,7 @@ int main(int argc, char **argv)
 	mkdir("/run/pingo", 0755);
 	fprintf(stderr, "pingo-arcade: %d jogos, %d na lista, %d teclados\n", ngames, nview, nkbd);
 
-	enum { V_GALLERY, V_MENU, V_LISTS } mode = V_GALLERY;
+	enum { V_GALLERY, V_MENU, V_LISTS, V_PAD2 } mode = V_GALLERY;
 	int msel = 0, lsel = 0, ltop = 0, rc = 0;
 	for (;;) {
 		SDL_Event e;
@@ -1082,7 +1183,10 @@ int main(int argc, char **argv)
 			rc = 3;
 			break;
 		}
-		if (mode == V_LISTS) {
+		if (mode == V_PAD2) {
+			if (pad2_frame(a))
+				mode = V_MENU;
+		} else if (mode == V_LISTS) {
 			if (a == A_UP && lsel > 0)
 				lsel--;
 			else if (a == A_DOWN && lsel < N_LISTS - 1)
@@ -1113,6 +1217,9 @@ int main(int argc, char **argv)
 					lsel = cur_list;
 					ltop = lsel - ROWS / 2 < 0 ? 0 : lsel - ROWS / 2;
 					mode = V_LISTS;
+				} else if (msel == M_PAD2) {
+					pad2_start();
+					mode = V_PAD2;
 				} else if (msel == M_OFF) {
 					cfg_save(nview ? games[view[sel]].zip : NULL);
 					message_screen("Desligando…");
@@ -1154,7 +1261,9 @@ int main(int argc, char **argv)
 		/* a imagem só carrega quando a seleção para um pouco */
 		if (nview && snap_for != view[sel] && SDL_GetTicks() - sel_changed_at > 120)
 			load_media(view[sel]);
-		if (mode == V_LISTS)
+		if (mode == V_PAD2)
+			draw_pad2();
+		else if (mode == V_LISTS)
 			draw_lists(lsel, ltop);
 		else if (mode == V_MENU)
 			draw_menu(msel);
