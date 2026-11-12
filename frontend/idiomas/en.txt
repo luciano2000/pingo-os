@@ -85,6 +85,7 @@ O_SCALE_FIT=Fit
 O_SCALE_INT=Integer
 O_SCREEN=Screen
 O_SCANLINES=Scanlines
+O_RUMBLE=Vibration
 O_GRID=LCD grid
 O_GHOST=Screen ghosting
 O_ON=On

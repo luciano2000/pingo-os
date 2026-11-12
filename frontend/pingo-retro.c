@@ -19,6 +19,7 @@
  * SPDX-License-Identifier: GPL-2.0-only
  */
 #include <dirent.h>
+#include <errno.h>
 #include <execinfo.h>
 #include <signal.h>
 #include <dlfcn.h>
@@ -217,6 +218,9 @@ static int default_bind(int f);
 enum { SCALE_FIT, SCALE_INT };
 static int scale_mode = SCALE_FIT;
 
+/* vibração: o aparelho tem motor, o core pediu, e a opção do menu */
+static bool rumble_hw, rumble_asked, rumble_on = true;
+
 #define MAX_VARS 192
 static struct var {
 	char *key, *desc;
@@ -393,6 +397,10 @@ static void var_set_value(const char *key, const char *value)
 		game_vol_apply();
 		return;
 	}
+	if (!strcmp(key, "pingo.vibracao")) {
+		rumble_on = !strcmp(value, "sim");
+		return;
+	}
 	if (!strcmp(key, "pingo.scanlines")) {
 		scanlines_on = !strcmp(value, "sim");
 		return;
@@ -529,6 +537,9 @@ static bool cfg_save(bool per_game)
 				game_vol_db[game_vol]);
 	len += (size_t)snprintf(buf + len, sizeof(buf) - len, "pingo.scanlines=%s\n",
 				scanlines_on ? "sim" : "nao");
+	if (rumble_asked && rumble_hw)
+		len += (size_t)snprintf(buf + len, sizeof(buf) - len, "pingo.vibracao=%s\n",
+					rumble_on ? "sim" : "nao");
 	if (scr)
 		len += (size_t)snprintf(buf + len, sizeof(buf) - len,
 					"pingo.tela=%s\npingo.grade=%s\npingo.rastro=%s\n",
@@ -1207,7 +1218,10 @@ static int open_input(const char *want)
 		if (strncmp(ent->d_name, "event", 5))
 			continue;
 		snprintf(path, sizeof(path), "/dev/input/%s", ent->d_name);
-		int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+		/* leitura e escrita: a vibração é escrita no controle */
+		int fd = open(path, O_RDWR | O_NONBLOCK | O_CLOEXEC);
+		if (fd < 0)
+			fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 		if (fd < 0)
 			continue;
 		if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) >= 0 && !strcmp(name, want)) {
@@ -1218,6 +1232,73 @@ static int open_input(const char *want)
 	}
 	closedir(dir);
 	return -1;
+}
+
+/* ---- vibração ----------------------------------------------------------- *
+ * O core pede força para os motores forte e fraco (RETRO_RUMBLE_*); o
+ * aparelho tem um motor só, no PWM, que o rocknix-joypad expõe como
+ * FF_RUMBLE (ff-memless). Um efeito só, atualizado quando a força muda,
+ * uma vez por quadro. */
+static uint16_t rumble_want[2], rumble_sent[2];
+static int rumble_id = -1;
+static bool rumble_playing;
+
+static void rumble_init(void)
+{
+	unsigned long bits[(FF_MAX + 8 * sizeof(long)) / (8 * sizeof(long))] = { 0 };
+	rumble_hw = pad_fd >= 0 && ioctl(pad_fd, EVIOCGBIT(EV_FF, sizeof(bits)), bits) >= 0 &&
+		    (bits[FF_RUMBLE / (8 * sizeof(long))] >> (FF_RUMBLE % (8 * sizeof(long)))) & 1;
+}
+
+static void rumble_write(uint16_t strong, uint16_t weak)
+{
+	if (!rumble_hw)
+		return;
+	if (strong || weak) {
+		struct ff_effect e = { .type = FF_RUMBLE, .id = (short)rumble_id };
+		e.u.rumble.strong_magnitude = strong;
+		e.u.rumble.weak_magnitude = weak;
+		e.replay.length = 0; /* até mandar parar */
+		if (ioctl(pad_fd, EVIOCSFF, &e) < 0) {
+			fprintf(stderr, "pingo-retro: vibração: %s\n", strerror(errno));
+			rumble_hw = false;
+			return;
+		}
+		rumble_id = e.id;
+	}
+	bool play = strong || weak;
+	if (play != rumble_playing && rumble_id >= 0) {
+		struct input_event ev = { .type = EV_FF, .code = (uint16_t)rumble_id, .value = play };
+		if (write(pad_fd, &ev, sizeof(ev)) != sizeof(ev))
+			fprintf(stderr, "pingo-retro: vibração: %s\n", strerror(errno));
+		rumble_playing = play;
+	}
+	rumble_sent[0] = strong;
+	rumble_sent[1] = weak;
+}
+
+/* Uma vez por quadro, depois do core */
+static void rumble_frame(void)
+{
+	uint16_t s = rumble_on ? rumble_want[0] : 0, w = rumble_on ? rumble_want[1] : 0;
+	if (s != rumble_sent[0] || w != rumble_sent[1])
+		rumble_write(s, w);
+}
+
+/* Menu, suspensão, saída: o motor não pode ficar ligado */
+static void rumble_stop(void)
+{
+	if (rumble_playing)
+		rumble_write(0, 0);
+}
+
+static bool RETRO_CALLCONV set_rumble_state(unsigned port, enum retro_rumble_effect effect,
+					     uint16_t strength)
+{
+	if (port != 0 || effect > RETRO_RUMBLE_WEAK)
+		return false;
+	rumble_want[effect] = strength;
+	return rumble_hw;
 }
 
 /* Layout libretro (Nintendo): B embaixo, A à direita, Y à esquerda, X em
@@ -1488,6 +1569,14 @@ static bool environment(unsigned cmd, void *data)
 			}
 		v->value = NULL;
 		return false;
+	}
+	case RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE: {
+		struct retro_rumble_interface *r = data;
+		if (!r)
+			return false;
+		r->set_rumble_state = set_rumble_state;
+		rumble_asked = true;
+		return true;
 	}
 	case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS: {
 		const struct retro_input_descriptor *d = data;
@@ -1959,7 +2048,7 @@ static void draw_menu(int sel)
 }
 
 /* opções: escala, botões, opções do core e as duas formas de salvar */
-enum { OPT_SCALE, OPT_SCANLINES, OPT_VOLUME, OPT_SCREEN, OPT_GRID, OPT_GHOST, OPT_BUTTONS, OPT_DIPS, OPT_VAR,
+enum { OPT_SCALE, OPT_SCANLINES, OPT_VOLUME, OPT_RUMBLE, OPT_SCREEN, OPT_GRID, OPT_GHOST, OPT_BUTTONS, OPT_DIPS, OPT_VAR,
        OPT_SAVE_GAME, OPT_SAVE_CONSOLE };
 static int opt_kind[MAX_VARS + 8], opt_arg[MAX_VARS + 8], opt_n;
 
@@ -1969,6 +2058,8 @@ static void options_build(void)
 	opt_kind[opt_n++] = OPT_SCALE;
 	opt_kind[opt_n++] = OPT_SCANLINES;
 	opt_kind[opt_n++] = OPT_VOLUME;
+	if (rumble_asked && rumble_hw)
+		opt_kind[opt_n++] = OPT_RUMBLE;
 	if (scr) {
 		opt_kind[opt_n++] = OPT_SCREEN;
 		opt_kind[opt_n++] = OPT_GRID;
@@ -2022,6 +2113,10 @@ static void draw_options(int sel, int top_item)
 			}
 			break;
 		}
+		case OPT_RUMBLE:
+			label = S_O_RUMBLE;
+			value = rumble_on ? S_O_ON_F : S_O_OFF_F;
+			break;
 		case OPT_SCANLINES:
 			label = S_O_SCANLINES;
 			value = scanlines_on ? S_O_ON_FP : S_O_OFF_FP;
@@ -2095,6 +2190,8 @@ static void option_change(int i, int d)
 	} else if (opt_kind[i] == OPT_VOLUME) {
 		game_vol = (game_vol + d + GAME_VOL_N) % GAME_VOL_N;
 		game_vol_apply();
+	} else if (opt_kind[i] == OPT_RUMBLE) {
+		rumble_on = !rumble_on;
 	} else if (opt_kind[i] == OPT_SCANLINES) {
 		scanlines_on = !scanlines_on;
 	} else if (opt_kind[i] == OPT_SCREEN) {
@@ -2983,6 +3080,7 @@ int main(int argc, char **argv)
 
 	pad_fd = open_input(GAMEPAD_NAME);
 	stick_ranges();
+	rumble_init();
 	vol_fd = open_input("gpio-keys-volume");
 	power_fd = open_input("axp20x-pek");
 	osd_init();
@@ -3014,11 +3112,13 @@ int main(int argc, char **argv)
 		poll_devices();
 		if (menu_requested) {
 			menu_requested = false;
+			rumble_stop();
 			if (!run_menu())
 				break;
 		}
 		if (suspend_requested) {
 			suspend_requested = false;
+			rumble_stop();
 			do_suspend();
 		}
 
@@ -3033,6 +3133,7 @@ int main(int argc, char **argv)
 				acc -= 1.0;
 			}
 		}
+		rumble_frame();
 		draw_game();
 		ambi_frame();
 		ra_draw_note();
@@ -3084,6 +3185,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+	rumble_stop();
 	if (power_off_requested)
 		save_for_resume();
 	else

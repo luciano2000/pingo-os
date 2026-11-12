@@ -107,6 +107,19 @@
 - [ ] Analógico Desligado no menu: o stick para de responder
 - [x] RG35XX-H (v0.3.3-beta)
 
+## Vibração
+
+- **Hardware:** um motor no PWM (PWM3 no RG40XX-H, PWM2 no RG35XX-H), exposto pelo rocknix-joypad como `FF_RUMBLE` (ff-memless) no "H700 Gamepad"; `rumble_enable` no sysfs já vem ligado.
+- **`pingo-retro`:** responde `RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE`; uma vez por quadro, se a força mudou, atualiza um único efeito (`EVIOCSFF`, duração 0 = até parar) e liga ou desliga com `EV_FF`. O aparelho tem um motor só: o driver usa o forte, ou o fraco se o forte for zero. Para ao abrir o menu, ao suspender e ao sair (o kernel também apaga o efeito se o processo morrer). O controle passa a ser aberto para escrita.
+- **Menu:** Opções → **Vibração** (Ligada/Desligada), só quando o core pede a interface e o aparelho tem motor; salva como `pingo.vibracao` por jogo ou console.
+- PCSX ReARMed: vibração do DualShock (`pcsx_rearmed_vibration`, ligada por padrão). Testado no RG40XX-H com Metal Gear Solid.
+
+### Checklist
+
+- [x] Metal Gear Solid vibra (RG40XX-H)
+- [ ] O motor para ao abrir o menu; Vibração Desligada no menu
+- [ ] RG35XX-H
+
 ## RG40XX-H
 
 - Mesmo H700, memória e tela 640x480 do RG35XX-H. O device tree dele (do ROCKNIX) já era compilado; as diferenças estão nele: analógico direito invertido (`invert-absrx/ry`), vibração por PWM, luzes RGB dos analógicos (`led-rgb`, UART5) e o painel `anbernic,rg40xx-panel`. O driver de controle é o mesmo (rocknix-joypad).
