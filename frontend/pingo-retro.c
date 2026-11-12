@@ -2097,6 +2097,14 @@ static int draw_hint(int right, const char *button, const char *text)
 	int y = UI_H - PAD_Y - BAR_H / 2;
 	int w = ui_text(F_BAR, text, right, y, COL_DIM, 1, 0);
 	int sp = ui_text_width(F_BAR, " ");
+	/* No painel do Arcade, A e B são o amarelo (5) e o laranja (6): a dica
+	 * mostra a cor do botão */
+	if (pad_fd < 0 && n_key_fds > 0 && (!strcmp(button, "A") || !strcmp(button, "B"))) {
+		const int d = 14;
+		ui_round_rect(right - w - sp - d, y - d / 2, d, d, d / 2,
+			      button[0] == 'A' ? 0xF6C318 : 0xF26A1B);
+		return w + sp + d;
+	}
 	ui_text(F_BAR_BOLD, button, right - w - sp, y, COL_TEXT, 1, 0);
 	return w + sp + ui_text_width(F_BAR_BOLD, button);
 }
