@@ -1,0 +1,9 @@
+#!/bin/sh
+# Wi-Fi: liga no boot (em segundo plano: esperar o Wi-Fi não pode atrasar o
+# boot). As redes e o liga/desliga vêm da tela de Wi-Fi (pingo-wifi).
+case "$1" in
+  start) /usr/sbin/pingo-wifi start > /dev/null 2>&1 & ;;
+  stop) /usr/sbin/pingo-wifi stop ;;
+  restart) /usr/sbin/pingo-wifi stop; /usr/sbin/pingo-wifi start ;;
+esac
+exit 0

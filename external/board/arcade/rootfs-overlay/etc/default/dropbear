@@ -1,0 +1,4 @@
+# SSH só com chave (a senha do root, "pingo", é pública e o bartop fica no
+# Wi-Fi). As chaves autorizadas ficam no cartão:
+# /mnt/sd1/.system/ssh/authorized_keys (/root/.ssh aponta para lá)
+DROPBEAR_ARGS="-s"

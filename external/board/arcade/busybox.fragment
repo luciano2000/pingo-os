@@ -1,0 +1,5 @@
+# Pingo Arcade: hora pela internet (ntpd) e utilitários dos scripts
+CONFIG_NTPD=y
+CONFIG_TIMEOUT=y
+CONFIG_PGREP=y
+CONFIG_PKILL=y

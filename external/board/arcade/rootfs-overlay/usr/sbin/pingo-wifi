@@ -1,0 +1,220 @@
+#!/bin/sh
+# Wi-Fi do Pingo OS (wpa_supplicant + udhcpc), usado pela tela de Wi-Fi do
+# launcher e pelo boot (S41pingo-wifi).
+#
+#   pingo-wifi start | stop        boot / desligamento
+#   pingo-wifi on | off            liga ou desliga (fica lembrado)
+#   pingo-wifi status              estado, rede, ip, sinal (uma linha cada)
+#   pingo-wifi scan                redes por perto: sinal<tab>tipo<tab>salva<tab>nome
+#   pingo-wifi connect <rede>      conecta; a senha (se houver) vem pela entrada
+#                                  padrão, nunca pela linha de comando
+#   pingo-wifi forget <rede>       esquece uma rede salva
+#
+# As redes ficam em /mnt/sd1/.system/wifi/wpa_supplicant.conf, com a senha
+# já convertida em chave (psk de 64 dígitos): a senha digitada não é
+# gravada em lugar nenhum.
+DIR=/mnt/sd1/.system/wifi
+CONF=$DIR/wpa_supplicant.conf
+OFF=$DIR/desligado
+RUN=/run/pingo-wifi
+CTRL=/run/wpa_supplicant
+LEGACY=/boot/pingo-wifi.txt # Fase 0: rede escrita no PC (migrada e apagada)
+
+say() { echo "pingo-wifi: $*" > /dev/kmsg; }
+cli() { wpa_cli -p "$CTRL" -i wlan0 "$@" 2>/dev/null; }
+hex() { printf '%s' "$1" | od -An -v -tx1 | tr -d ' \n'; }
+
+conf_init() {
+	mkdir -p "$DIR"
+	[ -s "$CONF" ] && return 0
+	printf 'ctrl_interface=%s\nupdate_config=1\ncountry=BR\n' "$CTRL" > "$CONF"
+}
+
+# chave de 64 dígitos a partir do nome da rede e da senha
+psk_of() {
+	wpa_passphrase "$1" "$2" 2>/dev/null | sed -n 's/^[[:space:]]*psk=\([0-9a-f]\{64\}\)$/\1/p'
+}
+
+# Rede da Fase 0 (pingo-wifi.txt na partição de boot): entra no arquivo de
+# redes já como chave e o .txt com a senha é apagado
+migrate_legacy() {
+	[ -r "$LEGACY" ] || return 0
+	local ssid pass psk
+	ssid="$(sed -n 's/^SSID=//p' "$LEGACY" | tr -d '\r')"
+	pass="$(sed -n 's/^SENHA=//p' "$LEGACY" | tr -d '\r')"
+	if [ -n "$ssid" ] && ! grep -q -e "ssid=$(hex "$ssid")\$" -e "ssid=\"$ssid\"\$" "$CONF"; then
+		if [ -n "$pass" ]; then
+			psk=$(psk_of "$ssid" "$pass")
+			[ -n "$psk" ] && printf 'network={\n\tssid=%s\n\tpsk=%s\n}\n' "$(hex "$ssid")" "$psk" >> "$CONF"
+		else
+			printf 'network={\n\tssid=%s\n\tkey_mgmt=NONE\n}\n' "$(hex "$ssid")" >> "$CONF"
+		fi
+		say "rede do pingo-wifi.txt importada"
+	fi
+	mount -o remount,rw /boot 2>/dev/null && { rm -f "$LEGACY"; sync; mount -o remount,ro /boot; }
+}
+
+# O RTL8821CS às vezes falha o primeiro probe no boot (erros de SDIO, -110);
+# religar o driver resolve. Mesmo quirk do ROCKNIX (040-wifi_probe_retry).
+wlan_wait() {
+	local i try dev
+	for i in 1 2 3 4 5 6 7 8 9 10; do [ -e /sys/class/net/wlan0 ] && return 0; sleep 1; done
+	for try in 1 2 3; do
+		[ -e /sys/class/net/wlan0 ] && return 0
+		for dev in /sys/bus/sdio/devices/*; do
+			[ -e "$dev/driver" ] && continue
+			case "$(cat "$dev/modalias" 2>/dev/null)" in sdio:*v024CdC821*) ;; *) continue ;; esac
+			say "RTL8821CS sem driver, religando $(basename "$dev") (tentativa $try)"
+			basename "$dev" > /sys/bus/sdio/drivers/rtw88_8821cs/bind 2>/dev/null
+		done
+		sleep 5
+	done
+	[ -e /sys/class/net/wlan0 ]
+}
+
+do_start() {
+	[ -e "$OFF" ] && return 0
+	mountpoint -q /mnt/sd1 || return 0
+	conf_init
+	migrate_legacy
+	mkdir -p "$RUN"
+	wlan_wait || { say "sem wlan0"; return 1; }
+	ip link set wlan0 up
+	iw dev wlan0 set power_save off 2>/dev/null
+	# Os dois ficam rodando: soltam a entrada e a saída de quem chamou
+	pidof wpa_supplicant > /dev/null ||
+		wpa_supplicant -B -i wlan0 -c "$CONF" -P "$RUN/wpa.pid" < /dev/null > /dev/null 2>&1 ||
+		return 1
+	[ -f "$RUN/udhcpc.pid" ] && kill -0 "$(cat "$RUN/udhcpc.pid")" 2>/dev/null ||
+		udhcpc -b -i wlan0 -p "$RUN/udhcpc.pid" -s /usr/share/udhcpc/default.script \
+			< /dev/null > /dev/null 2>&1
+	# Acerta o relógio pela internet e grava no RTC (o kernel lê o rtc0 no
+	# boot), a não ser que a hora seja manual (Data e hora no launcher)
+	[ -e /mnt/sd1/Config/hora-manual ] ||
+	( for i in 1 2 3 4 5 6; do
+		ntpd -n -q -p pool.ntp.org > /dev/null 2>&1 && { hwclock -w -u; break; }
+		sleep 10
+	done ) < /dev/null > /dev/null 2>&1 &
+}
+
+do_stop() {
+	[ -f "$RUN/udhcpc.pid" ] && kill "$(cat "$RUN/udhcpc.pid")" 2>/dev/null
+	[ -f "$RUN/wpa.pid" ] && kill "$(cat "$RUN/wpa.pid")" 2>/dev/null
+	rm -f "$RUN/udhcpc.pid" "$RUN/wpa.pid"
+	sleep 1
+	ip addr flush dev wlan0 2>/dev/null
+	ip link set wlan0 down 2>/dev/null
+}
+
+# número da rede salva com esse nome (ou nada)
+net_id() {
+	local want
+	want=$(hex "$1")
+	cli list_networks | awk 'NR > 1' | while IFS="	" read -r id ssid rest; do
+		[ "$(cli get_network "$id" ssid)" = "\"$1\"" ] && { echo "$id"; break; }
+		[ "$(cli get_network "$id" ssid)" = "$want" ] && { echo "$id"; break; }
+	done
+}
+
+do_status() {
+	if [ -e "$OFF" ]; then
+		echo "estado desligado"
+		return 0
+	fi
+	echo "estado ligado"
+	local st
+	st=$(cli status)
+	if echo "$st" | grep -q '^wpa_state=COMPLETED'; then
+		echo "rede $(echo "$st" | sed -n 's/^ssid=//p')"
+		echo "ip $(echo "$st" | sed -n 's/^ip_address=//p')"
+		echo "sinal $(iw dev wlan0 link 2>/dev/null | sed -n 's/.*signal: \(-[0-9]*\).*/\1/p')"
+	fi
+}
+
+do_scan() {
+	[ -e "$OFF" ] && return 1
+	cli scan > /dev/null
+	sleep 4
+	local saved
+	saved=$(cli list_networks | awk -F'\t' 'NR > 1 {print $2}')
+	# bssid / freq / sinal / flags / ssid: uma linha por rede (a mais forte)
+	cli scan_results | awk -F'\t' 'NR > 1 && $5 != "" && $5 !~ /^\\x00/ {
+		t = ($4 ~ /WPA|RSN|SAE/) ? "senha" : (($4 ~ /WEP/) ? "wep" : "aberta")
+		if (!($5 in best) || $3 > best[$5]) { best[$5] = $3; type[$5] = t }
+	} END { for (s in best) printf "%s\t%s\t%s\n", best[s], type[s], s }' |
+	sort -t'	' -k1,1nr | while IFS="	" read -r sig t ssid; do
+		s=0
+		printf '%s\n' "$saved" | grep -qxF "$ssid" && s=1
+		printf '%s\t%s\t%s\t%s\n' "$sig" "$t" "$s" "$ssid"
+	done
+}
+
+# espera associar (até 20 s) e pegar ip (até 10 s)
+wait_connected() {
+	local i
+	for i in $(seq 1 20); do
+		cli status | grep -q '^wpa_state=COMPLETED' && break
+		sleep 1
+	done
+	cli status | grep -q '^wpa_state=COMPLETED' || return 1
+	[ -f "$RUN/udhcpc.pid" ] && kill -USR1 "$(cat "$RUN/udhcpc.pid")" 2>/dev/null
+	for i in $(seq 1 10); do
+		ip -4 -o addr show wlan0 | grep -q inet && return 0
+		sleep 1
+	done
+	return 2
+}
+
+do_connect() {
+	local ssid=$1 pass="" id new=0 psk
+	[ -n "$ssid" ] || return 1
+	[ -e "$OFF" ] && return 1
+	IFS= read -r pass || true
+	id=$(net_id "$ssid")
+	if [ -n "$pass" ] || [ -z "$id" ]; then
+		# rede nova (ou senha nova): troca a salva pela digitada
+		[ -n "$id" ] && cli remove_network "$id" > /dev/null
+		id=$(cli add_network | tail -1)
+		new=1
+		cli set_network "$id" ssid "$(hex "$ssid")" > /dev/null
+		if [ -n "$pass" ]; then
+			psk=$(psk_of "$ssid" "$pass")
+			[ -n "$psk" ] || { cli remove_network "$id" > /dev/null; return 3; }
+			cli set_network "$id" psk "$psk" > /dev/null
+		else
+			cli set_network "$id" key_mgmt NONE > /dev/null
+		fi
+	fi
+	cli select_network "$id" > /dev/null
+	if wait_connected; then
+		cli enable_network all > /dev/null
+		cli save_config > /dev/null
+		return 0
+	fi
+	# não conectou: rede nova sai; as salvas voltam a valer
+	[ $new -eq 1 ] && cli remove_network "$id" > /dev/null
+	cli enable_network all > /dev/null
+	cli save_config > /dev/null
+	cli reassociate > /dev/null
+	return 2
+}
+
+do_forget() {
+	local id
+	id=$(net_id "$1")
+	[ -n "$id" ] || return 1
+	cli remove_network "$id" > /dev/null
+	cli save_config > /dev/null
+}
+
+case "$1" in
+	start) do_start ;;
+	stop) do_stop ;;
+	on) mkdir -p "$DIR"; rm -f "$OFF"; do_start ;;
+	off) mkdir -p "$DIR"; : > "$OFF"; do_stop ;;
+	status) do_status ;;
+	scan) do_scan ;;
+	connect) do_connect "$2" ;;
+	forget) do_forget "$2" ;;
+	*) echo "uso: $0 start|stop|on|off|status|scan|connect <rede>|forget <rede>" >&2; exit 2 ;;
+esac

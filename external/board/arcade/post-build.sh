@@ -27,3 +27,10 @@ install -D -m 0644 "$BR2_EXTERNAL_PINGO_PATH/board/arcade/marca/logo-vertical.pn
 	"$TARGET_DIR/usr/share/pingo/arcade/logo-vertical.png"
 install -D -m 0644 "$BR2_EXTERNAL_PINGO_PATH/board/arcade/marca/moeda.png" \
 	"$TARGET_DIR/usr/share/pingo/arcade/moeda.png"
+
+# SSH por chave: /root/.ssh no cartão (a raiz é somente leitura)
+rm -rf "$TARGET_DIR/root/.ssh"
+ln -sfn /mnt/sd1/.system/ssh "$TARGET_DIR/root/.ssh"
+
+# Scripts que saíram do overlay (o Buildroot não apaga do target)
+rm -f "$TARGET_DIR/etc/init.d/S95pingo-ip"

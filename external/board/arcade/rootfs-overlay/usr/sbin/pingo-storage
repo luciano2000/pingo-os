@@ -55,7 +55,7 @@ make_folders() {
 		"$MNT/Saves" "$MNT/States" "$MNT/Config"
 	[ -f "$MNT/Bios/fbneo/hiscore.dat" ] || [ ! -f /usr/share/pingo/arcade/hiscore.dat ] ||
 		cp /usr/share/pingo/arcade/hiscore.dat "$MNT/Bios/fbneo/hiscore.dat"
-	mkdir -p "$MNT/.system/dropbear" "$MNT/.system/cache" "$MNT/.system/logs"
+	mkdir -p "$MNT/.system/dropbear" "$MNT/.system/cache" "$MNT/.system/logs" "$MNT/.system/ssh"
 }
 
 mount_data() {
