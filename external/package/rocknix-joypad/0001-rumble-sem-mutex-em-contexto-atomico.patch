@@ -1,0 +1,43 @@
+rumble_play_effect: não dormir em contexto atômico
+
+O ff-memless chama o play_effect com o dev->event_lock (spinlock, IRQs
+desligadas) ou de um timer. O mutex_lock dormia quando a leitura do
+controle segurava o mutex, e o aparelho inteiro travava (RG40XX-H, Metal
+Gear Solid; um teste que muda a força a cada 16 ms trava no primeiro
+comando). Agora só grava o nível (READ_ONCE/WRITE_ONCE) e agenda o
+play_work, que pega o mutex.
+
+Pingo OS. Upstream: hackbar/rocknix-joypad.
+
+diff -ruN a/rocknix-singleadc-joypad.c b/rocknix-singleadc-joypad.c
+--- a/rocknix-singleadc-joypad.c
++++ b/rocknix-singleadc-joypad.c
+@@ -773,20 +773,21 @@
+ 	if (effect->type != FF_RUMBLE)
+ 		 return 0;
+ 
+-	mutex_lock(&joypad->lock);
+-	if (!joypad->rumble_enabled) {
+-		mutex_unlock(&joypad->lock);
++	/*
++	 * ff-memless chama isto com o dev->event_lock (spinlock, IRQs
++	 * desligadas) ou de um timer: não pode dormir. O mutex daqui dormia
++	 * quando a leitura do controle o segurava e travava o aparelho.
++	 * O nível é um u16 lido pelo play_work, que pega o mutex.
++	 */
++	if (!READ_ONCE(joypad->rumble_enabled))
+ 		return 0; // Ignore rumble effects if disabled
+-	}
+ 
+ 	if (effect->u.rumble.strong_magnitude)
+ 		boosted_level = effect->u.rumble.strong_magnitude + joypad->boost_strong;
+ 	else
+ 		boosted_level = effect->u.rumble.weak_magnitude + joypad->boost_weak;
+ 
+-	joypad->level = (u16)CLAMP(boosted_level, 0, 0xffff);
+-
+-	mutex_unlock(&joypad->lock);
++	WRITE_ONCE(joypad->level, (u16)CLAMP(boosted_level, 0, 0xffff));
+ 
+ 	schedule_work(&joypad->play_work);
+ 	return 0;

@@ -113,6 +113,7 @@
 - **`pingo-retro`:** responde `RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE`; uma vez por quadro, se a força mudou, atualiza um único efeito (`EVIOCSFF`, duração 0 = até parar) e liga ou desliga com `EV_FF`. O aparelho tem um motor só: o driver usa o forte, ou o fraco se o forte for zero. Para ao abrir o menu, ao suspender e ao sair (o kernel também apaga o efeito se o processo morrer). O controle passa a ser aberto para escrita.
 - **Menu:** Opções → **Vibração** (Ligada/Desligada), só quando o core pede a interface e o aparelho tem motor; salva como `pingo.vibracao` por jogo ou console.
 - PCSX ReARMed: vibração do DualShock (`pcsx_rearmed_vibration`, ligada por padrão). Testado no RG40XX-H com Metal Gear Solid.
+- **Travamento (resolvido, 2026-11-12):** depois de alguns minutos de Metal Gear, o aparelho inteiro congelava (nem o power respondia), sem mensagem no kernel. Um teste que muda a força a cada 16 ms travava no primeiro comando. Causa no rocknix-joypad: o `rumble_play_effect` pegava um mutex, mas o ff-memless o chama com o `event_lock` (spinlock, IRQs desligadas) ou de um timer; quando a leitura do controle segurava o mutex, ele dormia em contexto atômico. Patch `0001-rumble-sem-mutex-em-contexto-atomico.patch`: só grava o nível e agenda o `play_work`. Depois: 18.635 mudanças em 5 minutos sem travar. (Descarregar o módulo com `rmmod` corrompe a memória: para testar o driver, gravar a imagem.)
 
 ### Checklist
 
