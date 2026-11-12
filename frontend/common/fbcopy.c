@@ -25,14 +25,16 @@ static int read_sys(const char *file, int *a, int *b)
 	return n;
 }
 
-/* Geometria do fb0: só trabalha com 32 bits por pixel */
+/* Geometria do fb0: 32 bits por pixel (H700) ou 16, RGB565 (vc4 da Raspberry) */
+static int fb_bpp;
 static bool fb_geometry(int *w, int *h, int *stride)
 {
 	int bpp = 0;
 	if (read_sys("virtual_size", w, h) != 2 || read_sys("bits_per_pixel", &bpp, NULL) != 1 ||
 	    read_sys("stride", stride, NULL) != 1)
 		return false;
-	return bpp == 32 && *w > 0 && *h > 0 && *stride >= *w * 4;
+	fb_bpp = bpp;
+	return (bpp == 32 || bpp == 16) && *w > 0 && *h > 0 && *stride >= *w * (bpp / 8);
 }
 
 void fb_copy_from(SDL_Renderer *ren)
@@ -45,12 +47,13 @@ void fb_copy_from(SDL_Renderer *ren)
 	if (rh < h)
 		h = rh;
 
-	/* XRGB8888 little-endian no fb0 = ARGB8888 do SDL */
+	/* XRGB8888 little-endian no fb0 = ARGB8888 do SDL; em 16 bits, RGB565 */
 	Uint8 *px = malloc((size_t)stride * h);
 	if (!px)
 		return;
 	SDL_Rect r = { 0, 0, w, h };
-	if (SDL_RenderReadPixels(ren, &r, SDL_PIXELFORMAT_ARGB8888, px, stride) == 0) {
+	Uint32 fmt = fb_bpp == 16 ? SDL_PIXELFORMAT_RGB565 : SDL_PIXELFORMAT_ARGB8888;
+	if (SDL_RenderReadPixels(ren, &r, fmt, px, stride) == 0) {
 		int fd = open("/dev/fb0", O_WRONLY);
 		if (fd >= 0) {
 			if (write(fd, px, (size_t)stride * h) < 0)
