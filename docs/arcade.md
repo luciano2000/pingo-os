@@ -38,29 +38,49 @@ FBNeo, com `neogeo.zip`), `Bios/fbneo/samples/`, `Midia/`, `Saves/`,
 Atualizar sem perder os jogos: `sudo scripts/gravar-sistema.sh <img> /dev/sdX`
 (lê os endereços da imagem e confere o cartão antes de gravar).
 
-SSH: pela rede cabeada (`root`/`pingo`; a tela mostra o endereço). Com o
-Wi-Fi ligado, o SSH tem de passar a aceitar só chave.
+SSH: só por chave (o dropbear roda com `-s`; a senha `pingo` é pública).
+As chaves autorizadas ficam no cartão, em `.system/ssh/authorized_keys`
+(`/root/.ssh` aponta para lá). A chave de desenvolvimento fica no PC, em
+`.cache/ssh/pingo-arcade` (fora do Git). O endereço aparece no menu da
+galeria (Pingo Arcade <versão> · rede <ip>).
 
 ## Feito
 
 - [x] Boot, rede, partição ROMS automática
 - [x] Vídeo (vc4 KMS) em 1280×800, som pela Picade
 - [x] FBNeo: Metal Slug a 59,8 fps (5% do quadro em média)
-- [x] Botão de ligar desliga com segurança (S30pingo-power)
+- [x] Botão de ligar desliga com segurança
+- [x] pingo-retro: Picade/teclado como controle; menu do jogo nítido em
+      1280×800 (fontes na resolução real); dicas com as cores do painel
+- [x] Galeria (`pingo-arcade`): Quicksand em pílula, logo do Retrogamer,
+      painel do jogo, fundo desfocado (quando houver `Midia/<zip>/snap.png`)
+- [x] Listas: Clássicos, Todos, Favoritos, Mais jogados e gêneros do FBNeo
+      (lidos dos drivers: `scripts/fbneo-drivers.py`)
+- [x] Controle 2 (USB): reconhecido a quente, mapa por modelo
+      (`Config/controles/<vid>-<pid>.cfg`), assistente na galeria,
+      remapeamento por jogo no menu do jogo (Controle 1 / Controle 2)
+- [x] "Carregando…" entre a galeria e o jogo (fb0 de 16 bits, console
+      desligado)
+- [x] Wi-Fi com teclado na tela (pingo-wifi), hora pela internet (ntpd)
+
+Painel (fios na Picade): verde 1, azul 2, lilás 3, vermelho 4, amarelo 5,
+laranja 6; preto de cima = ESC (menu), preto de baixo = 1UP, branco da
+frente = ficha, azul de trás = ⏻. Na galeria e nos menus: amarelo
+confirma, laranja volta, lilás troca a lista, vermelho favorita.
+`gabinete=Nanorama` em `Config/arcade.cfg` dá o nome do controle 1.
 
 ## Próximos
 
-- [ ] pingo-retro: Picade/teclado como controle (gpio-keys), ESC = menu,
-      KEY_POWER salva e desliga
-- [ ] Galeria: Quicksand em pílula, fundo com o screenshot do jogo
-      escurecido, vídeo à direita, fabricante/ano/jogadores, logo do
-      Retrogamer no canto (`board/arcade/marca/`)
-- [ ] Filtro "Clássicos": sem homebrew/demos/testes, hacks e bootlegs,
-      mahjong/quiz/cassino, versões PCB repetidas, BIOS, clones; "Mostrar
-      todos" e "Esconder este jogo" no menu
+- [ ] Conferir a imagem gravada em 12/11 (boot direto na galeria, Wi-Fi
+      salvo conectando sozinho, hora certa) e medir o tempo de boot
+- [ ] Perfil de botões do Neo Geo (A B C D = 1 2 3 4, o arco do MVS) e
+      camada `neogeo.cfg`; "Botões" na galeria
 - [ ] Mídia: libretro-thumbnails (capas, telas) e ScreenScraper (vídeos,
-      conta do usuário no cartão) pelo Wi-Fi
-- [ ] Modo atração (vídeos aleatórios; "insira uma ficha" com a moeda)
-- [ ] RetroAchievements (o ra.c do Pingo); login por teclado ou arquivo
-- [ ] Wi-Fi, hora (NTP), tela de boot com o logo vertical
-- [ ] Depois: micro arcade vertical na Pi Zero W (tela SPI 3,2" 320×240)
+      conta do usuário no cartão)
+- [ ] Vídeo no painel da galeria; modo atração ("insira uma ficha")
+- [ ] Título do jogo no menu do jogo com o nome completo (hoje "mslug")
+- [ ] RetroAchievements (o ra.c do Pingo); login pelo teclado na tela
+- [ ] Tela de boot com o logo vertical
+- [ ] Pequeno glitch de cor ao sair do jogo (quadro do jogo na troca)
+- [ ] Depois: micro arcade vertical na Pi Zero W (tela SPI 3,2" 320×240,
+      clone com ILI9341 + XPT2046)
