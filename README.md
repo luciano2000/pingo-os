@@ -41,7 +41,7 @@ Gostou do projeto? Ajude a manter o desenvolvimento:
 
 - Início com os consoles que têm jogos, Recentes, Favoritos (Y num jogo) e Jogo aleatório (X).
 - Menu dentro do jogo (MENU): 4 save states com prévia, opções por jogo ou por console, botões remapeáveis.
-- Analógicos nos jogos; no PlayStation, DualShock com o analógico ligado.
+- Analógicos e vibração nos jogos; no PlayStation, DualShock com o analógico ligado.
 - Filtros de tela: cores de GB/GBC/GBA (DMG, GBC, GBA, SP 101), grade LCD, rastro e scanlines.
 - Arcade (FBNeo) com o nome dos jogos, dip switches, recordes e jogos verticais em pé.
 - Dois cartões: jogos no SD1, no SD2 ou nos dois juntos; um cartão do MinUI no slot 2 funciona como está.

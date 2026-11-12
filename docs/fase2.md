@@ -118,8 +118,8 @@
 ### Checklist
 
 - [x] Metal Gear Solid vibra (RG40XX-H)
-- [ ] O motor para ao abrir o menu; Vibração Desligada no menu
-- [ ] RG35XX-H
+- [x] O motor para ao abrir o menu; Vibração Desligada no menu
+- [x] RG35XX-H
 
 ## RG40XX-H
 
