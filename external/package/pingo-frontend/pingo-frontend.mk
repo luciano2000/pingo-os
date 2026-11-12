@@ -11,7 +11,7 @@ PINGO_FRONTEND_SITE_METHOD = local
 # mais novos que o código, o make do build os aceitaria como prontos e a
 # imagem levaria um programa x86-64
 PINGO_FRONTEND_OVERRIDE_SRCDIR_RSYNC_EXCLUSIONS = \
-	--exclude=/pingo-retro --exclude=/pingo-launcher --exclude=/pingo-leds --exclude='*.o'
+	--exclude=/pingo-retro --exclude=/pingo-launcher --exclude=/pingo-leds --exclude=/pingo-arcade --exclude='*.o'
 PINGO_FRONTEND_LICENSE = GPL-2.0, MIT (libretro.h)
 PINGO_FRONTEND_DEPENDENCIES = sdl2 sdl2_ttf font-inter alsa-lib libzip host-pkgconf \
 	rcheevos libchdr libcurl

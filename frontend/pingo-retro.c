@@ -1341,10 +1341,14 @@ static bool RETRO_CALLCONV set_rumble_state(unsigned port, enum retro_rumble_eff
 	return rumble_hw;
 }
 
-/* Teclas -> botões do controle. Painel de 6 botões em duas fileiras
- * (Picade: 1 2 3 em cima, 4 5 6 embaixo), como o de Street Fighter: em
- * cima soco fraco/médio/forte, embaixo chute; no FBNeo, Y X L e B A R.
- * No menu, o botão 1 confirma e o 2 volta (e Enter/Esc de um teclado). */
+/* Teclas -> botões do controle. Painel do bartop, fios nos bornes da Picade:
+ *     verde(1)   azul(2)    lilás(3)
+ *     amarelo(5) laranja(6) vermelho(4)
+ * No FBNeo (retropad), jogos de 6 botões como Street Fighter: socos em cima
+ * (Y X L) e chutes embaixo (B A R, da esquerda para a direita). Neo Geo
+ * (A B C D = 1 2 3 4, o arco do gabinete MVS) entra por perfil.
+ * Nos menus, o amarelo (5) confirma e o laranja (6) volta (e Enter/Backspace
+ * de um teclado). */
 static int key_to_pad(int code, bool menu)
 {
 	switch (code) {
@@ -1352,12 +1356,12 @@ static int key_to_pad(int code, bool menu)
 	case KEY_DOWN:      return BTN_DPAD_DOWN;
 	case KEY_LEFT:      return BTN_DPAD_LEFT;
 	case KEY_RIGHT:     return BTN_DPAD_RIGHT;
-	case KEY_LEFTCTRL:  return menu ? BTN_EAST : BTN_NORTH;  /* 1: Y */
-	case KEY_LEFTALT:   return menu ? BTN_SOUTH : BTN_WEST;  /* 2: X */
-	case KEY_SPACE:     return BTN_TL;                       /* 3: L */
-	case KEY_LEFTSHIFT: return BTN_SOUTH;                    /* 4: B */
-	case KEY_Z:         return BTN_EAST;                     /* 5: A */
-	case KEY_X:         return BTN_TR;                       /* 6: R */
+	case KEY_LEFTCTRL:  return BTN_NORTH;                    /* 1 verde: Y */
+	case KEY_LEFTALT:   return BTN_WEST;                     /* 2 azul: X */
+	case KEY_SPACE:     return BTN_TL;                       /* 3 lilás: L */
+	case KEY_LEFTSHIFT: return BTN_TR;                       /* 4 vermelho: R */
+	case KEY_Z:         return menu ? BTN_EAST : BTN_SOUTH;  /* 5 amarelo: B */
+	case KEY_X:         return menu ? BTN_SOUTH : BTN_EAST;  /* 6 laranja: A */
 	case KEY_1:         return BTN_START;                    /* 1P */
 	case KEY_5:         return BTN_SELECT;                   /* ficha */
 	case KEY_ESC:       return BTN_MODE;                     /* menu */

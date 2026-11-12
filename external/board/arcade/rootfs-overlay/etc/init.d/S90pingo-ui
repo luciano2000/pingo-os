@@ -1,0 +1,20 @@
+#!/bin/sh
+# Interface (launcher + jogos) na tela.
+# Log no cartão (sobrevive a desligamentos), com rotação simples.
+case "$1" in
+	start)
+		mkdir -p /run/pingo
+		LOG=/run/pingo/ui.log
+		if mountpoint -q /mnt/sd1; then
+			mkdir -p /mnt/sd1/.system/logs
+			LOG=/mnt/sd1/.system/logs/ui.log
+			[ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 262144 ] && mv "$LOG" "$LOG.1"
+		fi
+		echo "=== $(date '+%F %T') boot $(. /etc/os-release; echo "$VERSION_ID")" >> "$LOG"
+		setsid sh -c "exec /usr/bin/pingo-shell >> '$LOG' 2>&1" < /dev/null > /dev/null 2>&1 &
+		;;
+	stop)
+		killall pingo-shell pingo-launcher pingo-retro 2>/dev/null
+		;;
+esac
+exit 0

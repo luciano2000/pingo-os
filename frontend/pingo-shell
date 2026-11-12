@@ -14,10 +14,19 @@ load_tz() {
 	[ -n "$z" ] && [ -e "/usr/share/zoneinfo/$z" ] && export TZ=":$z"
 }
 
+# Pingo Arcade (bartop): a galeria de arcade no lugar do launcher
+LAUNCHER=/usr/bin/pingo-launcher
+grep -q '^ID=pingo-arcade' /etc/os-release && LAUNCHER=/usr/bin/pingo-arcade
+
 while true; do
 	load_tz
-	/usr/bin/pingo-launcher
+	$LAUNCHER
 	rc=$?
+	if [ $rc -eq 3 ]; then # galeria do Arcade: botão de ligar ou Desligar
+		sync
+		/sbin/poweroff
+		exit 0
+	fi
 	if [ -f /run/pingo/next ]; then
 		mode=""
 		{ read -r core; read -r rom; read -r console; read -r mode; } < /run/pingo/next
@@ -34,7 +43,7 @@ while true; do
 		/usr/bin/pingo-retro "$core" "$rom" "$console" $mode
 		if [ $? -eq 3 ]; then # power segurado no jogo
 			# desenha e deixa no fb0 (fica na tela até apagar)
-			/usr/bin/pingo-launcher --message "Desligando…"
+			$LAUNCHER --message "Desligando…"
 			sync
 			/sbin/poweroff
 			exit 0

@@ -19,3 +19,11 @@ mkdir -p "$TARGET_DIR/boot" "$TARGET_DIR/mnt/sd1"
 mkdir -p "$TARGET_DIR/usr/share/fonts/quicksand"
 cp "$BR2_EXTERNAL_PINGO_PATH"/board/h700/rootfs-overlay/usr/share/fonts/quicksand/* \
 	"$TARGET_DIR/usr/share/fonts/quicksand/"
+
+# Marca do Retrogamer Brasil para a galeria (logo e moeda)
+install -D -m 0644 "$BR2_EXTERNAL_PINGO_PATH/board/arcade/marca/logo-horizontal.png" \
+	"$TARGET_DIR/usr/share/pingo/arcade/logo-horizontal.png"
+install -D -m 0644 "$BR2_EXTERNAL_PINGO_PATH/board/arcade/marca/logo-vertical.png" \
+	"$TARGET_DIR/usr/share/pingo/arcade/logo-vertical.png"
+install -D -m 0644 "$BR2_EXTERNAL_PINGO_PATH/board/arcade/marca/moeda.png" \
+	"$TARGET_DIR/usr/share/pingo/arcade/moeda.png"

@@ -26,4 +26,15 @@ define LIBRETRO_FBNEO_ARCADE_NAMES
 endef
 LIBRETRO_FBNEO_POST_INSTALL_TARGET_HOOKS += LIBRETRO_FBNEO_ARCADE_NAMES
 
+# Pingo Arcade: tabela da galeria (ano, fabricante, clone, sistema, tipo,
+# gênero, jogadores, vertical)
+ifeq ($(BR2_PACKAGE_RPI_FIRMWARE),y)
+define LIBRETRO_FBNEO_ARCADE_GALLERY
+	python3 -I $(BR2_EXTERNAL_PINGO_PATH)/../scripts/fbneo-arcade.py \
+		"$(@D)/dats/FinalBurn Neo (ClrMame Pro XML, Arcade only).dat" \
+		$(@D)/src/burn $(TARGET_DIR)/usr/share/pingo/arcade/arcade.tsv
+endef
+LIBRETRO_FBNEO_POST_INSTALL_TARGET_HOOKS += LIBRETRO_FBNEO_ARCADE_GALLERY
+endif
+
 $(eval $(generic-package))
