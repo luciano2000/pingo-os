@@ -49,6 +49,7 @@ void ui_quit(void);
 
 /* Usa um renderer que já existe (pingo-retro): carrega fontes e ícones */
 bool ui_attach(SDL_Renderer *renderer);
+void ui_logical(bool on);
 void ui_detach(void);
 
 /* Bolinha de 10 px dos slots: cheia ou só o contorno */

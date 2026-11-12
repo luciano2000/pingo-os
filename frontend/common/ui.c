@@ -22,6 +22,10 @@
 static SDL_Window *window;
 static SDL_Renderer *ren;
 static TTF_Font *fonts[F_COUNT_N];
+/* Telas maiores que 640x480 (Pingo Arcade, 1280x800): a interface continua
+ * em coordenadas de 640x480 (SDL_RenderSetLogicalSize), mas fontes e cantos
+ * são desenhados na resolução real, k vezes maiores, e ficam nítidos. */
+static float k = 1.0f;
 
 /* ---- cache de textos ------------------------------------------------- */
 
@@ -62,8 +66,8 @@ static struct text_entry *text_get(enum font_id f, const char *s)
 	if (!surf)
 		return NULL;
 	slot->tex = SDL_CreateTextureFromSurface(ren, surf);
-	slot->w = surf->w;
-	slot->h = surf->h;
+	slot->w = (int)(surf->w / k + 0.5f);
+	slot->h = (int)(surf->h / k + 0.5f);
 	SDL_FreeSurface(surf);
 	slot->font = f;
 	slot->str = strdup(s);
@@ -76,7 +80,7 @@ int ui_text_width(enum font_id f, const char *s)
 	int w = 0;
 	if (*s)
 		TTF_SizeUTF8(fonts[f], s, &w, NULL);
-	return w;
+	return (int)(w / k + 0.5f);
 }
 
 /* Corta no limite de caractere UTF-8 e põe reticências */
@@ -275,7 +279,9 @@ void ui_round_rect(int x, int y, int w, int h, int r, Uint32 rgb)
 			if (corner_cache[i])
 				SDL_DestroyTexture(corner_cache[i]);
 			corner_cache_r[i] = (float)r;
-			corner_cache[i] = raster(2 * r, 2 * r, in_disc, &corner_cache_r[i]);
+			corner_cache_r[i] = (float)r;
+			float rk = r * k;
+			corner_cache[i] = raster((int)(2 * rk + 0.5f), (int)(2 * rk + 0.5f), in_disc, &rk);
 			corner_tex = corner_cache[i];
 		}
 		corner_r = (float)r;
@@ -285,7 +291,8 @@ void ui_round_rect(int x, int y, int w, int h, int r, Uint32 rgb)
 	SDL_Rect src, dst;
 	for (int i = 0; i < 4; i++) {
 		int sx = (i & 1) ? r : 0, sy = (i & 2) ? r : 0;
-		src = (SDL_Rect){ sx, sy, r, r };
+		int rk = (int)(r * k + 0.5f);
+		src = (SDL_Rect){ sx ? rk : 0, sy ? rk : 0, rk, rk };
 		dst = (SDL_Rect){ (i & 1) ? x + w - r : x, (i & 2) ? y + h - r : y, r, r };
 		SDL_RenderCopy(ren, corner_tex, &src, &dst);
 	}
@@ -412,10 +419,15 @@ static bool load_assets(void)
 	const char *font_dir = getenv("PINGO_FONT_DIR");
 	if (!font_dir || !*font_dir)
 		font_dir = FONT_DIR;
+	int ow = UI_W, oh = UI_H;
+	if (SDL_GetRendererOutputSize(ren, &ow, &oh) == 0 && ow > UI_W && oh > UI_H)
+		k = SDL_min((float)ow / UI_W, (float)oh / UI_H);
+	else
+		k = 1.0f;
 	for (int i = 0; i < F_COUNT_N; i++) {
 		char path[512];
 		snprintf(path, sizeof(path), "%s/%s", font_dir, spec[i].file);
-		fonts[i] = TTF_OpenFontIndex(path, spec[i].size, spec[i].index);
+		fonts[i] = TTF_OpenFontIndex(path, (int)(spec[i].size * k + 0.5f), spec[i].index);
 		if (!fonts[i]) {
 			fprintf(stderr, "pingo-launcher: fonte %s: %s\n", path, TTF_GetError());
 			return false;
@@ -426,6 +438,13 @@ static bool load_assets(void)
 	wifi_tex = raster(18, 14, in_wifi, NULL);
 	battery_tex = raster(26, 14, in_battery, NULL);
 	return true;
+}
+
+/* Interface em coordenadas de 640x480 (no-op numa tela de 640x480) */
+void ui_logical(bool on)
+{
+	if (ren && k != 1.0f)
+		SDL_RenderSetLogicalSize(ren, on ? UI_W : 0, on ? UI_H : 0);
 }
 
 bool ui_attach(SDL_Renderer *renderer)
@@ -563,7 +582,14 @@ void ui_screenshot_check(SDL_Renderer *r)
 	SDL_Surface *s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
 	if (!s)
 		return;
-	if (SDL_RenderReadPixels(r, NULL, SDL_PIXELFORMAT_ARGB8888, s->pixels, s->pitch) == 0) {
+	/* a tela inteira, sem a escala de 640x480 */
+	int lw, lh;
+	SDL_RenderGetLogicalSize(r, &lw, &lh);
+	SDL_RenderSetLogicalSize(r, 0, 0);
+	SDL_RenderSetViewport(r, NULL);
+	int ok = SDL_RenderReadPixels(r, NULL, SDL_PIXELFORMAT_ARGB8888, s->pixels, s->pitch);
+	SDL_RenderSetLogicalSize(r, lw, lh);
+	if (ok == 0) {
 		char path[128], stamp[32];
 		time_t t = time(NULL);
 		struct tm tm;

@@ -933,6 +933,7 @@ static void draw_scanlines(const SDL_Rect *dst)
 
 static void draw_game(void)
 {
+	ui_logical(false); /* o jogo em coordenadas da tela */
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 	SDL_RenderClear(renderer);
 	if (texture) {
@@ -1162,6 +1163,11 @@ static void audio_pause(bool pause)
 /* ---- entrada (evdev) ------------------------------------------------- */
 
 static int pad_fd = -1, vol_fd = -1, power_fd = -1;
+/* Teclados: a Picade do Pingo Arcade (gpio-keys, teclas do MAME) e teclados
+ * USB. As teclas viram os botões do controle do portátil (key_to_pad), então
+ * o resto do código só conhece BTN_*. */
+#define MAX_KEY_FDS 6
+static int key_fds[MAX_KEY_FDS], n_key_fds;
 static bool pad_state[16];
 
 /* Analógicos (RETRO_DEVICE_ANALOG): [esquerdo/direito][x/y], -32767..32767.
@@ -1234,6 +1240,40 @@ static int open_input(const char *want)
 	return -1;
 }
 
+/* Teclados: todo dispositivo com setas e Ctrl (a Picade, teclados USB) */
+static bool has_key(int fd, int code)
+{
+	unsigned long bits[KEY_MAX / (8 * sizeof(long)) + 1] = { 0 };
+	return ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(bits)), bits) >= 0 &&
+	       (bits[code / (8 * sizeof(long))] >> (code % (8 * sizeof(long)))) & 1;
+}
+
+static void open_keyboards(void)
+{
+	DIR *dir = opendir("/dev/input");
+	struct dirent *ent;
+	char path[300], name[256];
+	if (!dir)
+		return;
+	while ((ent = readdir(dir)) && n_key_fds < MAX_KEY_FDS) {
+		if (strncmp(ent->d_name, "event", 5))
+			continue;
+		snprintf(path, sizeof(path), "/dev/input/%s", ent->d_name);
+		int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+		if (fd < 0)
+			continue;
+		if (has_key(fd, KEY_UP) && has_key(fd, KEY_LEFTCTRL)) {
+			if (ioctl(fd, EVIOCGNAME(sizeof(name)), name) < 0)
+				strcpy(name, "?");
+			fprintf(stderr, "pingo-retro: teclado %s (%s)\n", name, path);
+			key_fds[n_key_fds++] = fd;
+		} else {
+			close(fd);
+		}
+	}
+	closedir(dir);
+}
+
 /* ---- vibração ----------------------------------------------------------- *
  * O core pede força para os motores forte e fraco (RETRO_RUMBLE_*); o
  * aparelho tem um motor só, no PWM, que o rocknix-joypad expõe como
@@ -1299,6 +1339,32 @@ static bool RETRO_CALLCONV set_rumble_state(unsigned port, enum retro_rumble_eff
 		return false;
 	rumble_want[effect] = strength;
 	return rumble_hw;
+}
+
+/* Teclas -> botões do controle. Painel de 6 botões em duas fileiras
+ * (Picade: 1 2 3 em cima, 4 5 6 embaixo), como o de Street Fighter: em
+ * cima soco fraco/médio/forte, embaixo chute; no FBNeo, Y X L e B A R.
+ * No menu, o botão 1 confirma e o 2 volta (e Enter/Esc de um teclado). */
+static int key_to_pad(int code, bool menu)
+{
+	switch (code) {
+	case KEY_UP:        return BTN_DPAD_UP;
+	case KEY_DOWN:      return BTN_DPAD_DOWN;
+	case KEY_LEFT:      return BTN_DPAD_LEFT;
+	case KEY_RIGHT:     return BTN_DPAD_RIGHT;
+	case KEY_LEFTCTRL:  return menu ? BTN_EAST : BTN_NORTH;  /* 1: Y */
+	case KEY_LEFTALT:   return menu ? BTN_SOUTH : BTN_WEST;  /* 2: X */
+	case KEY_SPACE:     return BTN_TL;                       /* 3: L */
+	case KEY_LEFTSHIFT: return BTN_SOUTH;                    /* 4: B */
+	case KEY_Z:         return BTN_EAST;                     /* 5: A */
+	case KEY_X:         return BTN_TR;                       /* 6: R */
+	case KEY_1:         return BTN_START;                    /* 1P */
+	case KEY_5:         return BTN_SELECT;                   /* ficha */
+	case KEY_ESC:       return BTN_MODE;                     /* menu */
+	case KEY_ENTER:     return menu ? BTN_EAST : BTN_START;
+	case KEY_BACKSPACE: return menu ? BTN_SOUTH : -1;
+	default:            return -1;
+	}
 }
 
 /* Layout libretro (Nintendo): B embaixo, A à direita, Y à esquerda, X em
@@ -1389,6 +1455,8 @@ static int button_by_name(const char *name)
 	return -1;
 }
 
+static void pad_event(const struct input_event *e);
+
 /* Lê todos os dispositivos (uma vez por quadro, no jogo e no menu) */
 static void poll_devices(void)
 {
@@ -1417,21 +1485,55 @@ static void poll_devices(void)
 	while (vol_fd >= 0 && read(vol_fd, &ev, sizeof(ev)) == sizeof(ev))
 		if (ev.type == EV_KEY)
 			osd_key(ev.code, ev.value);
-	while (pad_fd >= 0 && read(pad_fd, &ev, sizeof(ev)) == sizeof(ev)) {
+	while (pad_fd >= 0 && read(pad_fd, &ev, sizeof(ev)) == sizeof(ev))
+		pad_event(&ev);
+	for (int k = 0; k < n_key_fds; k++)
+		while (read(key_fds[k], &ev, sizeof(ev)) == sizeof(ev)) {
+			if (ev.type != EV_KEY)
+				continue;
+			if (ev.code == KEY_POWER) { /* botão de ligar da Picade */
+				if (ev.value == 1) {
+					fprintf(stderr, "pingo-retro: botão de ligar: desligar\n");
+					power_off_requested = quit_requested = true;
+				}
+				continue;
+			}
+			int menu_code = key_to_pad(ev.code, true), game_code = key_to_pad(ev.code, false);
+			if (game_code < 0)
+				continue;
+			if (game_code == BTN_MODE) {
+				struct input_event m = ev;
+				m.code = BTN_MODE;
+				pad_event(&m);
+				continue;
+			}
+			if (ev.value == 1 && npressed < 16)
+				pressed[npressed++] = menu_code;
+			for (int f = 0; f < 16; f++)
+				if (bind[f] == game_code)
+					pad_state[f] = ev.value != 0;
+		}
+}
+
+/* Um evento do controle (portátil) */
+static void pad_event(const struct input_event *e)
+{
+	struct input_event ev = *e;
+	{
 		if (ev.type == EV_ABS && ev.code <= ABS_RY && ev.code != ABS_Z) {
 			int side = ev.code >= ABS_RX, axis = ev.code == ABS_Y || ev.code == ABS_RY;
 			stick[side][axis] = stick_scale(ev.code, ev.value);
-			continue;
+			return;
 		}
 		if (ev.type != EV_KEY)
-			continue;
+			return;
 		if (osd_key(ev.code, ev.value))
-			continue;
+			return;
 		if (ev.code == BTN_MODE) {
 			/* MENU ao soltar, sem Vol± junto */
 			if (osd_menu_tapped())
 				menu_requested = true;
-			continue;
+			return;
 		}
 		if (ev.value == 1 && npressed < 16)
 			pressed[npressed++] = ev.code;
@@ -1914,6 +2016,7 @@ static void draw_dimmed_game(void)
 	draw_game();
 	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 215);
 	SDL_RenderFillRect(renderer, NULL);
+	ui_logical(true); /* o menu em coordenadas de 640x480 */
 }
 
 static void draw_toast_or(void (*left)(void))
@@ -3083,6 +3186,7 @@ int main(int argc, char **argv)
 	rumble_init();
 	vol_fd = open_input("gpio-keys-volume");
 	power_fd = open_input("axp20x-pek");
+	open_keyboards();
 	osd_init();
 
 	core.set_video_refresh(video_refresh);
@@ -3136,6 +3240,7 @@ int main(int argc, char **argv)
 		rumble_frame();
 		draw_game();
 		ambi_frame();
+		ui_logical(true); /* avisos por cima do jogo, em 640x480 */
 		ra_draw_note();
 		if (toast[0] && SDL_GetTicks() < toast_until) {
 			int w = ui_text_width(F_BAR, toast) + 2 * ROW_PAD;

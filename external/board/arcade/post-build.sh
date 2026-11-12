@@ -13,3 +13,9 @@ HOME_URL="https://github.com/luciano2000/pingo-os"
 OS
 
 mkdir -p "$TARGET_DIR/boot" "$TARGET_DIR/mnt/sd1"
+
+# Fonte das listas (Quicksand, OFL): a mesma do Pingo OS, que está no
+# overlay do H700
+mkdir -p "$TARGET_DIR/usr/share/fonts/quicksand"
+cp "$BR2_EXTERNAL_PINGO_PATH"/board/h700/rootfs-overlay/usr/share/fonts/quicksand/* \
+	"$TARGET_DIR/usr/share/fonts/quicksand/"
