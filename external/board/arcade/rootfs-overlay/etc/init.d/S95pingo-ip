@@ -1,0 +1,16 @@
+#!/bin/sh
+# Fase 1 (sem interface ainda): mostra na tela o endereço da rede, para o SSH.
+case "$1" in
+	start)
+		(
+			for i in $(seq 1 30); do
+				ip=$(ip -4 -o addr show eth0 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+				[ -n "$ip" ] && break
+				sleep 1
+			done
+			printf '\033[2J\033[H\n  Pingo Arcade %s\n\n  rede: %s\n\n' \
+				"$(. /etc/os-release; echo "$VERSION_ID")" "${ip:-sem cabo de rede}" > /dev/tty1
+		) &
+		;;
+esac
+exit 0

@@ -1,0 +1,23 @@
+# Pingo Arcade - Raspberry Pi 3 Model B+ (config.txt do firmware)
+start_file=start.elf
+fixup_file=fixup.dat
+kernel=Image
+arm_64bit=1
+
+# Boot rápido e sem o arco-íris
+boot_delay=0
+disable_splash=1
+
+# Vídeo pelo KMS (Mesa vc4); a tela é a do HDMI
+dtoverlay=vc4-kms-v3d
+disable_overscan=1
+gpu_mem=64
+
+# Picade X HAT: botões, joystick, botão de ligar e som (I2S). O som da placa
+# (P2 de 3,5 mm) fica desligado.
+dtparam=audio=off
+dtoverlay=pingo-picade
+
+# Serial nos pinos 14/15 (RX/TX da Picade) para depuração; sem Bluetooth
+dtoverlay=disable-bt
+enable_uart=1

@@ -19,6 +19,9 @@ PINGO_H700_BOARD = $(BR2_EXTERNAL_PINGO_PATH)/board/h700
 # --- Kernel ---------------------------------------------------------------
 # Device trees do ROCKNIX (variantes de painel e de aparelho) entram na árvore
 # do kernel, como o ROCKNIX faz com rsync em arch/arm64/boot/dts.
+# Só no H700: o Pingo Arcade (Raspberry Pi) usa o kernel e os device trees da
+# Raspberry Pi Foundation sem acréscimos
+ifeq ($(BR2_PACKAGE_RPI_FIRMWARE),)
 define PINGO_LINUX_ADD_DTS
 	rsync -a $(PINGO_H700_BOARD)/dts/ $(LINUX_DIR)/arch/arm64/boot/dts/
 	for f in $(PINGO_H700_BOARD)/dts/allwinner/*.dts; do \
@@ -52,6 +55,7 @@ ifeq ($(BR2_PACKAGE_LINUX_FIRMWARE),y)
 $(LINUX_TARGET_CONFIGURE): | linux-firmware
 LINUX_PRE_BUILD_HOOKS += PINGO_LINUX_ADD_FIRMWARE
 endif
+endif # H700
 
 # --- U-Boot ---------------------------------------------------------------
 # defconfig do ROCKNIX para LPDDR4 (RG35XX-H, RG40XX-H/V)

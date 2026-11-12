@@ -1,0 +1,15 @@
+#!/bin/sh
+# Botão de ligar da Picade (KEY_POWER): desliga com segurança. Ao fim do
+# desligamento, o kernel avisa a Picade (GPIO 4) e ela corta a energia.
+# Fase 1, sem interface: depois a interface cuida disso (salvar o jogo antes).
+DEV=/dev/input/by-path/platform-pingo_keys-event
+case "$1" in
+	start)
+		[ -e "$DEV" ] || exit 0
+		(
+			evtest "$DEV" 2>/dev/null | grep -q -m1 'code 116 (KEY_POWER), value 1' &&
+				{ echo "pingo-power: botão de ligar, desligando" > /dev/kmsg; poweroff; }
+		) < /dev/null > /dev/null 2>&1 &
+		;;
+esac
+exit 0

@@ -1,0 +1,17 @@
+# Pingo Arcade: ajustes sobre o bcm2711_defconfig da Raspberry Pi Foundation
+CONFIG_LOCALVERSION="-pingo"
+# Raiz squashfs somente leitura + partição ROMS em exFAT
+CONFIG_SQUASHFS=y
+CONFIG_SQUASHFS_ZSTD=y
+CONFIG_EXFAT_FS=y
+CONFIG_VFAT_FS=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+# Botões da Picade e desligamento pela placa
+CONFIG_KEYBOARD_GPIO=y
+CONFIG_POWER_RESET_GPIO=y
+# Módulos sem compressão: o udev (libkmod) e o modprobe carregam direto, e o
+# squashfs já comprime a raiz
+CONFIG_MODULE_COMPRESS_NONE=y
+# CONFIG_MODULE_COMPRESS_XZ is not set
+# CONFIG_MODULE_COMPRESS_ALL is not set

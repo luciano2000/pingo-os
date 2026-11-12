@@ -1,0 +1,96 @@
+#!/bin/sh
+# Pingo Arcade: partição ROMS (exFAT) no resto do cartão, montada em /mnt/sd1.
+#
+# Primeiro boot: cria a partição 3 no espaço livre e formata, sem perguntar
+# (é um bartop: não há quem confirme, e o cartão acabou de ser gravado).
+# Só formata uma partição vazia, sem nenhum sistema de arquivos.
+# Depois de regravar a .img, a tabela perde a partição 3, mas os dados
+# continuam no lugar: ela é recriada no mesmo início e reaproveitada.
+#
+# Estado em /run/pingo/storage: ok | nodisk | unknown <tipo>
+MNT=/mnt/sd1
+LABEL=ROMS
+STATE=/run/pingo/storage
+
+say() { echo "pingo-storage: $*" > /dev/kmsg; }
+state() { mkdir -p /run/pingo; echo "$*" > "$STATE"; }
+
+root_disk() {
+	local uuid dev
+	uuid=$(sed -n 's/.*root=PARTUUID=\([^ ]*\).*/\1/p' /proc/cmdline)
+	dev=$(blkid -t PARTUUID="$uuid" -o device 2>/dev/null | head -1)
+	[ -n "$dev" ] || return 1
+	DISK="/dev/$(basename "$(readlink -f /sys/class/block/$(basename "$dev")/..)")"
+	case "$DISK" in *[0-9]) PSEP=p ;; *) PSEP= ;; esac
+	DATA_PART="${DISK}${PSEP}3"
+}
+
+data_start() {
+	local last
+	last=$(sfdisk -l -o End "$DISK" 2>/dev/null | awk '/^ *[0-9]+ *$/ {if ($1 > e) e = $1} END {print e+0}')
+	echo $(( (last / 2048 + 1) * 2048 ))
+}
+
+create_entry() {
+	local size start free
+	size=$(cat /sys/class/block/$(basename "$DISK")/size)
+	start=$(data_start)
+	free=$((size - start))
+	if [ "$free" -lt 2097152 ]; then
+		say "sem espaço livre para a partição $LABEL ($free setores)"
+		return 1
+	fi
+	say "criando $DATA_PART a partir do setor $start ($free setores)"
+	echo "$start,,07" | sfdisk --append --no-reread --no-tell-kernel -q "$DISK" || return 1
+	partx -a -n 3 "$DISK" 2>/dev/null || partx -u "$DISK"
+	for i in 1 2 3 4 5 6 7 8 9 10; do [ -b "$DATA_PART" ] && break; sleep 1; done
+	[ -b "$DATA_PART" ]
+}
+
+fs_type() { blkid -p -o value -s TYPE "$DATA_PART" 2>/dev/null; }
+
+make_folders() {
+	# Roms: os .zip do FBNeo. Midia: capas, telas e vídeos baixados.
+	mkdir -p "$MNT/Roms" "$MNT/Bios/fbneo/samples" "$MNT/Midia" \
+		"$MNT/Saves" "$MNT/States" "$MNT/Config"
+	[ -f "$MNT/Bios/fbneo/hiscore.dat" ] || [ ! -f /usr/share/pingo/arcade/hiscore.dat ] ||
+		cp /usr/share/pingo/arcade/hiscore.dat "$MNT/Bios/fbneo/hiscore.dat"
+	mkdir -p "$MNT/.system/dropbear" "$MNT/.system/cache" "$MNT/.system/logs"
+}
+
+mount_data() {
+	fsck.exfat -p "$DATA_PART" > /dev/null 2>&1
+	rc=$?
+	[ $rc -ge 4 ] && say "fsck.exfat terminou com código $rc"
+	mount -t exfat -o noatime,errors=remount-ro "$DATA_PART" "$MNT" || {
+		say "falha ao montar $DATA_PART"; return 1; }
+	make_folders
+	[ -e /var/run/dropbear ] && [ ! -L /var/run/dropbear ] && rm -rf /var/run/dropbear
+	ln -sfn "$MNT/.system/dropbear" /var/run/dropbear
+	state ok
+}
+
+do_boot() {
+	root_disk || { say "não achei o disco do sistema"; state nodisk; return 0; }
+	if [ ! -b "$DATA_PART" ]; then
+		create_entry || { state nodisk; return 0; }
+	fi
+	case "$(fs_type)" in
+		exfat) mount_data || state unknown exfat ;;
+		"")
+			say "partição $LABEL vazia: formatando"
+			mkfs.exfat -L "$LABEL" "$DATA_PART" > /dev/null && sync && mount_data ||
+				state nodisk
+			;;
+		*)
+			say "$DATA_PART é '$(fs_type)', não exFAT: não mexo"
+			state unknown "$(fs_type)"
+			;;
+	esac
+}
+
+case "$1" in
+	boot) do_boot ;;
+	stop) sync; umount "$MNT" 2>/dev/null ;;
+	*) echo "uso: $0 boot|stop" >&2; exit 2 ;;
+esac

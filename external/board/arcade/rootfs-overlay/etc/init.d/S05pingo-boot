@@ -1,0 +1,12 @@
+#!/bin/sh
+# Monta a partição de boot (FAT, rótulo PINGOBOOT) em /boot, somente leitura.
+case "$1" in
+  start)
+    dev="$(blkid -L PINGOBOOT 2>/dev/null)"
+    [ -n "$dev" ] && mount -t vfat -o ro "$dev" /boot
+    ;;
+  stop)
+    umount /boot 2>/dev/null
+    ;;
+esac
+exit 0

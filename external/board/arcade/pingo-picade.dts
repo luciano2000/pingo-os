@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Pingo Arcade: Pimoroni Picade X HAT na Raspberry Pi.
+ *
+ * Joystick e botões viram teclas (gpio-keys); o botão de ligar manda
+ * KEY_POWER e, no desligamento, o GPIO 4 avisa a placa para cortar a
+ * energia. Som: DAC PCM5102A no I2S. Como o GPIO 20 (PCM_DIN) é o
+ * "esquerda" do joystick, o I2S usa o 26 no lugar (a placa não grava som).
+ *
+ * Pinos (BCM), todos ativos em nível baixo com pull-up:
+ *   joystick  cima 12, baixo 6, esquerda 20, direita 16
+ *   botões    1:5  2:11  3:8  4:25  5:9  6:10
+ *   ENT 27, ESC 22, moeda 23, 1UP 24, ligar 17; LED 13
+ *
+ * Teclas: as do MAME (setas, Ctrl, Alt, espaço, Shift, Z, X; 5 = moeda,
+ * 1 = start), para que um teclado USB funcione igual.
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2835";
+
+	fragment@0 {
+		target = <&gpio>;
+		__overlay__ {
+			pingo_keys_pins: pingo_keys_pins {
+				brcm,pins =     <17 5 6 8 9 10 11 12 16 20 22 23 24 25 27>;
+				brcm,function = <0>;   /* entrada */
+				brcm,pull =     <2>;   /* pull-up */
+			};
+			pingo_i2s_pins: pingo_i2s_pins {
+				brcm,pins = <18 19 26 21>;
+				brcm,function = <4>;   /* ALT0: PCM */
+			};
+		};
+	};
+
+	fragment@1 {
+		target-path = "/";
+		__overlay__ {
+			pingo_poweroff {
+				compatible = "gpio-poweroff";
+				gpios = <&gpio 4 1>;
+				force;
+			};
+
+			pingo_keys {
+				compatible = "gpio-keys";
+				label = "Picade";
+				pinctrl-names = "default";
+				pinctrl-0 = <&pingo_keys_pins>;
+
+				cima     { label = "cima";     linux,code = <103>; gpios = <&gpio 12 1>; };
+				baixo    { label = "baixo";    linux,code = <108>; gpios = <&gpio 6 1>; };
+				esquerda { label = "esquerda"; linux,code = <105>; gpios = <&gpio 20 1>; };
+				direita  { label = "direita";  linux,code = <106>; gpios = <&gpio 16 1>; };
+				b1 { label = "botao 1"; linux,code = <29>; gpios = <&gpio 5 1>; };  /* Ctrl */
+				b2 { label = "botao 2"; linux,code = <56>; gpios = <&gpio 11 1>; }; /* Alt */
+				b3 { label = "botao 3"; linux,code = <57>; gpios = <&gpio 8 1>; };  /* espaço */
+				b4 { label = "botao 4"; linux,code = <42>; gpios = <&gpio 25 1>; }; /* Shift */
+				b5 { label = "botao 5"; linux,code = <44>; gpios = <&gpio 9 1>; };  /* Z */
+				b6 { label = "botao 6"; linux,code = <45>; gpios = <&gpio 10 1>; }; /* X */
+				ent    { label = "enter"; linux,code = <28>; gpios = <&gpio 27 1>; };
+				esc    { label = "esc";   linux,code = <1>;  gpios = <&gpio 22 1>; };
+				moeda  { label = "moeda"; linux,code = <6>;  gpios = <&gpio 23 1>; }; /* 5 */
+				start  { label = "1up";   linux,code = <2>;  gpios = <&gpio 24 1>; }; /* 1 */
+				ligar  { label = "ligar"; linux,code = <116>; gpios = <&gpio 17 1>; }; /* KEY_POWER */
+			};
+
+			pingo_led {
+				compatible = "gpio-leds";
+				led {
+					label = "picade";
+					gpios = <&gpio 13 1>;
+					linux,default-trigger = "default-on";
+				};
+			};
+
+			/* o nome importa: o rpi-simple-soundcard (hifiberry-dac) procura
+			 * o codec pelo dispositivo "pcm5102a-codec" */
+			pcm5102a-codec {
+				#sound-dai-cells = <0>;
+				compatible = "ti,pcm5102a";
+			};
+		};
+	};
+
+	fragment@2 {
+		target = <&i2s_clk_consumer>;
+		__overlay__ {
+			status = "okay";
+			pinctrl-names = "default";
+			pinctrl-0 = <&pingo_i2s_pins>;
+		};
+	};
+
+	fragment@3 {
+		target = <&sound>;
+		__overlay__ {
+			compatible = "hifiberry,hifiberry-dac";
+			i2s-controller = <&i2s_clk_consumer>;
+			status = "okay";
+		};
+	};
+};
