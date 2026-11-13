@@ -1360,12 +1360,12 @@ static bool RETRO_CALLCONV set_rumble_state(unsigned port, enum retro_rumble_eff
 }
 
 /* Teclas -> botões do controle. Painel do bartop, fios nos bornes da Picade:
- *     verde(1)   azul(2)    lilás(3)
- *     amarelo(5) laranja(6) vermelho(4)
- * No FBNeo (retropad), jogos de 6 botões como Street Fighter: socos em cima
- * (Y X L) e chutes embaixo (B A R, da esquerda para a direita). Neo Geo
- * (A B C D = 1 2 3 4, o arco do gabinete MVS) entra por perfil.
- * Nos menus, o amarelo (5) confirma e o laranja (6) volta (e Enter/Backspace
+ *     verde(2)   azul(3)    lilás(4)
+ *     amarelo(1) laranja(5) vermelho(6)
+ * Borne n = botão n do jogo, na ordem do FBNeo (retropad B A Y X L R): Neo
+ * Geo A B C D = 1 2 3 4 (amarelo e o arco de cima, como no MVS) e os jogos
+ * de 1 ou 2 botões no amarelo e no verde.
+ * Nos menus, o amarelo (1) confirma e o laranja (5) volta (e Enter/Backspace
  * de um teclado). */
 static int key_to_pad(int code, bool menu)
 {
@@ -1374,12 +1374,12 @@ static int key_to_pad(int code, bool menu)
 	case KEY_DOWN:      return BTN_DPAD_DOWN;
 	case KEY_LEFT:      return BTN_DPAD_LEFT;
 	case KEY_RIGHT:     return BTN_DPAD_RIGHT;
-	case KEY_LEFTCTRL:  return BTN_NORTH;                    /* 1 verde: Y */
-	case KEY_LEFTALT:   return BTN_WEST;                     /* 2 azul: X */
-	case KEY_SPACE:     return BTN_TL;                       /* 3 lilás: L */
-	case KEY_LEFTSHIFT: return BTN_TR;                       /* 4 vermelho: R */
-	case KEY_Z:         return menu ? BTN_EAST : BTN_SOUTH;  /* 5 amarelo: B */
-	case KEY_X:         return menu ? BTN_SOUTH : BTN_EAST;  /* 6 laranja: A */
+	case KEY_LEFTCTRL:  return menu ? BTN_EAST : BTN_SOUTH;  /* 1 amarelo: B */
+	case KEY_LEFTALT:   return menu ? BTN_NORTH : BTN_EAST;  /* 2 verde: A */
+	case KEY_SPACE:     return BTN_NORTH;                    /* 3 azul: Y */
+	case KEY_LEFTSHIFT: return BTN_WEST;                     /* 4 lilás: X */
+	case KEY_Z:         return menu ? BTN_SOUTH : BTN_TL;    /* 5 laranja: L */
+	case KEY_X:         return BTN_TR;                       /* 6 vermelho: R */
 	case KEY_1:         return BTN_START;                    /* 1P */
 	case KEY_5:         return BTN_SELECT;                   /* ficha */
 	case KEY_ESC:       return BTN_MODE;                     /* menu */
@@ -1483,7 +1483,7 @@ static void pad_event(const struct input_event *e);
 
 /* ---- controle 2 (USB) ---------------------------------------------------- *
  * Qualquer gamepad/joystick que não seja o painel. Os botões têm a mesma
- * numeração do painel (key_to_pad): 1 2 3 = Y X L, 4 = R, 5 6 = B A. */
+ * numeração do painel (key_to_pad): 1 a 6 = B A Y X L R. */
 static struct c2_dev p2 = { .fd = -1 };
 static bool pad2_state[16];
 static Uint32 p2_next_scan;
@@ -1491,9 +1491,9 @@ static Uint32 p2_next_scan;
 static const int p2_id[C2_N] = {
 		[C2_UP] = RETRO_DEVICE_ID_JOYPAD_UP, [C2_DOWN] = RETRO_DEVICE_ID_JOYPAD_DOWN,
 		[C2_LEFT] = RETRO_DEVICE_ID_JOYPAD_LEFT, [C2_RIGHT] = RETRO_DEVICE_ID_JOYPAD_RIGHT,
-		[C2_B1] = RETRO_DEVICE_ID_JOYPAD_Y, [C2_B2] = RETRO_DEVICE_ID_JOYPAD_X,
-		[C2_B3] = RETRO_DEVICE_ID_JOYPAD_L, [C2_B4] = RETRO_DEVICE_ID_JOYPAD_R,
-		[C2_B5] = RETRO_DEVICE_ID_JOYPAD_B, [C2_B6] = RETRO_DEVICE_ID_JOYPAD_A,
+		[C2_B1] = RETRO_DEVICE_ID_JOYPAD_B, [C2_B2] = RETRO_DEVICE_ID_JOYPAD_A,
+		[C2_B3] = RETRO_DEVICE_ID_JOYPAD_Y, [C2_B4] = RETRO_DEVICE_ID_JOYPAD_X,
+		[C2_B5] = RETRO_DEVICE_ID_JOYPAD_L, [C2_B6] = RETRO_DEVICE_ID_JOYPAD_R,
 		[C2_START] = RETRO_DEVICE_ID_JOYPAD_START, [C2_COIN] = RETRO_DEVICE_ID_JOYPAD_SELECT,
 };
 static int p2_last = -1; /* último aperto, para o remapeamento */
@@ -2097,7 +2097,7 @@ static int draw_hint(int right, const char *button, const char *text)
 	int y = UI_H - PAD_Y - BAR_H / 2;
 	int w = ui_text(F_BAR, text, right, y, COL_DIM, 1, 0);
 	int sp = ui_text_width(F_BAR, " ");
-	/* No painel do Arcade, A e B são o amarelo (5) e o laranja (6): a dica
+	/* No painel do Arcade, A e B são o amarelo (1) e o laranja (5): a dica
 	 * mostra a cor do botão */
 	if (pad_fd < 0 && n_key_fds > 0 && (!strcmp(button, "A") || !strcmp(button, "B"))) {
 		const int d = 14;
@@ -2451,12 +2451,12 @@ static const char *button_label(int code)
 {
 	if (pad_fd < 0 && n_key_fds > 0)
 		switch (code) {
-		case BTN_NORTH:  return "1";
-		case BTN_WEST:   return "2";
-		case BTN_TL:     return "3";
-		case BTN_TR:     return "4";
-		case BTN_SOUTH:  return "5";
-		case BTN_EAST:   return "6";
+		case BTN_SOUTH:  return "1";
+		case BTN_EAST:   return "2";
+		case BTN_NORTH:  return "3";
+		case BTN_WEST:   return "4";
+		case BTN_TL:     return "5";
+		case BTN_TR:     return "6";
 		case BTN_START:  return "1P";
 		case BTN_SELECT: return "Ficha";
 		}

@@ -7,7 +7,7 @@
  * fora BIOS, homebrew, demos, hacks, bootlegs, mahjong/quiz/cassino, versões
  * de placa repetidas e clones cujo original também está no cartão.
  *
- * Painel: amarelo (5) confirma, laranja (6) volta, preto de cima = menu.
+ * Painel: amarelo (1) confirma, laranja (5) volta, preto de cima = menu.
  *
  * Desenha na resolução da tela (medidas em 1280x800, escaladas). O jogo
  * escolhido vai para /run/pingo/next e o pingo-shell abre o pingo-retro.
@@ -51,12 +51,12 @@
 #define FONT_INTER  "/usr/share/fonts/inter/"
 #define FONT_QUICK  "/usr/share/fonts/quicksand/Quicksand.ttf"
 
-/* Cores dos botões do painel (verde 1, azul 2, ... ; os pretos: menu e 1P) */
-#define COR_AMARELO 0xF6C318  /* 5: confirmar */
-#define COR_LARANJA 0xF26A1B  /* 6: voltar */
+/* Cores dos botões do painel (amarelo 1, verde 2, ... ; os pretos: menu e 1P) */
+#define COR_AMARELO 0xF6C318  /* 1: confirmar */
+#define COR_LARANJA 0xF26A1B  /* 5: voltar */
 #define COR_PRETO   0x1A1A1A  /* menu */
-#define COR_LILAS   0xE07AB8  /* 3: próxima lista */
-#define COR_VERMELHO 0xD8232A /* 4: favorito */
+#define COR_LILAS   0xE07AB8  /* 4: próxima lista */
+#define COR_VERMELHO 0xD8232A /* 6: favorito */
 
 #define COL_BG      0x000000
 #define COL_TEXT    0xE8E8E8
@@ -657,13 +657,13 @@ static int key_action(int code)
 	case KEY_DOWN:      return A_DOWN;
 	case KEY_LEFT:      return A_LEFT;
 	case KEY_RIGHT:     return A_RIGHT;
-	case KEY_Z:         /* botão 5 (amarelo) */
+	case KEY_LEFTCTRL:  /* botão 1 (amarelo) */
 	case KEY_ENTER:     return A_OK;
 	case KEY_1:         return A_START; /* 1P: joga; no teclado da tela, OK */
-	case KEY_X:         /* botão 6 (laranja) */
+	case KEY_Z:         /* botão 5 (laranja) */
 	case KEY_BACKSPACE: return A_BACK;
-	case KEY_SPACE:     return A_LIST;  /* botão 3 (lilás) */
-	case KEY_LEFTSHIFT: return A_FAV;   /* botão 4 (vermelho) */
+	case KEY_LEFTSHIFT: return A_LIST;  /* botão 4 (lilás) */
+	case KEY_X:         return A_FAV;   /* botão 6 (vermelho) */
 	case KEY_ESC:       return A_MENU;
 	case KEY_POWER:     return A_POWER;
 	default:            return A_NONE;
@@ -836,7 +836,7 @@ static void draw_gallery(void)
 		int fav_w = g->fav ? PX(26) : 0;
 		text(s ? F_LIST_SEL : F_LIST, g->name, PX(LIST_X) + PX(22), y + PX(ROW_H) / 2,
 		     s ? COL_SEL_FG : COL_TEXT, 0, PX(LIST_W) - PX(44) - fav_w);
-		if (g->fav) /* favorito: bolinha vermelha, a cor do botão 4 */
+		if (g->fav) /* favorito: bolinha vermelha, a cor do botão 6 */
 			dot(PX(LIST_X) + PX(LIST_W) - PX(26), y + PX(ROW_H) / 2, PX(7), COR_VERMELHO);
 	}
 

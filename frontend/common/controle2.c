@@ -78,24 +78,24 @@ static void map_default(struct c2_dev *d)
 	}
 
 	if (d->vid == 0x0583 && d->pid == 0x2060) {
-		/* iBuffalo Classic (de SNES): Street Fighter do SNES, Y X L socos,
-		 * B A R chutes */
-		bind_set(&d->map[C2_B1], 'b', BTN_TOP, 0);     /* Y */
-		bind_set(&d->map[C2_B2], 'b', BTN_THUMB2, 0);  /* X */
-		bind_set(&d->map[C2_B3], 'b', BTN_TOP2, 0);    /* L */
-		bind_set(&d->map[C2_B5], 'b', BTN_THUMB, 0);   /* B */
-		bind_set(&d->map[C2_B6], 'b', BTN_TRIGGER, 0); /* A */
-		bind_set(&d->map[C2_B4], 'b', BTN_PINKIE, 0);  /* R */
+		/* iBuffalo Classic (de SNES): botões 1 a 6 = B A Y X L R, os
+		 * nomes do retropad (Neo Geo A B C D = B A Y X) */
+		bind_set(&d->map[C2_B1], 'b', BTN_THUMB, 0);   /* B */
+		bind_set(&d->map[C2_B2], 'b', BTN_TRIGGER, 0); /* A */
+		bind_set(&d->map[C2_B3], 'b', BTN_TOP, 0);     /* Y */
+		bind_set(&d->map[C2_B4], 'b', BTN_THUMB2, 0);  /* X */
+		bind_set(&d->map[C2_B5], 'b', BTN_TOP2, 0);    /* L */
+		bind_set(&d->map[C2_B6], 'b', BTN_PINKIE, 0);  /* R */
 		bind_set(&d->map[C2_COIN], 'b', BTN_BASE, 0);  /* Select */
 		bind_set(&d->map[C2_START], 'b', BTN_BASE2, 0);
 	} else if (bit(keys, BTN_SOUTH)) {
 		/* gamepad moderno (Xbox, PlayStation): a mesma ideia */
-		bind_set(&d->map[C2_B1], 'b', BTN_WEST, 0);
-		bind_set(&d->map[C2_B2], 'b', BTN_NORTH, 0);
-		bind_set(&d->map[C2_B3], 'b', BTN_TL, 0);
-		bind_set(&d->map[C2_B5], 'b', BTN_SOUTH, 0);
-		bind_set(&d->map[C2_B6], 'b', BTN_EAST, 0);
-		bind_set(&d->map[C2_B4], 'b', BTN_TR, 0);
+		bind_set(&d->map[C2_B1], 'b', BTN_SOUTH, 0);
+		bind_set(&d->map[C2_B2], 'b', BTN_EAST, 0);
+		bind_set(&d->map[C2_B3], 'b', BTN_WEST, 0);
+		bind_set(&d->map[C2_B4], 'b', BTN_NORTH, 0);
+		bind_set(&d->map[C2_B5], 'b', BTN_TL, 0);
+		bind_set(&d->map[C2_B6], 'b', BTN_TR, 0);
 		bind_set(&d->map[C2_COIN], 'b', BTN_SELECT, 0);
 		bind_set(&d->map[C2_START], 'b', BTN_START, 0);
 	} else {

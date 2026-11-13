@@ -22,7 +22,7 @@ Mesmo repositório, mesmo frontend (pingo-retro), configuração própria:
 
 | Botão do gabinete | Borne da Picade | Tecla | Função |
 |---|---|---|---|
-| 6 de ação | 1-6 | Ctrl, Alt, espaço, Shift, Z, X | soco/chute (SF), A B C D (Neo Geo) |
+| 6 de ação | 1-6 | Ctrl, Alt, espaço, Shift, Z, X | botões 1-6 do FBNeo (B A Y X L R): Neo Geo A B C D = 1 2 3 4 |
 | preto 1 | 1UP | 1 | start |
 | preto 2 | ESC | Esc | menu |
 | pequeno da frente | ¼ | 5 | ficha |
@@ -63,8 +63,9 @@ galeria (Pingo Arcade <versão> · rede <ip>).
       desligado)
 - [x] Wi-Fi com teclado na tela (pingo-wifi), hora pela internet (ntpd)
 
-Painel (fios na Picade): verde 1, azul 2, lilás 3, vermelho 4, amarelo 5,
-laranja 6; preto de cima = ESC (menu), preto de baixo = 1UP, branco da
+Painel (fios na Picade): amarelo 1, verde 2, azul 3, lilás 4, laranja 5,
+vermelho 6 (embaixo amarelo-laranja-vermelho, em cima verde-azul-lilás:
+o arco do Neo Geo é amarelo + a fileira de cima); preto de cima = ESC (menu), preto de baixo = 1UP, branco da
 frente = ficha, azul de trás = ⏻. Na galeria e nos menus: amarelo
 confirma, laranja volta, lilás troca a lista, vermelho favorita.
 `gabinete=Nanorama` em `Config/arcade.cfg` dá o nome do controle 1.
@@ -73,8 +74,10 @@ confirma, laranja volta, lilás troca a lista, vermelho favorita.
 
 - [ ] Conferir a imagem gravada em 12/11 (boot direto na galeria, Wi-Fi
       salvo conectando sozinho, hora certa) e medir o tempo de boot
-- [ ] Perfil de botões do Neo Geo (A B C D = 1 2 3 4, o arco do MVS) e
-      camada `neogeo.cfg`; "Botões" na galeria
+- [x] Borne n = botão n do jogo (Neo Geo A B C D = 1 2 3 4, jogos de 1-2
+      botões no amarelo e no verde)
+- [ ] Camada de luta de 6 botões (Capcom: socos em cima, chutes embaixo)
+      automática nos jogos de Punch/Kick; "Botões" na galeria
 - [ ] Mídia: libretro-thumbnails (capas, telas) e ScreenScraper (vídeos,
       conta do usuário no cartão)
 - [ ] Vídeo no painel da galeria; modo atração ("insira uma ficha")
