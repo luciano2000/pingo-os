@@ -76,8 +76,8 @@ confirma, laranja volta, lilás troca a lista, vermelho favorita.
       salvo conectando sozinho, hora certa) e medir o tempo de boot
 - [x] Borne n = botão n do jogo (Neo Geo A B C D = 1 2 3 4, jogos de 1-2
       botões no amarelo e no verde)
-- [ ] Camada de luta de 6 botões (Capcom: socos em cima, chutes embaixo)
-      automática nos jogos de Punch/Kick; "Botões" na galeria
+- [ ] "Botões" na galeria (os jogos de luta de 6 botões, poucos, se
+      remapeiam no menu do jogo e ficam salvos no `<jogo>.cfg`)
 - [ ] Mídia: libretro-thumbnails (capas, telas) e ScreenScraper (vídeos,
       conta do usuário no cartão)
 - [ ] Vídeo no painel da galeria; modo atração ("insira uma ficha")
