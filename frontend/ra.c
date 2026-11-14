@@ -518,6 +518,24 @@ static void set_core_clause(const char *name, const char *version)
 			*p = '_';
 }
 
+/* Tem rota para a internet? Sem Wi-Fi conectado não há rota padrão
+ * (/proc/net/route, destino 00000000): aí as conquistas nem começam, sem
+ * login, tentativas nem avisos. Não usa a rede, é na hora. */
+static bool net_up(void)
+{
+	FILE *f = fopen("/proc/net/route", "r");
+	char line[256], ifname[32];
+	unsigned long dest;
+	bool up = false;
+	if (!f)
+		return false;
+	while (!up && fgets(line, sizeof(line), f))
+		if (sscanf(line, "%31s %lx", ifname, &dest) == 2 && dest == 0 && strcmp(ifname, "lo"))
+			up = true;
+	fclose(f);
+	return up;
+}
+
 bool ra_start(const char *console_code, const char *core_name, const char *core_version)
 {
 	set_core_clause(core_name, core_version);
@@ -525,6 +543,10 @@ bool ra_start(const char *console_code, const char *core_name, const char *core_
 	console_id = console_of(console_code);
 	if (!user[0] || !token[0] || !console_id)
 		return false;
+	if (!net_up()) {
+		fprintf(stderr, "ra: sem internet, conquistas desligadas neste jogo\n");
+		return false;
+	}
 	make_client();
 	/* Hardcore: o rcheevos sabe quais cores não servem para o console e
 	 * quais opções de core são proibidas (overclock, trapaças, região PAL...) */

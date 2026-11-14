@@ -55,6 +55,7 @@
 - **CHD** (`frontend/chd_hash.c`): o leitor de CD do rcheevos só lê `.cue`/`.bin`/`.iso`; um cdreader próprio abre os `.chd` com o libchdr (pacote `libchdr`, BSD-3, estático) e repassa o resto ao leitor padrão. Setores no LBA do disco (faixa 1 no 0), pregap no arquivo só com PGTYPE `V`, faixas arredondadas a 4 quadros de 2448 bytes, áudio com os bytes trocados. Conferido no PC com 25 jogos de PC Engine CD (hash do `.chd` igual ao do `.cue`/`.bin` extraído) e no aparelho com Crash Bandicoot (PS), Sonic CD (Sega CD) e Lords of Thunder (PC Engine CD).
 
 - **Sem internet (2026-11-11):** ao sair do jogo, o `ra_stop` esperava a fila inteira; com as imagens de um jogo grande ainda baixando (FF IX: 104 conquistas) e a internet falhando, a saída travava por vários segundos. Agora as imagens que faltam são descartadas (ficam para a próxima vez) e o resto tem até 6 s. O login que falha por falta de internet (logo depois de acordar, o Wi-Fi ainda está voltando) é repetido a cada 5 s, até 12 vezes, e o jogo é carregado quando ele dá certo; conta ou token inválido avisa na hora. Testado tirando a rota padrão durante o login.
+- **Sem rede nenhuma (2026-11-14):** antes de tudo o `ra_start` olha se há rota padrão (`/proc/net/route`); sem ela (Wi-Fi desligado ou sem sinal, no metrô) as conquistas ficam desligadas naquele jogo: sem login, tentativas nem avisos. Com Wi-Fi conectado e a internet falhando, vale o esquema acima.
 
 ### Checklist
 
@@ -65,6 +66,7 @@
 - [x] Notificação com a imagem da conquista; imagens na lista (bloqueadas em preto e branco)
 - [x] Lista de conquistas no menu do jogo (ordem por pontos, caixa de descrição)
 - [ ] Hardcore: Carregar bloqueado
+- [ ] Bug (2026-11-14, no metrô, PlayStation): sem internet, Start não iniciava o jogo nos jogos com conquistas. Conferir no `ui.log` e se o sem-rota resolve
 
 ## Transições entre listas
 
