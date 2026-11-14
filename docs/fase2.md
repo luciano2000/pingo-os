@@ -142,3 +142,16 @@
 - **Ambilight:** o `pingo-retro` reduz o quadro a ~16x12, ~15 vezes por segundo, e calcula a cor de cada metade (esquerda → analógico esquerdo, direita → direito). Cor predominante, não média: peso maior para as cores saturadas; tela escura/cinza = luz fraca e neutra. O serviço `pingo-leds` suaviza as transições, roda os efeitos e fala com a serial. Fora do jogo, a cor fixa.
 - **Etapas:** (1) protocolo + teste no aparelho (quantos LEDs por analógico, ordem, lados); (2) cor fixa, presets, brilho, tela; (3) efeitos e Bateria; (4) Ambilight.
 - **Travamento do microcontrolador (resolvido, 2026-11-09):** com a Ambilight, as luzes congelavam (ou apagavam) no começo do jogo e só voltavam desligando o aparelho; nem cortar a energia pelo `rgb:kbd_backlight` destravava. O chip responde `XXH_002` a cada pacote aceito, o que permitiu ver o momento exato: o serviço mandava rajadas (um pacote a cada ~5 ms), porque cada cor do jogo acordava o laço e disparava um envio. Parado no menu, o chip aguenta as rajadas; com o jogo rodando, não. Agora: relógio fixo, no máximo um pacote a cada 40 ms; a energia das luzes nunca é desligada (apagar = cor preta); 4 pacotes sem resposta e só vai um pacote de teste a cada meio segundo. Resumo em `/run/pingo/leds.state`.
+
+## Chaves de dificuldade do Atari 2600
+
+- [ ] Opção nos jogos de Atari 2600: **Dificuldade P1** e **Dificuldade P2**,
+      cada uma A ou B (as duas chavinhas do console; B é o padrão do
+      aparelho, A costuma ser o modo difícil). Fica salva por jogo, como as
+      outras opções.
+- **Como o stella2014 faz:** não tem opção do core; as chaves mudam por
+  botão (`libretro.cxx`): L = esquerda A, L2 = esquerda B, R = direita A,
+  R2 = direita B. O `pingo-retro` pode "apertar" o botão certo por alguns
+  quadros ao abrir o jogo e ao trocar a opção (como o "Virar o disquete" do
+  FDS), sem ocupar L/R do jogador; conferir se o core lembra a posição
+  quando o botão é solto.
