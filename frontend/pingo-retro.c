@@ -2255,7 +2255,7 @@ static void draw_menu(int sel)
 	int right = UI_W - PAD_X;
 	right -= draw_hint(right, "B", S_BACK) + 22;
 	draw_hint(right, "A", S_CONFIRM);
-	osd_draw(renderer, screen_w, screen_h);
+	osd_draw(renderer, UI_W, UI_H);
 	ui_screenshot_check(renderer);
 	SDL_RenderPresent(renderer);
 }
@@ -2379,7 +2379,7 @@ static void draw_options(int sel, int top_item)
 		draw_hint(right, "◀ ▶", S_HINT_CHANGE);
 	else
 		draw_hint(right, "A", S_CONFIRM);
-	osd_draw(renderer, screen_w, screen_h);
+	osd_draw(renderer, UI_W, UI_H);
 	ui_screenshot_check(renderer);
 	SDL_RenderPresent(renderer);
 }
@@ -2505,7 +2505,7 @@ static void draw_buttons(int sel, int top_item, bool waiting)
 		right -= draw_hint(right, "B", S_BACK) + 22;
 		draw_hint(right, "A", sel < nbfunc ? S_HINT_CHANGE : S_CONFIRM);
 	}
-	osd_draw(renderer, screen_w, screen_h);
+	osd_draw(renderer, UI_W, UI_H);
 	ui_screenshot_check(renderer);
 	SDL_RenderPresent(renderer);
 }
@@ -2611,7 +2611,7 @@ static void draw_buttons_choice(int sel)
 	int right = UI_W - PAD_X;
 	right -= draw_hint(right, "B", S_BACK) + 22;
 	draw_hint(right, "A", S_CONFIRM);
-	osd_draw(renderer, screen_w, screen_h);
+	osd_draw(renderer, UI_W, UI_H);
 	ui_screenshot_check(renderer);
 	SDL_RenderPresent(renderer);
 }
@@ -2673,7 +2673,7 @@ static void draw_dips(int sel, int top_item)
 		draw_hint(right, "◀ ▶", S_HINT_CHANGE);
 	else
 		draw_hint(right, "A", S_CONFIRM);
-	osd_draw(renderer, screen_w, screen_h);
+	osd_draw(renderer, UI_W, UI_H);
 	ui_screenshot_check(renderer);
 	SDL_RenderPresent(renderer);
 }
@@ -2994,7 +2994,7 @@ static void run_cheevos(void)
 		right -= draw_hint(right, "B", S_BACK) + 22;
 		if (n > rows)
 			draw_hint(right, "◀ ▶", S_RA_PAGE);
-		osd_draw(renderer, screen_w, screen_h);
+		osd_draw(renderer, UI_W, UI_H);
 		ui_screenshot_check(renderer);
 		SDL_RenderPresent(renderer);
 	}
@@ -3470,7 +3470,7 @@ int main(int argc, char **argv)
 			ui_round_rect((UI_W - w) / 2, PAD_Y, w, BAR_H + 4, ROW_RADIUS, 0x000000);
 			ui_text(F_BAR, toast, UI_W / 2, PAD_Y + (BAR_H + 4) / 2, COL_TEXT, 2, 0);
 		}
-		osd_draw(renderer, screen_w, screen_h);
+		osd_draw(renderer, UI_W, UI_H);
 		ui_screenshot_check(renderer);
 		SDL_RenderPresent(renderer);
 

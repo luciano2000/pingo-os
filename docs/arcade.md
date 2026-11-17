@@ -14,7 +14,10 @@ Mesmo repositório, mesmo frontend (pingo-retro), configuração própria:
 - **Picade X HAT**: overlay próprio (`board/arcade/pingo-picade.dts`; o da
   Pimoroni não declara licença). Botões viram teclas (as do MAME), ⏻ manda
   KEY_POWER e o GPIO 4 corta a energia no fim do desligamento. Som: PCM5102A
-  no I2S (o nó tem que se chamar `pcm5102a-codec`).
+  no I2S (o nó tem que se chamar `pcm5102a-codec`). Ele estala quando o
+  I2S liga/desliga (entrar e sair do jogo): tudo passa por um dmix
+  (`/etc/asound.conf`) e o `S35pingo-som` deixa um `aplay` de silêncio
+  aberto, então o relógio nunca para.
 - **Tela**: a placa não sinaliza hotplug; `video=HDMI-A-1:D` no
   `cmdline.txt` força a saída. O EDID anuncia 1280×800.
 - **Energia**: fonte 12 V 5 A → placa da tela + conversor 12→5 V USB →

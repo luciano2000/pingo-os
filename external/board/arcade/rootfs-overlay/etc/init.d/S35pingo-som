@@ -1,0 +1,13 @@
+#!/bin/sh
+# Silêncio contínuo no dmix (ver /etc/asound.conf): o PCM5102A estala
+# quando o I2S liga ou desliga, então o relógio fica sempre ligado.
+case "$1" in
+	start)
+		start-stop-daemon -S -b -q -m -p /run/pingo-som.pid --exec /usr/bin/aplay -- \
+			-q -t raw -f S16_LE -r 48000 -c 2 /dev/zero
+		;;
+	stop)
+		start-stop-daemon -K -q -p /run/pingo-som.pid
+		;;
+esac
+exit 0
