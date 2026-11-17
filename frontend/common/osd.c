@@ -30,6 +30,8 @@
 static const int bright_pct[BRIGHT_STEPS + 1] = { 0, 4, 8, 14, 22, 32, 44, 58, 72, 86, 100 };
 
 static int volume = 13, bright = 6;
+static bool vol_saved;  /* sistema.cfg já tinha um volume */
+static bool hw_volume;  /* achou o controle do codec; senão o volume é por software */
 static bool menu_down, menu_combo, menu_tap;
 static enum { SHOW_NONE, SHOW_VOLUME, SHOW_BRIGHT } shown;
 static Uint32 shown_until;
@@ -52,6 +54,7 @@ static void apply_volume(void)
 	snd_mixer_selem_id_alloca(&sid);
 	snd_mixer_selem_id_set_name(sid, MIXER_CTL);
 	snd_mixer_elem_t *e = snd_mixer_find_selem(m, sid);
+	hw_volume = e != NULL;
 	if (e) {
 		long lo, hi;
 		snd_mixer_selem_get_playback_volume_range(e, &lo, &hi);
@@ -130,8 +133,10 @@ static void cfg_load(void)
 		return;
 	while (fgets(line, sizeof(line), f)) {
 		int v;
-		if (sscanf(line, "volume=%d", &v) == 1 && v >= 0 && v <= VOLUME_STEPS)
+		if (sscanf(line, "volume=%d", &v) == 1 && v >= 0 && v <= VOLUME_STEPS) {
 			volume = v;
+			vol_saved = true;
+		}
 		else if (sscanf(line, "brilho=%d", &v) == 1 && v >= 1 && v <= BRIGHT_STEPS)
 			bright = v;
 	}
@@ -156,6 +161,11 @@ void osd_init(void)
 	osd_screen(true); /* nunca começa com a tela apagada */
 	cfg_load();
 	apply_volume();
+	/* Sem controle no codec (o PCM5102A da Picade não tem) o volume é um
+	 * ganho no som que o pingo-retro entrega; começa no máximo, que é como
+	 * o som saía antes de existir o controle */
+	if (!hw_volume && !vol_saved)
+		volume = VOLUME_STEPS;
 	apply_bright();
 }
 
@@ -202,6 +212,37 @@ bool osd_key(int code, int value)
 	shown_until = SDL_GetTicks() + SHOW_MS;
 	changed = true;
 	return true;
+}
+
+bool osd_menu_held(void)
+{
+	return menu_down;
+}
+
+void osd_volume_step(int d)
+{
+	if (menu_down)
+		menu_combo = true; /* o MENU solto depois não abre o menu */
+	volume += d;
+	if (volume < 0)
+		volume = 0;
+	if (volume > VOLUME_STEPS)
+		volume = VOLUME_STEPS;
+	apply_volume();
+	shown = SHOW_VOLUME;
+	cfg_save();
+	shown_until = SDL_GetTicks() + SHOW_MS;
+	changed = true;
+}
+
+float osd_soft_gain(void)
+{
+	if (hw_volume)
+		return 1.0f;
+	if (volume <= 0)
+		return 0.0f;
+	/* 2 dB por passo: do máximo (0 dB) até -38 dB no passo 1 */
+	return powf(10.0f, -2.0f * (VOLUME_STEPS - volume) / 20.0f);
 }
 
 bool osd_menu_tapped(void)

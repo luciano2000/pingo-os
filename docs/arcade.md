@@ -68,6 +68,9 @@ vermelho 6 (embaixo amarelo-laranja-vermelho, em cima verde-azul-lilás:
 o arco do Neo Geo é amarelo + a fileira de cima); preto de cima = ESC (menu), preto de baixo = 1UP, branco da
 frente = ficha, azul de trás = ⏻. Na galeria e nos menus: amarelo
 confirma, laranja volta, lilás troca a lista, vermelho favorita.
+Volume (no jogo e no menu do jogo): segurar o MENU e dar cima/baixo no
+stick. O PCM5102A não tem controle no hardware, então é ganho no som do
+pingo-retro (2 dB por passo, 20 passos), salvo em `Config/sistema.cfg`.
 `gabinete=Nanorama` em `Config/arcade.cfg` dá o nome do controle 1.
 
 ## Próximos
@@ -76,6 +79,7 @@ confirma, laranja volta, lilás troca a lista, vermelho favorita.
       salvo conectando sozinho, hora certa) e medir o tempo de boot
 - [x] Borne n = botão n do jogo (Neo Geo A B C D = 1 2 3 4, jogos de 1-2
       botões no amarelo e no verde)
+- [ ] Volume (MENU + cima/baixo) também na galeria, quando ela tiver som
 - [ ] "Botões" na galeria (os jogos de luta de 6 botões, poucos, se
       remapeiam no menu do jogo e ficam salvos no `<jogo>.cfg`)
 - [ ] Mídia: libretro-thumbnails (capas, telas) e ScreenScraper (vídeos,

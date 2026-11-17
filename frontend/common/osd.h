@@ -21,6 +21,17 @@ void osd_init(void);
  * (BTN_MODE). Devolve true se o evento foi consumido. */
 bool osd_key(int code, int value);
 
+/* MENU está apertado (para combinações como MENU + cima/baixo) */
+bool osd_menu_held(void);
+
+/* Sobe/desce um passo do volume e mostra a sobreposição. Com o MENU
+ * apertado, conta como combinação (soltar o MENU não abre o menu). */
+void osd_volume_step(int d);
+
+/* Ganho a aplicar no som quando o codec não tem controle de volume
+ * (1.0 quando o volume é no hardware) */
+float osd_soft_gain(void);
+
 /* MENU foi solto sem ter sido usado com Vol±: é um toque de MENU de verdade */
 bool osd_menu_tapped(void);
 

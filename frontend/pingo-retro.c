@@ -1105,9 +1105,11 @@ static unsigned long audio_n;
 /* Ganho com limitador suave: abaixo de 80 % do máximo é só a multiplicação;
  * acima, a curva arredonda até o máximo em vez de cortar (sem estalo). A
  * tanhf só roda nas amostras que passam do joelho, que são raras. */
+static float mix_gain = 1.0f; /* game_gain x volume por software (osd) */
+
 static inline int16_t gain_sample(float x)
 {
-	x *= game_gain;
+	x *= mix_gain;
 	const float knee = 0.8f * 32767.0f, room = 32767.0f - knee;
 	float a = x < 0 ? -x : x;
 	if (a > knee)
@@ -1119,6 +1121,8 @@ static size_t audio_batch(const int16_t *data, size_t frames)
 {
 	static int16_t out[8192 * 2];
 	size_t o = 0;
+
+	mix_gain = game_gain * osd_soft_gain();
 
 	for (size_t i = 0; i < frames * 2; i++) {
 		int v = data[i] < 0 ? -data[i] : data[i];
@@ -1573,6 +1577,13 @@ static void poll_devices(void)
 					fprintf(stderr, "pingo-retro: botão de ligar: desligar\n");
 					power_off_requested = quit_requested = true;
 				}
+				continue;
+			}
+			/* Volume no arcade (não tem botão de volume): MENU + cima/baixo.
+			 * Só a descida (e a repetição) é engolida; a subida passa, para
+			 * não deixar direção presa se ela foi apertada antes do MENU */
+			if ((ev.code == KEY_UP || ev.code == KEY_DOWN) && ev.value != 0 && osd_menu_held()) {
+				osd_volume_step(ev.code == KEY_UP ? 1 : -1);
 				continue;
 			}
 			int menu_code = key_to_pad(ev.code, true), game_code = key_to_pad(ev.code, false);
