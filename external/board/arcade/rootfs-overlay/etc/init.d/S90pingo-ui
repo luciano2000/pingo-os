@@ -19,7 +19,7 @@ case "$1" in
 		setsid sh -c "exec /usr/bin/pingo-shell >> '$LOG' 2>&1" < /dev/null > /dev/null 2>&1 &
 		;;
 	stop)
-		killall pingo-shell pingo-launcher pingo-retro 2>/dev/null
+		killall pingo-shell pingo-launcher pingo-arcade pingo-retro 2>/dev/null
 		;;
 esac
 exit 0
