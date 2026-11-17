@@ -85,8 +85,12 @@ pingo-retro (2 dB por passo, 20 passos), salvo em `Config/sistema.cfg`.
 - [ ] Volume (MENU + cima/baixo) também na galeria, quando ela tiver som
 - [ ] "Botões" na galeria (os jogos de luta de 6 botões, poucos, se
       remapeiam no menu do jogo e ficam salvos no `<jogo>.cfg`)
-- [ ] Mídia: libretro-thumbnails (capas, telas) e ScreenScraper (vídeos,
-      conta do usuário no cartão)
+- [x] Mídia do libretro-thumbnails (FBNeo): `scripts/arcade-midia.py
+      <arcade.tsv> <lista de zips> .cache/midia` baixa snap, título e capa
+      (600 px) para `<zip>/`; depois `tar | ssh` para `Midia/` no cartão
+      (2344 de 2362 jogos, ~860 MB; faltam só BIOS). Rodar de novo só
+      baixa o que falta.
+- [ ] Vídeos do ScreenScraper (conta do usuário no cartão)
 - [ ] Vídeo no painel da galeria; modo atração ("insira uma ficha")
 - [ ] Título do jogo no menu do jogo com o nome completo (hoje "mslug")
 - [ ] RetroAchievements (o ra.c do Pingo); login pelo teclado na tela
