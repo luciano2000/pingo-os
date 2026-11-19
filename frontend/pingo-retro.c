@@ -1170,6 +1170,48 @@ static void audio_sample(int16_t left, int16_t right)
 	audio_batch(frame, 1);
 }
 
+static void audio_open(void)
+{
+	SDL_AudioSpec want = { 0 }, have;
+	want.freq = AUDIO_RATE;
+	want.format = AUDIO_S16SYS;
+	want.channels = 2;
+	want.samples = 512;
+	audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+	if (audio_dev) {
+		audio_target = AUDIO_RATE * 4 * 64 / 1000; /* ~64 ms na fila */
+		SDL_PauseAudioDevice(audio_dev, 0);
+	} else {
+		fprintf(stderr, "pingo-retro: sem som: %s\n", SDL_GetError());
+	}
+}
+
+/* Fecha o som antes de suspender: com o dispositivo aberto (mesmo pausado o
+ * SDL segue escrevendo silêncio) a escrita pode cair no meio da suspensão,
+ * o ALSA devolve EIO e o SDL desiste do dispositivo de vez: jogo mudo */
+static void audio_close(void)
+{
+	if (audio_dev)
+		SDL_CloseAudioDevice(audio_dev);
+	audio_dev = 0;
+}
+
+/* O SDL marcou o dispositivo como perdido (erro do ALSA): reabre, no
+ * máximo uma vez por segundo */
+static void audio_check(void)
+{
+	static Uint32 last;
+	if (!audio_dev || SDL_GetAudioDeviceStatus(audio_dev) != SDL_AUDIO_STOPPED)
+		return;
+	Uint32 now = SDL_GetTicks();
+	if (now - last < 1000)
+		return;
+	last = now;
+	fprintf(stderr, "pingo-retro: som caiu, reabrindo\n");
+	audio_close();
+	audio_open();
+}
+
 static void audio_pause(bool pause)
 {
 	if (!audio_dev)
@@ -2044,7 +2086,8 @@ static void clear_resume(void)
 static void do_suspend(void)
 {
 	save_for_resume();
-	audio_pause(true);
+	audio_close();
+	osd_black(renderer);
 	int rc = system("/usr/bin/pingo-suspend");
 	if (rc != -1 && WIFEXITED(rc) && WEXITSTATUS(rc) == 10) {
 		fprintf(stderr, "pingo-retro: suspenso por muito tempo ou bateria fraca: desligar\n");
@@ -2052,7 +2095,7 @@ static void do_suspend(void)
 		return;
 	}
 	clear_resume(); /* acordou: o jogo continua da RAM */
-	audio_pause(false);
+	audio_open();
 }
 
 /* ---- menu do jogo ---------------------------------------------------- */
@@ -3391,18 +3434,7 @@ int main(int argc, char **argv)
 		av.geometry.base_height, fps, core_rate, lockstep ? "1 quadro por vsync" : "acumulando",
 		rotation ? ", tela girada" : "");
 
-	SDL_AudioSpec want = { 0 }, have;
-	want.freq = AUDIO_RATE;
-	want.format = AUDIO_S16SYS;
-	want.channels = 2;
-	want.samples = 512;
-	audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-	if (audio_dev) {
-		audio_target = AUDIO_RATE * 4 * 64 / 1000; /* ~64 ms na fila */
-		SDL_PauseAudioDevice(audio_dev, 0);
-	} else {
-		fprintf(stderr, "pingo-retro: sem som: %s\n", SDL_GetError());
-	}
+	audio_open();
 
 	pad_fd = open_input(GAMEPAD_NAME);
 	stick_ranges();
@@ -3461,6 +3493,7 @@ int main(int argc, char **argv)
 			}
 		}
 		rumble_frame();
+		audio_check();
 		draw_game();
 		ambi_frame();
 		ui_logical(true); /* avisos por cima do jogo, em 640x480 */

@@ -1341,6 +1341,7 @@ static void suspend(void)
 {
 	/* pingo-suspend devolve quando o aparelho acorda; 10: ficou suspenso
 	 * tempo demais ou a bateria ficou fraca, então desliga */
+	osd_black(ui_renderer());
 	int rc = system("/usr/bin/pingo-suspend");
 	if (rc != -1 && WIFEXITED(rc) && WEXITSTATUS(rc) == 10)
 		shutdown_now();
@@ -2988,6 +2989,7 @@ int main(int argc, char **argv)
 		if (!screen_off && SDL_GetTicks() - last_input >= SCREEN_OFF_MS) {
 			screen_off = true;
 			held = -1;
+			osd_black(ui_renderer());
 			osd_screen(false);
 		}
 		if (osd_changed())

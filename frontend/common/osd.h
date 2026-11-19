@@ -42,6 +42,10 @@ bool osd_changed(void);
 /* Desenha por cima do que já está no renderer (coordenadas lógicas w x h) */
 void osd_draw(SDL_Renderer *ren, int w, int h);
 
+/* Tela preta antes de apagar a luz: sem a luz o LCD ainda mostra a
+ * imagem, bem fraca (a "sombra" do menu com a tela desligada) */
+void osd_black(SDL_Renderer *ren);
+
 /* Liga/desliga a luz da tela (proteção de tela), sem mexer no brilho */
 void osd_screen(bool on);
 

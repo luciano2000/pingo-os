@@ -108,6 +108,18 @@ static void apply_bright(void)
 	}
 }
 
+void osd_black(SDL_Renderer *ren)
+{
+	if (!ren)
+		return;
+	/* duas vezes: os dois buffers da tela ficam pretos */
+	for (int i = 0; i < 2; i++) {
+		SDL_SetRenderDrawColor(ren, 0, 0, 0, 255);
+		SDL_RenderClear(ren);
+		SDL_RenderPresent(ren);
+	}
+}
+
 void osd_screen(bool on)
 {
 	char path[300];
