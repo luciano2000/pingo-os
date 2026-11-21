@@ -11,7 +11,14 @@
 #define STBI_NO_HDR
 #define STBI_NO_LINEAR
 #include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 #pragma GCC diagnostic pop
+
+int img_save_png(const char *path, const void *rgb, int w, int h)
+{
+	return stbi_write_png(path, w, h, 3, rgb, w * 3);
+}
 
 SDL_Texture *img_load(SDL_Renderer *ren, const char *path, int gray)
 {

@@ -9,4 +9,7 @@
  * branco (conquista ainda bloqueada) */
 SDL_Texture *img_load(SDL_Renderer *ren, const char *path, int gray);
 
+/* RGB 8 bits por canal, sem espaço entre linhas; 0 se falhou */
+int img_save_png(const char *path, const void *rgb, int w, int h);
+
 #endif

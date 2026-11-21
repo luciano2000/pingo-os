@@ -78,6 +78,7 @@ O sistema somente leitura é a principal defesa contra corrupção: ele nunca é
 /Bios/
 /Saves/      ← SRAM (sempre no SD1)
 /States/     ← save states (sempre no SD1)
+/Screenshots/ ← capturas de tela do menu do jogo (sempre no SD1)
 /Ports/      ← PortMaster
 /Config/     ← configurações do sistema e de cada console
 ```

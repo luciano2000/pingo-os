@@ -2016,6 +2016,60 @@ static bool state_save(int s)
 	return ok;
 }
 
+/* Captura de tela: o quadro atual na resolução do jogo (girado como na
+ * tela), em <ROMS>/Screenshots/<nome do jogo> 001.png. Número em vez de
+ * data: o Pi do arcade não tem relógio sem rede. Devolve o número ou 0. */
+static int screenshot_save(void)
+{
+	if (!frame_buf)
+		return 0;
+	SDL_Surface *src = SDL_CreateRGBSurfaceWithFormatFrom(
+		frame_buf, frame_w, frame_h, tex_bpp * 8, frame_pitch, tex_format);
+	SDL_Surface *rgb = src ? SDL_ConvertSurfaceFormat(src, SDL_PIXELFORMAT_RGB24, 0) : NULL;
+	SDL_FreeSurface(src);
+	if (!rgb)
+		return 0;
+	int w = rgb->w, h = rgb->h, r = rotation & 3;
+	int ow = r & 1 ? h : w, oh = r & 1 ? w : h;
+	unsigned char *out = malloc((size_t)ow * oh * 3);
+	for (int y = 0; out && y < oh; y++)
+		for (int x = 0; x < ow; x++) {
+			int sx, sy; /* rotação anti-horária, como em blit_rotated */
+			switch (r) {
+			case 1:  sx = w - 1 - y; sy = x;         break;
+			case 2:  sx = w - 1 - x; sy = h - 1 - y; break;
+			case 3:  sx = y;         sy = h - 1 - x; break;
+			default: sx = x;         sy = y;         break;
+			}
+			memcpy(out + ((size_t)y * ow + x) * 3,
+			       (unsigned char *)rgb->pixels + (size_t)sy * rgb->pitch + sx * 3, 3);
+		}
+	SDL_FreeSurface(rgb);
+	if (!out)
+		return 0;
+
+	char dir[4096], path[4200];
+	snprintf(dir, sizeof(dir), "%s/Screenshots", DATA_ROOT);
+	mkdir_p(dir);
+	char name[512]; /* o FAT não aceita estes */
+	snprintf(name, sizeof(name), "%s", game_label);
+	for (char *c = name; *c; c++)
+		if (strchr("\\/:*?\"<>|", *c))
+			*c = '_';
+	int n = 0;
+	for (int i = 1; i < 1000 && !n; i++) {
+		struct stat st;
+		snprintf(path, sizeof(path), "%s/%s %03d.png", dir, name, i);
+		if (stat(path, &st) != 0)
+			n = i;
+	}
+	if (n && !img_save_png(path, out, ow, oh))
+		n = 0;
+	free(out);
+	sync();
+	return n;
+}
+
 static bool state_load(int s)
 {
 	char path[4096];
@@ -2187,8 +2241,8 @@ static void hint_slot(void)
 	ui_text(F_BAR, S_HINT_SLOT, PAD_X + w + ui_text_width(F_BAR, " "), y, COL_DIM, 0, 0);
 }
 
-enum { MI_CONTINUE, MI_SAVE, MI_LOAD, MI_OPTIONS, MI_CHEEVOS, MI_DISC, MI_FLIP, MI_QUIT };
-static int menu_ids[8], menu_n;
+enum { MI_CONTINUE, MI_SAVE, MI_LOAD, MI_OPTIONS, MI_SHOT, MI_CHEEVOS, MI_DISC, MI_FLIP, MI_QUIT };
+static int menu_ids[9], menu_n;
 
 static void menu_build(void)
 {
@@ -2197,6 +2251,7 @@ static void menu_build(void)
 	menu_ids[menu_n++] = MI_SAVE;
 	menu_ids[menu_n++] = MI_LOAD;
 	menu_ids[menu_n++] = MI_OPTIONS;
+	menu_ids[menu_n++] = MI_SHOT;
 	if (ra_active())
 		menu_ids[menu_n++] = MI_CHEEVOS;
 	if (disc_count() > 1)
@@ -2213,6 +2268,7 @@ static const char *menu_label(int id, char *buf, size_t n)
 	case MI_SAVE:     return S_M_SAVE;
 	case MI_LOAD:     return S_M_LOAD;
 	case MI_OPTIONS:  return S_M_OPTIONS;
+	case MI_SHOT:     return S_M_SHOT;
 	case MI_CHEEVOS:  return S_M_CHEEVOS;
 	case MI_DISC:
 		snprintf(buf, n, S_M_DISC, disc_index() + 1, disc_count());
@@ -3105,6 +3161,14 @@ static bool run_menu(void)
 			if (id == MI_OPTIONS) {
 				if (!run_options())
 					break;
+				continue;
+			}
+			if (id == MI_SHOT) {
+				int n = screenshot_save();
+				if (n)
+					show_toast(S_SHOT_SAVED, n);
+				else
+					show_toast(S_SHOT_FAILED);
 				continue;
 			}
 			if (id == MI_CHEEVOS) {

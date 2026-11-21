@@ -26,7 +26,7 @@ CURL_CFLAGS = $(shell $(PKG_CONFIG) --cflags libcurl)
 CURL_LIBS = $(shell $(PKG_CONFIG) --libs libcurl)
 endif
 
-pingo-retro: pingo-retro.c ra.c ra.h chd_hash.c chd_hash.h common/imagem.c common/imagem.h include/libretro.h include/stb_image.h $(COMMON_SRC) $(COMMON_HDR)
+pingo-retro: pingo-retro.c ra.c ra.h chd_hash.c chd_hash.h common/imagem.c common/imagem.h include/libretro.h include/stb_image.h include/stb_image_write.h $(COMMON_SRC) $(COMMON_HDR)
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(ZIP_CFLAGS) $(RC_CFLAGS) $(CURL_CFLAGS) $(LDFLAGS) \
 		-o $@ pingo-retro.c ra.c chd_hash.c common/imagem.c $(COMMON_SRC) $(RC_LIBS) $(CURL_LIBS) \
 		$(TTF_LIBS) $(SDL_LIBS) $(ALSA_LIBS) $(ZIP_LIBS) -ldl -lm
@@ -36,7 +36,7 @@ pingo-launcher: $(LAUNCHER_SRC) $(LAUNCHER_HDR) $(COMMON_SRC) $(COMMON_HDR)
 		$(TTF_LIBS) $(SDL_LIBS) $(ALSA_LIBS) -lm
 
 # Galeria do Pingo Arcade (bartop): só SDL2, SDL2_ttf e o leitor de PNG
-pingo-arcade: arcade/main.c common/imagem.c common/imagem.h common/controle2.c common/controle2.h common/fbcopy.c common/fbcopy.h include/stb_image.h
+pingo-arcade: arcade/main.c common/imagem.c common/imagem.h common/controle2.c common/controle2.h common/fbcopy.c common/fbcopy.h include/stb_image.h include/stb_image_write.h
 	$(CC) $(CFLAGS) $(SDL_CFLAGS) $(LDFLAGS) -o $@ arcade/main.c common/imagem.c common/controle2.c common/fbcopy.c \
 		$(TTF_LIBS) $(SDL_LIBS) -lm
 
