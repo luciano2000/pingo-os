@@ -42,8 +42,10 @@ struct c2_dev {
 	bool saved; /* o mapa veio de um arquivo */
 };
 
-/* Procura um controle; true se achou (e carregou o mapa) */
-bool c2_open(struct c2_dev *d);
+/* Procura um controle; true se achou (e carregou o mapa). skip_fd: o
+ * dispositivo do player 1, que não pode virar também o 2 (o controle
+ * embutido dos portáteis); -1 se não há */
+bool c2_open(struct c2_dev *d, int skip_fd);
 void c2_close(struct c2_dev *d);
 
 /* Lê os eventos; cb(função, apertado) a cada mudança. false se o controle

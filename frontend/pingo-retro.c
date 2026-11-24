@@ -1568,7 +1568,7 @@ static void p2_poll(void)
 		if (SDL_GetTicks() < p2_next_scan)
 			return;
 		p2_next_scan = SDL_GetTicks() + 2000;
-		if (c2_open(&p2))
+		if (c2_open(&p2, pad_fd))
 			fprintf(stderr, "pingo-retro: controle 2: %s (%04x:%04x, mapa %s)\n", p2.name,
 				p2.vid, p2.pid, p2.saved ? "salvo" : "padrão");
 		return;

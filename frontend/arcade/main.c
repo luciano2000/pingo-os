@@ -981,7 +981,7 @@ static Uint32 p2_ignore_until, p2_done_at;
 static void pad2_start(void)
 {
 	if (p2.fd < 0)
-		c2_open(&p2);
+		c2_open(&p2, -1);
 	p2_step = 0;
 	p2_done_at = 0;
 	p2_ignore_until = SDL_GetTicks() + 300;
@@ -993,7 +993,7 @@ static bool pad2_frame(int a)
 	Uint32 now = SDL_GetTicks();
 	if (p2.fd < 0) {
 		if (now >= p2_ignore_until) { /* procura de novo (plugado agora) */
-			c2_open(&p2);
+			c2_open(&p2, -1);
 			p2_ignore_until = now + 1000;
 		}
 		return a == A_BACK || a == A_MENU;

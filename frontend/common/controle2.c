@@ -183,11 +183,13 @@ bool c2_save(struct c2_dev *d)
 	return true;
 }
 
-bool c2_open(struct c2_dev *d)
+bool c2_open(struct c2_dev *d, int skip_fd)
 {
 	DIR *dir = opendir("/dev/input");
 	struct dirent *e;
 	char path[300];
+	struct stat skip_st;
+	bool skip = skip_fd >= 0 && fstat(skip_fd, &skip_st) == 0;
 	if (!dir)
 		return false;
 	d->fd = -1;
@@ -198,7 +200,9 @@ bool c2_open(struct c2_dev *d)
 		int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 		if (fd < 0)
 			continue;
-		if (!is_pad(fd)) {
+		struct stat st;
+		if (!is_pad(fd) ||
+		    (skip && fstat(fd, &st) == 0 && st.st_rdev == skip_st.st_rdev)) {
 			close(fd);
 			continue;
 		}
