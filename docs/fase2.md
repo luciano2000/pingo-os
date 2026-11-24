@@ -147,13 +147,31 @@
 
 ## Chaves de dificuldade do Atari 2600
 
-- [ ] Opção nos jogos de Atari 2600: **Dificuldade P1** e **Dificuldade P2**,
-      cada uma A ou B (as duas chavinhas do console; B é o padrão do
-      aparelho, A costuma ser o modo difícil). Fica salva por jogo, como as
-      outras opções.
-- **Como o stella2014 faz:** não tem opção do core; as chaves mudam por
-  botão (`libretro.cxx`): L = esquerda A, L2 = esquerda B, R = direita A,
-  R2 = direita B. O `pingo-retro` pode "apertar" o botão certo por alguns
-  quadros ao abrir o jogo e ao trocar a opção (como o "Virar o disquete" do
-  FDS), sem ocupar L/R do jogador; conferir se o core lembra a posição
-  quando o botão é solto.
+- [x] São botões, como no stella2014: L1 = Dificuldade P1: A, L2 = P1: B,
+      R1/R2 = P2: A/B, L3 = Cor, R3 = Preto e branco, Start = Reset. O core
+      guarda a posição (como a chavinha); ela vai junto nos save states.
+      Testado no Breakout (na A a raquete fica com metade do tamanho).
+- Primeiro foi feita uma opção no menu (Dificuldade P1/P2: Do jogo, A, B),
+  retirada a pedido: duplicava os botões e confundia.
+
+## Nomes dos botões
+
+- [x] A tela de botões mostra os botões do controle de verdade de cada
+      console, com os nomes dele (`pad_names` no `pingo-retro.c`): NES A/B,
+      SNES ABXY LR, Mega Drive A B C X Y Z Mode, Master System 1 2 Pause,
+      PC Engine I II Run, PlayStation Xis/Bola/Quadrado/Triângulo... O core
+      às vezes manda os nomes de outra plataforma (o Genesis Plus GX dá A/B/C
+      ao Master System), por isso a tabela.
+- Arcade e Neo Geo: os nomes vêm de cada jogo (FBNeo) e os comuns são
+  traduzidos ("Weak Punch" → "Soco fraco", "Coin" → "Ficha").
+- Linhas do P2 (as chaves de dificuldade do Atari) só com o controle 2.
+
+## Controle 2 nos portáteis
+
+- O controle embutido é sempre o controle 1 e nunca vira o 2 (antes virava
+  os dois: no Raiden, o Start do P2 entrava e as duas naves andavam juntas).
+- **Engasgos (2026-11-24):** abrir um dispositivo de entrada custa 13-25 ms
+  neste kernel (medido: power, fone, volume e controle). Sem controle 2, a
+  procura a cada 2 s abria todos e o jogo perdia ~4 quadros (58,5 fps em
+  vez de 60). Agora só procura quando muda algo em `/dev/input`, e nunca
+  abre o do player 1. Medido depois: um jogo de cada console a 60,0 fps.

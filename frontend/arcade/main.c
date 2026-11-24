@@ -1583,6 +1583,10 @@ int main(int argc, char **argv)
 		SDL_Delay(300);
 		return 0; /* a imagem fica no fb0 até desligar */
 	}
+	/* já na tela (e não um buffer ainda não desenhado, com restos do jogo
+	 * que acabou de fechar) enquanto a lista e as imagens carregam */
+	message_screen("Carregando…");
+	message_screen("Carregando…");
 	logo = img_load(ren, SHARE "/logo-horizontal.png", 0);
 	coin = img_load(ren, SHARE "/moeda.png", 0);
 	open_keyboards();

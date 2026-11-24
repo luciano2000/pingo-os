@@ -1564,10 +1564,19 @@ static void p2_event(int func, bool down)
 static void p2_poll(void)
 {
 	if (p2.fd < 0) {
-		/* procura um controle de vez em quando (plugado com o jogo aberto) */
+		/* procura um controle de vez em quando (plugado com o jogo aberto),
+		 * mas só se apareceu algo novo em /dev/input: abrir os
+		 * dispositivos a cada 2 s fazia o jogo engasgar */
+		static struct timespec seen = { -1, 0 };
+		struct stat st;
 		if (SDL_GetTicks() < p2_next_scan)
 			return;
 		p2_next_scan = SDL_GetTicks() + 2000;
+		if (stat("/dev/input", &st) == 0) {
+			if (st.st_mtim.tv_sec == seen.tv_sec && st.st_mtim.tv_nsec == seen.tv_nsec)
+				return;
+			seen = st.st_mtim;
+		}
 		if (c2_open(&p2, pad_fd))
 			fprintf(stderr, "pingo-retro: controle 2: %s (%04x:%04x, mapa %s)\n", p2.name,
 				p2.vid, p2.pid, p2.saved ? "salvo" : "padrão");
@@ -2528,6 +2537,130 @@ static bool was_pressed(int code)
 	return false;
 }
 
+/* Tela de botões: os nomes do controle de verdade de cada console, na
+ * ordem do controle (o core às vezes manda os de outra plataforma: o
+ * Genesis Plus GX dá A/B/C também ao Master System). p2: só com o
+ * controle 2 plugado (as chaves do P2 do Atari ficam no controle 1). */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#define J(x) RETRO_DEVICE_ID_JOYPAD_##x
+struct pad_name { int id; const char *pt, *en; bool p2; };
+static const struct pad_name pn_nes[] = {
+	{ J(A), "A" }, { J(B), "B" }, { J(X), "A turbo", "Turbo A" }, { J(Y), "B turbo", "Turbo B" },
+	{ J(SELECT), "Select" }, { J(START), "Start" }, { -1 } };
+static const struct pad_name pn_fds[] = {
+	{ J(A), "A" }, { J(B), "B" }, { J(SELECT), "Select" }, { J(START), "Start" }, { -1 } };
+static const struct pad_name pn_snes[] = {
+	{ J(A), "A" }, { J(B), "B" }, { J(X), "X" }, { J(Y), "Y" }, { J(L), "L" }, { J(R), "R" },
+	{ J(SELECT), "Select" }, { J(START), "Start" }, { -1 } };
+static const struct pad_name pn_gb[] = {
+	{ J(A), "A" }, { J(B), "B" }, { J(X), "A turbo", "Turbo A" }, { J(Y), "B turbo", "Turbo B" },
+	{ J(SELECT), "Select" }, { J(START), "Start" }, { -1 } };
+static const struct pad_name pn_gba[] = {
+	{ J(A), "A" }, { J(B), "B" }, { J(L), "L" }, { J(R), "R" },
+	{ J(X), "A turbo", "Turbo A" }, { J(Y), "B turbo", "Turbo B" },
+	{ J(SELECT), "Select" }, { J(START), "Start" }, { -1 } };
+static const struct pad_name pn_md[] = { /* 6 botões: A B C embaixo, X Y Z em cima */
+	{ J(Y), "A" }, { J(B), "B" }, { J(A), "C" }, { J(L), "X" }, { J(X), "Y" }, { J(R), "Z" },
+	{ J(START), "Start" }, { J(SELECT), "Mode" }, { -1 } };
+static const struct pad_name pn_ms[] = {
+	{ J(B), "1" }, { J(A), "2" }, { J(START), "Pause" }, { -1 } };
+static const struct pad_name pn_gg[] = {
+	{ J(B), "1" }, { J(A), "2" }, { J(START), "Start" }, { -1 } };
+static const struct pad_name pn_pce[] = {
+	{ J(A), "I" }, { J(B), "II" }, { J(SELECT), "Select" }, { J(START), "Run" }, { -1 } };
+static const struct pad_name pn_vb[] = {
+	{ J(A), "A" }, { J(B), "B" }, { J(L), "L" }, { J(R), "R" },
+	{ J(L2), "Direcional direito ↑", "Right D-Pad ↑" }, { J(L3), "Direcional direito ↓", "Right D-Pad ↓" },
+	{ J(R2), "Direcional direito ←", "Right D-Pad ←" }, { J(R3), "Direcional direito →", "Right D-Pad →" },
+	{ J(SELECT), "Select" }, { J(START), "Start" }, { -1 } };
+static const struct pad_name pn_pokemini[] = {
+	{ J(A), "A" }, { J(B), "B" }, { J(R), "C" }, { J(L), "Sacudir", "Shake" },
+	{ J(SELECT), "Liga/desliga", "Power" }, { -1 } };
+static const struct pad_name pn_ngp[] = { /* o core troca os nomes: o "A" é o id B */
+	{ J(B), "A" }, { J(A), "B" }, { J(START), "Option" }, { -1 } };
+static const struct pad_name pn_ws[] = {
+	{ J(A), "A" }, { J(B), "B" }, { J(START), "Start" },
+	{ J(R2), "Y1 (↑)" }, { J(R), "Y2 (→)" }, { J(L2), "Y3 (↓)" }, { J(L), "Y4 (←)" },
+	{ J(SELECT), "Girar a tela", "Rotate screen" }, { -1 } };
+static const struct pad_name pn_msx[] = {
+	{ J(A), "Botão 1", "Button 1" }, { J(B), "Botão 2", "Button 2" }, { -1 } };
+static const struct pad_name pn_a2600[] = {
+	{ J(B), "Botão", "Button" },
+	{ J(L), "Dificuldade P1: A", "P1 Difficulty: A" }, { J(L2), "Dificuldade P1: B", "P1 Difficulty: B" },
+	{ J(R), "Dificuldade P2: A", "P2 Difficulty: A", true },
+	{ J(R2), "Dificuldade P2: B", "P2 Difficulty: B", true },
+	{ J(L3), "Cor", "Color" }, { J(R3), "Preto e branco", "Black and white" },
+	{ J(SELECT), "Select" }, { J(START), "Reset" }, { -1 } };
+static const struct pad_name pn_a7800[] = {
+	{ J(B), "1" }, { J(A), "2" },
+	{ J(L), "Dificuldade P1", "P1 Difficulty" }, { J(R), "Dificuldade P2", "P2 Difficulty", true },
+	{ J(SELECT), "Select" }, { J(START), "Pause" }, { J(X), "Reset" }, { -1 } };
+static const struct pad_name pn_lynx[] = {
+	{ J(A), "A" }, { J(B), "B" }, { J(L), "Option 1" }, { J(R), "Option 2" },
+	{ J(START), "Pause" }, { J(SELECT), "Girar a tela", "Rotate screen" }, { -1 } };
+static const struct pad_name pn_ps[] = {
+	{ J(B), "Xis", "Cross" }, { J(A), "Bola", "Circle" },
+	{ J(Y), "Quadrado", "Square" }, { J(X), "Triângulo", "Triangle" },
+	{ J(L), "L1" }, { J(R), "R1" }, { J(L2), "L2" }, { J(R2), "R2" }, { J(L3), "L3" }, { J(R3), "R3" },
+	{ J(SELECT), "Select" }, { J(START), "Start" }, { -1 } };
+#undef J
+#pragma GCC diagnostic pop
+static const struct { const char *code; const struct pad_name *n; } pad_names[] = {
+	{ "NES", pn_nes }, { "FDS", pn_fds }, { "SNES", pn_snes }, { "GB", pn_gb }, { "GBC", pn_gb },
+	{ "GBA", pn_gba }, { "MD", pn_md }, { "SEGACD", pn_md }, { "32X", pn_md }, { "MS", pn_ms },
+	{ "GG", pn_gg }, { "PCE", pn_pce }, { "PCECD", pn_pce }, { "VB", pn_vb },
+	{ "POKEMINI", pn_pokemini }, { "NGP", pn_ngp }, { "WS", pn_ws }, { "MSX", pn_msx },
+	{ "A2600", pn_a2600 }, { "A7800", pn_a7800 }, { "LYNX", pn_lynx }, { "PS", pn_ps },
+};
+
+static const struct pad_name *pad_names_for_console(void)
+{
+	for (size_t i = 0; i < sizeof(pad_names) / sizeof(*pad_names); i++)
+		if (!strcmp(pad_names[i].code, console_code))
+			return pad_names[i].n;
+	return NULL;
+}
+
+/* Arcade (FBNeo): os nomes vêm do jogo ("P1 Weak Punch"); os comuns em
+ * português, o resto como vem */
+static const char *const fbneo_words[][2] = {
+	{ "Coin", "Ficha" }, { "Start", "Start" }, { "Select", "Select" },
+	{ "Fire", "Tiro" }, { "Shot", "Tiro" }, { "Shoot", "Tiro" }, { "Bomb", "Bomba" },
+	{ "Jump", "Pular" }, { "Attack", "Ataque" }, { "Special", "Especial" },
+	{ "Punch", "Soco" }, { "Kick", "Chute" },
+	{ "Weak Punch", "Soco fraco" }, { "Medium Punch", "Soco médio" }, { "Strong Punch", "Soco forte" },
+	{ "Weak Kick", "Chute fraco" }, { "Medium Kick", "Chute médio" }, { "Strong Kick", "Chute forte" },
+	{ "Light Punch", "Soco fraco" }, { "Heavy Punch", "Soco forte" },
+	{ "Light Kick", "Chute fraco" }, { "Heavy Kick", "Chute forte" },
+	{ "Buttons 3x Punch", "3 socos" }, { "Buttons 3x Kick", "3 chutes" },
+	{ "Brake", "Freio" }, { "Accelerate", "Acelerar" }, { "Gear", "Marcha" },
+	{ "Rotate Left", "Girar ←" }, { "Rotate Right", "Girar →" },
+	{ "Service", "Serviço" }, { "Test", "Teste" }, { "Reset", "Reset" },
+};
+
+static const char *fbneo_name(const char *d, char *buf, size_t n)
+{
+	if (d[0] == 'P' && d[1] >= '1' && d[1] <= '6' && d[2] == ' ')
+		d += 3; /* "P1 " */
+	if (!lang_is_pt())
+		return d;
+	for (size_t i = 0; i < sizeof(fbneo_words) / sizeof(*fbneo_words); i++)
+		if (!strcasecmp(fbneo_words[i][0], d))
+			return fbneo_words[i][1];
+	/* "Button 1", "Fire 2", "Button A", "Buttons AB" */
+	static const char *const pre[][2] = { { "Buttons ", "Botões " }, { "Button ", "Botão " },
+					      { "Fire ", "Tiro " }, { "Shot ", "Tiro " } };
+	for (size_t i = 0; i < sizeof(pre) / sizeof(*pre); i++) {
+		size_t l = strlen(pre[i][0]);
+		if (!strncasecmp(d, pre[i][0], l)) {
+			snprintf(buf, n, "%s%s", pre[i][1], d + l);
+			return buf;
+		}
+	}
+	return d;
+}
+
 /* Funções que aparecem na tela de botões: as que o core nomeou (menos o
  * direcional); sem nomes, os botões do layout padrão */
 static int bfunc[16], nbfunc;
@@ -2540,10 +2673,17 @@ static void buttons_build(void)
 		RETRO_DEVICE_ID_JOYPAD_L2, RETRO_DEVICE_ID_JOYPAD_R2, RETRO_DEVICE_ID_JOYPAD_L3,
 		RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START,
 	};
+	const struct pad_name *t = pad_names_for_console();
+	nbfunc = 0;
+	if (t) {
+		for (; t->id >= 0; t++)
+			if (!t->p2 || p2.fd >= 0)
+				bfunc[nbfunc++] = t->id;
+		return;
+	}
 	bool named = false;
 	for (int f = 0; f < 16; f++)
 		named |= desc_name[f] != NULL;
-	nbfunc = 0;
 	for (unsigned i = 0; i < sizeof(order) / sizeof(order[0]); i++)
 		if (!named || desc_name[order[i]])
 			bfunc[nbfunc++] = order[i];
@@ -2553,7 +2693,16 @@ static const char *func_name(int f)
 {
 	static const char *def[16] = { "B", "Y", "Select", "Start", "↑", "↓", "←", "→",
 				       "A", "X", "L1", "R1", "L2", "R2", "L3", "R3" };
-	return desc_name[f] ? desc_name[f] : def[f];
+	static char buf[16][96];
+	const struct pad_name *t = pad_names_for_console();
+	for (; t && t->id >= 0; t++)
+		if (t->id == f)
+			return lang_is_pt() || !t->en ? t->pt : t->en;
+	if (!desc_name[f])
+		return def[f];
+	if (!strcmp(console_code, "ARCADE") || !strcmp(console_code, "NEOGEO"))
+		return fbneo_name(desc_name[f], buf[f], sizeof(buf[f]));
+	return desc_name[f];
 }
 
 /* Nome do botão para a tela: no painel do Arcade, a numeração dos bornes */
@@ -3364,6 +3513,26 @@ static void names_from_path(const char *rom, const char *code)
 	}
 }
 
+/* Arcade (FBNeo): o nome do jogo pelo DAT, como no launcher e na galeria
+ * ("Metal Slug" em vez de "mslug") */
+static void arcade_label(void)
+{
+	FILE *f = fopen("/usr/share/pingo/arcade/fbneo.tsv", "r");
+	char line[1024];
+	size_t n = strlen(game_base);
+	if (!f)
+		return;
+	while (fgets(line, sizeof(line), f))
+		if (!strncmp(line, game_base, n) && line[n] == '\t') {
+			char *d = line + n + 1, *t = strchr(d, '\t');
+			if (t)
+				*t = 0;
+			clean_label(d, game_label, sizeof(game_label));
+			break;
+		}
+	fclose(f);
+}
+
 int main(int argc, char **argv)
 {
 	struct retro_system_info sysinfo = { 0 };
@@ -3386,6 +3555,8 @@ int main(int argc, char **argv)
 	lang_load();
 	ui_screenshot_init();
 	names_from_path(argv[2], argc > 3 ? argv[3] : NULL);
+	if (strstr(argv[1], "fbneo"))
+		arcade_label();
 	ambi_init();
 	bool resume = argc > 4 && !strcmp(argv[4], "resume");
 	snprintf(resume_core, sizeof(resume_core), "%s", argv[1]);
@@ -3523,7 +3694,7 @@ int main(int argc, char **argv)
 		clear_resume(); /* um só retorno: se travar, não entra em laço */
 	}
 
-	Uint32 t0 = SDL_GetTicks(), frames = 0, last_sram = SDL_GetTicks();
+	Uint32 t0 = SDL_GetTicks(), frames = 0, last_sram = SDL_GetTicks(), last_bat = 0;
 	bool low_battery_warned = false;
 	double acc = 0;
 	while (!quit_requested) {
@@ -3584,6 +3755,10 @@ int main(int argc, char **argv)
 		if (now - last_sram >= 5000) { /* SRAM: grava sozinha quando muda */
 			sram_save();
 			last_sram = now;
+		}
+		/* bateria: a cada minuto (no fim ela cai ~1 %/min: dá tempo de salvar) */
+		if (now - last_bat >= 60000) {
+			last_bat = now;
 			bool chg;
 			int bat = battery_percent(&chg);
 			if (!chg && bat >= 0 && bat <= 3) {
@@ -3632,6 +3807,18 @@ int main(int argc, char **argv)
 		ui_logical(true);
 		ui_text(F_BIG, "Carregando…", UI_W / 2, UI_H / 2, COL_TEXT, 2, 0);
 		fb_copy_from(renderer);
+		/* e na tela também, nos dois buffers: senão o último quadro do jogo
+		 * fica nela, e a galeria abre com restos dele (cores trocadas) */
+		for (int i = 0; i < 2; i++) {
+			if (i) {
+				ui_logical(false);
+				SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+				SDL_RenderClear(renderer);
+				ui_logical(true);
+				ui_text(F_BIG, "Carregando…", UI_W / 2, UI_H / 2, COL_TEXT, 2, 0);
+			}
+			SDL_RenderPresent(renderer);
+		}
 	} else {
 		fb_clear();
 	}

@@ -90,11 +90,15 @@ pingo-retro (2 dB por passo, 20 passos), salvo em `Config/sistema.cfg`.
       (600 px) para `<zip>/`; depois `tar | ssh` para `Midia/` no cartão
       (2344 de 2362 jogos, ~860 MB; faltam só BIOS). Rodar de novo só
       baixa o que falta.
-- [ ] Vídeos do ScreenScraper (conta do usuário no cartão)
+- [ ] Vídeos do ScreenScraper (conta do usuário no cartão). Só no arcade:
+      os portáteis não vão ter vídeos
 - [ ] Vídeo no painel da galeria; modo atração ("insira uma ficha")
-- [ ] Título do jogo no menu do jogo com o nome completo (hoje "mslug")
+- [x] Título do jogo no menu do jogo com o nome completo (`fbneo.tsv`,
+      também nos portáteis e no nome das capturas de tela)
 - [ ] RetroAchievements (o ra.c do Pingo); login pelo teclado na tela
 - [ ] Tela de boot com o logo vertical
-- [ ] Pequeno glitch de cor ao sair do jogo (quadro do jogo na troca)
+- [ ] Pequeno glitch de cor ao sair do jogo (quadro do jogo na troca):
+      corrigido no código (o jogo mostra "Carregando…" na tela antes de
+      fechar e a galeria também, ao abrir); falta conferir na Pi
 - [ ] Depois: micro arcade vertical na Pi Zero W (tela SPI 3,2" 320×240,
       clone com ILI9341 + XPT2046)

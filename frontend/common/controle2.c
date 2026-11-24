@@ -197,12 +197,15 @@ bool c2_open(struct c2_dev *d, int skip_fd)
 		if (strncmp(e->d_name, "event", 5))
 			continue;
 		snprintf(path, sizeof(path), "/dev/input/%s", e->d_name);
+		struct stat st;
+		/* o do player 1 nem é aberto: abrir o controle embutido dos
+		 * portáteis trava o driver por alguns quadros */
+		if (skip && stat(path, &st) == 0 && st.st_rdev == skip_st.st_rdev)
+			continue;
 		int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
 		if (fd < 0)
 			continue;
-		struct stat st;
-		if (!is_pad(fd) ||
-		    (skip && fstat(fd, &st) == 0 && st.st_rdev == skip_st.st_rdev)) {
+		if (!is_pad(fd)) {
 			close(fd);
 			continue;
 		}
